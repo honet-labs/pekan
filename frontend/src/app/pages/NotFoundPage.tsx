@@ -70,7 +70,7 @@ export default function NotFoundPage() {
       </div>
       
       <p style={{ marginTop: "2rem", fontSize: "0.85rem", opacity: 0.4 }}>
-        PEKAN saja &bull; Error Code: 404_NOT_FOUND
+        PEKAN &bull; Error Code: 404_NOT_FOUND
       </p>
     </div>
   );
