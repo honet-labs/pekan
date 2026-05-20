@@ -11,8 +11,9 @@ import {
   adminResetUserPassword, adminUpdateUserEmail, adminUpdateUserPhone,
   listTenantBackups, createTenantBackup, restoreTenantBackup, downloadTenantBackupBlob,
   getWhatsAppQueueStats, getWhatsAppQueueHistory, retryWhatsAppQueueMessage,
+  checkUpdate, applyUpdate, getUpdateStatus,
   TenantListItem, AuditLog, GrowthStats, TenantModule, ServerStatus, BackupFile, DatabaseTable, DatabaseGrowthPoint, QueryResult, TenantUser,
-  WhatsAppQueueStats, WhatsAppQueueItem
+  WhatsAppQueueStats, WhatsAppQueueItem, UpdateStatusInfo, UpdateProgress
 } from "../api/admin.api";
 
 import { useToast } from "../../../../core/hooks/useToast";
@@ -25,7 +26,7 @@ import { BackToTop } from "../../../../core/components/BackToTop";
 import { PasswordInput } from "../../../../core/components/PasswordInput";
 import { PageHeader } from "../../../../core/components/PageHeader";
 
-type Tab = "dashboard" | "tenants" | "add_tenant" | "stats" | "server" | "logs" | "notifications" | "ai" | "database" | "backups" | "storage" | "optimization" | "dbtool" | "whatsapp";
+type Tab = "dashboard" | "tenants" | "add_tenant" | "stats" | "server" | "logs" | "notifications" | "ai" | "database" | "backups" | "storage" | "optimization" | "dbtool" | "whatsapp" | "updates";
 
 const DEFAULT_WA_BOT_SYSTEM_PROMPT = `Anda adalah Asisten AI PEKAN, perencana keuangan pribadi yang profesional, ringkas, dan sangat membantu.
 Tugas Anda adalah membalas pesan pengguna WhatsApp secara interaktif. Pengguna sudah login/terverifikasi.
@@ -101,6 +102,14 @@ export function AdminDashboardPage(): JSX.Element {
   const [waEndDate, setWaEndDate] = useState("");
   const [waAutoRefresh, setWaAutoRefresh] = useState("off"); // "off" | "1m" | "5m"
   const waRefreshTimer = useRef<any>(null);
+
+  // System Update States
+  const [updateInfo, setUpdateInfo] = useState<UpdateStatusInfo | null>(null);
+  const [updateProgress, setUpdateProgress] = useState<UpdateProgress | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [applyingUpdate, setApplyingUpdate] = useState(false);
+  const updatePollTimer = useRef<any>(null);
+  const terminalLogEndRef = useRef<HTMLDivElement>(null);
 
   const [form, setForm] = useState({
     tenant_code: "",
@@ -356,10 +365,18 @@ export function AdminDashboardPage(): JSX.Element {
       if (activeTab === "whatsapp") {
         loadWhatsAppQueueStats();
       }
+      if (activeTab === "updates") {
+        handleCheckUpdate();
+        pollUpdateStatus();
+        updatePollTimer.current = setInterval(pollUpdateStatus, 2500);
+      } else {
+        if (updatePollTimer.current) clearInterval(updatePollTimer.current);
+      }
 
     }
     return () => {
       if (refreshInterval.current) clearInterval(refreshInterval.current);
+      if (updatePollTimer.current) clearInterval(updatePollTimer.current);
     };
   }, [isLoggedIn, activeTab]);
 
@@ -885,6 +902,53 @@ export function AdminDashboardPage(): JSX.Element {
       }
     }
   }, [activeTab, stats]);
+
+  const handleCheckUpdate = async () => {
+    setCheckingUpdate(true);
+    try {
+      const data = await checkUpdate();
+      setUpdateInfo(data);
+      success("Status update berhasil diperiksa.");
+    } catch (err) {
+      error(`Gagal memeriksa update: ${err instanceof Error ? err.message : "Error"}`);
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
+
+  const pollUpdateStatus = async () => {
+    try {
+      const data = await getUpdateStatus();
+      setUpdateProgress(data);
+      if (data.status === "running") {
+        setApplyingUpdate(true);
+      } else {
+        setApplyingUpdate(false);
+      }
+      
+      // Auto-scroll terminal log to bottom
+      if (terminalLogEndRef.current) {
+        terminalLogEndRef.current.scrollIntoView({ behavior: "smooth" });
+      }
+    } catch (err) {
+      // Ignore background poll errors
+    }
+  };
+
+  const handleApplyUpdate = async () => {
+    if (!window.confirm("Apakah Anda yakin ingin memulai pembaruan sistem? Ini akan mematikan dan membangun ulang layanan backend & frontend secara otomatis.")) {
+      return;
+    }
+    setApplyingUpdate(true);
+    try {
+      await applyUpdate();
+      success("Proses update sistem dimulai! Silakan pantau log di bawah.");
+      pollUpdateStatus();
+    } catch (err) {
+      error(`Gagal memulai update: ${err instanceof Error ? err.message : "Error"}`);
+      setApplyingUpdate(false);
+    }
+  };
 
   const loadTenants = async () => {
     setLoading(true);
@@ -1652,6 +1716,7 @@ export function AdminDashboardPage(): JSX.Element {
               <button className={`app-nav-link sub-link ${activeTab === "server" ? "is-active" : ""}`} onClick={() => { setActiveTab("server"); setSidebarOpen(false); }}>{t("admin.nav_server")}</button>
               <button className={`app-nav-link sub-link ${activeTab === "logs" ? "is-active" : ""}`} onClick={() => { setActiveTab("logs"); setSidebarOpen(false); }}>{t("admin.nav_logs")}</button>
               <button className={`app-nav-link sub-link ${activeTab === "backups" ? "is-active" : ""}`} onClick={() => { setActiveTab("backups"); setSidebarOpen(false); }}>Backup & Restore</button>
+              <button className={`app-nav-link sub-link ${activeTab === "updates" ? "is-active" : ""}`} onClick={() => { setActiveTab("updates"); setSidebarOpen(false); }}>System Update</button>
               <button className={`app-nav-link sub-link ${activeTab === "ai" ? "is-active" : ""}`} onClick={() => { setActiveTab("ai"); setSidebarOpen(false); }}>AI Settings</button>
               <button className={`app-nav-link sub-link ${activeTab === "whatsapp" ? "is-active" : ""}`} onClick={() => { setActiveTab("whatsapp"); setSidebarOpen(false); }}>Chat AI Queue</button>
               <button className={`app-nav-link sub-link ${activeTab === "notifications" ? "is-active" : ""}`} onClick={() => { setActiveTab("notifications"); setSidebarOpen(false); }}>Notification Providers</button>
@@ -1724,6 +1789,7 @@ export function AdminDashboardPage(): JSX.Element {
               activeTab === "database" ? "Database Configuration" :
               activeTab === "backups" ? "Backup & Restore" :
               activeTab === "whatsapp" ? "Chat AI Queue & Statistics" :
+              activeTab === "updates" ? "System Auto-Updater" :
               t("admin.nav_dashboard")
             }
             description={
@@ -1736,6 +1802,7 @@ export function AdminDashboardPage(): JSX.Element {
               activeTab === "database" ? "Kelola pengaturan koneksi PostgreSQL database Anda." :
               activeTab === "backups" ? "Kelola file dump database untuk keamanan data dan migrasi." :
               activeTab === "whatsapp" ? "Pantau statistik antrean pesan real-time, status pemrosesan AI, log error, dan retry manual." :
+              activeTab === "updates" ? "Periksa, unduh, dan pasang pembaruan kode aplikasi Pekan langsung dari GitHub secara aman." :
               "Pusat kendali dan infrastruktur Pekan"
             }
             hideInfo={true}
@@ -3322,6 +3389,164 @@ export function AdminDashboardPage(): JSX.Element {
                    <button className="btn btn-primary spacing-mt-md" type="submit">Simpan Konfigurasi</button>
                  </form>
                </div>
+            </div>
+          )}
+
+          {activeTab === "updates" && (
+            <div className="updates-view" style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+              <div className="surface card shadow-soft" style={{ padding: "2rem" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
+                  <div>
+                    <h3 className="form-title" style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700 }}>
+                      Status Sinkronisasi GitHub
+                    </h3>
+                    <p className="opacity-70 text-sm" style={{ marginTop: "4px" }}>
+                      Hubungkan server lokal dengan repositori Pekan untuk deployment otomatis sekali klik.
+                    </p>
+                  </div>
+                  <div style={{ display: "flex", gap: "10px" }}>
+                    <button 
+                      className="btn btn-secondary-outline" 
+                      onClick={handleCheckUpdate} 
+                      disabled={checkingUpdate || applyingUpdate}
+                      style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                    >
+                      {checkingUpdate ? (
+                        <span className="spinner spinner-xs"></span>
+                      ) : (
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                      )}
+                      Periksa Pembaruan
+                    </button>
+                    {updateInfo?.update_available && (
+                      <button 
+                        className="btn btn-primary" 
+                        onClick={handleApplyUpdate} 
+                        disabled={applyingUpdate}
+                        style={{ display: "flex", alignItems: "center", gap: "8px", background: "linear-gradient(135deg, var(--primary) 0%, #4f46e5 100%)", border: "none" }}
+                      >
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                        Perbarui Sekarang
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="spacing-mt-lg" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1.5rem" }}>
+                  <div className="surface card shadow-softstat-card" style={{ background: "rgba(0,0,0,0.02)", border: "1px solid rgba(0,0,0,0.05)", padding: "1.5rem", borderRadius: "12px" }}>
+                    <span className="text-xs text-muted" style={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Versi Saat Ini (Local)</span>
+                    {updateInfo ? (
+                      <div className="spacing-mt-sm">
+                        <strong className="text-lg font-mono text-indigo" style={{ display: "block" }}>
+                          {updateInfo.is_git_repo ? updateInfo.current_commit.slice(0, 8) : "Bukan repositori Git"}
+                        </strong>
+                        <span className="text-xs text-muted" style={{ display: "block", marginTop: "4px" }}>
+                          {updateInfo.is_git_repo ? new Date(updateInfo.current_date).toLocaleString("id-ID") : "Instalasi manual (Zip)"}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="spacing-mt-sm opacity-50">Menghubungkan ke git...</div>
+                    )}
+                  </div>
+
+                  <div className="surface card shadow-softstat-card" style={{ background: "rgba(0,0,0,0.02)", border: "1px solid rgba(0,0,0,0.05)", padding: "1.5rem", borderRadius: "12px" }}>
+                    <span className="text-xs text-muted" style={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Versi Terbaru (GitHub Remote)</span>
+                    {updateInfo ? (
+                      <div className="spacing-mt-sm">
+                        <strong className="text-lg font-mono text-emerald" style={{ display: "block" }}>
+                          {updateInfo.latest_commit ? updateInfo.latest_commit.slice(0, 8) : "Tidak terhubung"}
+                        </strong>
+                        <span className="text-xs text-muted" style={{ display: "block", marginTop: "4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {updateInfo.latest_message || "Tidak ada pesan commit"}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="spacing-mt-sm opacity-50">Mengambil data dari remote...</div>
+                    )}
+                  </div>
+
+                  <div className="surface card shadow-softstat-card" style={{ background: "rgba(0,0,0,0.02)", border: "1px solid rgba(0,0,0,0.05)", padding: "1.5rem", borderRadius: "12px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                    <span className="text-xs text-muted" style={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Status Pembaruan</span>
+                    <div className="spacing-mt-sm" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      {updateInfo?.update_available ? (
+                        <>
+                          <span className="badge-status stopped" style={{ background: "#fef2f2", color: "#ef4444", fontSize: "0.85rem", padding: "4px 12px" }}>
+                            UPDATE TERSEDIA
+                          </span>
+                          <span className="text-xs text-rose" style={{ fontWeight: 600 }}>Diperlukan sinkronisasi</span>
+                        </>
+                      ) : updateInfo ? (
+                        <>
+                          <span className="badge-status running" style={{ background: "#ecfdf5", color: "#10b981", fontSize: "0.85rem", padding: "4px 12px" }}>
+                            UP TO DATE
+                          </span>
+                          <span className="text-xs text-emerald" style={{ fontWeight: 600 }}>Sistem sudah optimal</span>
+                        </>
+                      ) : (
+                        <span className="text-xs opacity-50">Menunggu pemeriksaan...</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="surface card shadow-soft" style={{ background: "#0f172a", border: "1px solid #1e293b", padding: "1.5rem", borderRadius: "12px", display: "flex", flexDirection: "column", minHeight: "450px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #1e293b", paddingBottom: "1rem", marginBottom: "1rem" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      <span style={{ width: "12px", height: "12px", borderRadius: "50%", background: "#ef4444" }}></span>
+                      <span style={{ width: "12px", height: "12px", borderRadius: "50%", background: "#f59e0b" }}></span>
+                      <span style={{ width: "12px", height: "12px", borderRadius: "50%", background: "#10b981" }}></span>
+                    </div>
+                    <span className="font-mono text-xs" style={{ color: "#94a3b8", marginLeft: "8px", fontWeight: 600 }}>
+                      pekan-deployer@bash ~ stdout console log
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    {updateProgress?.status === "running" && (
+                      <span className="text-xs font-mono text-amber" style={{ animation: "pulse 1.5s infinite" }}>
+                        ● SEDANG MEMPROSES DEPLOYMENT...
+                      </span>
+                    )}
+                    {updateProgress?.status === "success" && (
+                      <span className="text-xs font-mono text-emerald">
+                        ● DEPLOYMENT BERHASIL! (Reloading...)
+                      </span>
+                    )}
+                    {updateProgress?.status === "failed" && (
+                      <span className="text-xs font-mono text-rose">
+                        ● DEPLOYMENT GAGAL: {updateProgress.error}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div 
+                  style={{ 
+                    flex: 1, 
+                    background: "#020617", 
+                    borderRadius: "8px", 
+                    padding: "1.5rem", 
+                    overflowY: "auto", 
+                    maxHeight: "350px", 
+                    fontFamily: "'Courier New', Courier, monospace", 
+                    fontSize: "0.85rem", 
+                    lineHeight: "1.6", 
+                    color: "#38bdf8", 
+                    whiteSpace: "pre-wrap", 
+                    boxShadow: "inset 0 2px 8px rgba(0,0,0,0.8)" 
+                  }}
+                >
+                  {updateProgress?.logs ? (
+                    updateProgress.logs
+                  ) : (
+                    <div style={{ color: "#64748b", fontStyle: "italic" }}>
+                      Belum ada aktivitas deployment. Klik "Perbarui Sekarang" untuk memulai build ulang infrastruktur.
+                    </div>
+                  )}
+                  <div ref={terminalLogEndRef} />
+                </div>
+              </div>
             </div>
           )}
         </main>

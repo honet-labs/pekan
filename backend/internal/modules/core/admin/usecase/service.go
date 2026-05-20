@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"pekan/backend/internal/modules/core/admin/domain"
@@ -70,6 +71,13 @@ type Repository interface {
 }
 
 
+type UpdateState struct {
+	Status    string    `json:"status"` // "idle", "running", "success", "failed"
+	StartedAt time.Time `json:"started_at"`
+	EndedAt   time.Time `json:"ended_at"`
+	Error     string    `json:"error"`
+}
+
 type Service struct {
 	repo      Repository
 	audit     audit.Logger
@@ -78,6 +86,9 @@ type Service struct {
 	storage   storage.ObjectStorage
 	redis     *redis.Client
 	db        *sql.DB
+
+	updateState UpdateState
+	updateMu    sync.Mutex
 }
 
 func NewService(repo Repository, audit audit.Logger, secretKey string, storageProvider storage.ObjectStorage, rdb *redis.Client, dbConn *sql.DB) *Service {
@@ -89,6 +100,9 @@ func NewService(repo Repository, audit audit.Logger, secretKey string, storagePr
 		storage:   storageProvider,
 		redis:     rdb,
 		db:        dbConn,
+		updateState: UpdateState{
+			Status: "idle",
+		},
 	}
 }
 
@@ -802,5 +816,251 @@ func (s *Service) RetryWhatsAppQueueMessage(ctx context.Context, id string) erro
 		_ = s.audit.Write(ctx, "RETRY_WHATSAPP_QUEUE_MSG", "queue", id, nil, nil)
 	}
 	return err
+}
+
+// Helper to run git commands in current or parent directory
+func (s *Service) runGitCmd(ctx context.Context, args ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", args...)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := cmd.Run(); err == nil {
+		return strings.TrimSpace(out.String()), nil
+	}
+
+	cmdParent := exec.CommandContext(ctx, "git", append([]string{"-C", ".."}, args...)...)
+	var outParent bytes.Buffer
+	cmdParent.Stdout = &outParent
+	if err := cmdParent.Run(); err == nil {
+		return strings.TrimSpace(outParent.String()), nil
+	}
+
+	return "", errors.New("not a git repository")
+}
+
+// CheckUpdate queries the GitHub API and local Git status to check if a new commit is available.
+func (s *Service) CheckUpdate(ctx context.Context) (domain.UpdateStatusInfo, error) {
+	var info domain.UpdateStatusInfo
+
+	// Check if local git repo
+	isGit := false
+	localCommit := ""
+	localDate := ""
+
+	if commit, err := s.runGitCmd(ctx, "rev-parse", "HEAD"); err == nil {
+		isGit = true
+		localCommit = commit
+		if date, err := s.runGitCmd(ctx, "log", "-1", "--format=%cd"); err == nil {
+			localDate = date
+		}
+	}
+
+	info.IsGitRepo = isGit
+	info.CurrentCommit = localCommit
+	info.CurrentDate = localDate
+
+	// Fetch latest remote commit from GitHub API
+	client := &http.Client{Timeout: 10 * time.Second}
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.github.com/repos/aannddrrii294/pekan/commits/main", nil)
+	if err != nil {
+		return info, err
+	}
+	req.Header.Set("User-Agent", "pekan-update-agent")
+	
+	resp, err := client.Do(req)
+	if err == nil {
+		defer resp.Body.Close()
+		if resp.StatusCode == http.StatusOK {
+			var githubCommits struct {
+				Sha string `json:"sha"`
+				Commit struct {
+					Message string `json:"message"`
+					Committer struct {
+						Date string `json:"date"`
+					} `json:"committer"`
+				} `json:"commit"`
+			}
+			if err := json.NewDecoder(resp.Body).Decode(&githubCommits); err == nil {
+				info.LatestCommit = githubCommits.Sha
+				info.LatestMessage = githubCommits.Commit.Message
+				info.LatestDate = githubCommits.Commit.Committer.Date
+				if isGit && localCommit != githubCommits.Sha {
+					info.UpdateAvailable = true
+				}
+				return info, nil
+			}
+		}
+	}
+
+	// Fallback to git fetch + rev-parse origin/main if github API failed
+	if isGit {
+		_, _ = s.runGitCmd(ctx, "fetch", "origin")
+		if remoteCommit, err := s.runGitCmd(ctx, "rev-parse", "origin/main"); err == nil {
+			info.LatestCommit = remoteCommit
+			if remoteMsg, err := s.runGitCmd(ctx, "log", "-1", "origin/main", "--format=%s"); err == nil {
+				info.LatestMessage = remoteMsg
+			}
+			if remoteDate, err := s.runGitCmd(ctx, "log", "-1", "origin/main", "--format=%cd"); err == nil {
+				info.LatestDate = remoteDate
+			}
+			if localCommit != remoteCommit {
+				info.UpdateAvailable = true
+			}
+			return info, nil
+		}
+	}
+
+	return info, nil
+}
+
+// ApplyUpdate triggers a background update build and deploys changes safely.
+func (s *Service) ApplyUpdate(ctx context.Context) error {
+	s.updateMu.Lock()
+	if s.updateState.Status == "running" {
+		s.updateMu.Unlock()
+		return errors.New("update is already running")
+	}
+
+	s.updateState.Status = "running"
+	s.updateState.StartedAt = time.Now()
+	s.updateState.Error = ""
+	s.updateMu.Unlock()
+
+	// Clear/ensure log file exists
+	_ = os.MkdirAll("logs", 0755)
+	logFile, err := os.OpenFile("logs/update.log", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		s.updateMu.Lock()
+		s.updateState.Status = "failed"
+		s.updateState.EndedAt = time.Now()
+		s.updateState.Error = err.Error()
+		s.updateMu.Unlock()
+		return err
+	}
+
+	go func() {
+		defer logFile.Close()
+
+		writeLog := func(format string, args ...any) {
+			msg := fmt.Sprintf("[%s] %s\n", time.Now().Format("15:04:05"), fmt.Sprintf(format, args...))
+			_, _ = logFile.WriteString(msg)
+			log.Println("[Update]", msg)
+		}
+
+		writeLog("Starting System Update Process...")
+
+		// Helper to run exec commands and stream to log file
+		runCmd := func(name string, dir string, args ...string) error {
+			writeLog("Executing: %s %s in %s", name, strings.Join(args, " "), dir)
+			cmd := exec.Command(name, args...)
+			cmd.Dir = dir
+			cmd.Stdout = logFile
+			cmd.Stderr = logFile
+			return cmd.Run()
+		}
+
+		// 1. Fetch and reset git repo
+		writeLog("1/6 Fetching latest code from GitHub...")
+		if err := runCmd("git", ".", "fetch", "origin"); err != nil {
+			// Try parent directory
+			if err := runCmd("git", "..", "fetch", "origin"); err != nil {
+				writeLog("Failed to fetch from git: %v. Continuing...", err)
+			} else {
+				_ = runCmd("git", "..", "reset", "--hard", "origin/main")
+			}
+		} else {
+			_ = runCmd("git", ".", "reset", "--hard", "origin/main")
+		}
+
+		// 2. Tidy dependencies and build backend binaries
+		writeLog("2/6 Rebuilding Go backend services...")
+		if err := runCmd("/usr/local/go/bin/go", ".", "mod", "tidy"); err != nil {
+			writeLog("Warning: go mod tidy failed: %v", err)
+		}
+
+		if err := runCmd("/usr/local/go/bin/go", ".", "build", "-o", "../bin/pekan-api", "./cmd/api"); err != nil {
+			writeLog("Error: pekan-api build failed: %v", err)
+			s.markFailed(err)
+			return
+		}
+
+		_ = runCmd("/usr/local/go/bin/go", ".", "build", "-o", "../bin/pekan-worker", "./cmd/worker")
+		_ = runCmd("/usr/local/go/bin/go", ".", "build", "-o", "../bin/pekan-ai", "./cmd/ai")
+
+		// 3. Database migrations
+		writeLog("3/6 Applying migrations...")
+		_ = runCmd("chmod", ".", "+x", "./scripts/apply_migrations.sh")
+		if err := runCmd("./scripts/apply_migrations.sh", "."); err != nil {
+			writeLog("Warning: migration script failed: %v", err)
+		}
+		// Run tenant migrations
+		_ = runCmd("/usr/local/go/bin/go", ".", "run", "./scripts/migrate_tenants.go")
+
+		// 4. Rebuild frontend React assets
+		writeLog("4/6 Rebuilding React Frontend...")
+		if err := runCmd("npm", "../frontend", "install", "--include=dev", "--no-audit"); err != nil {
+			writeLog("Warning: npm install failed: %v", err)
+		}
+		if err := runCmd("npm", "../frontend", "run", "build"); err != nil {
+			writeLog("Error: frontend build failed: %v", err)
+			s.markFailed(err)
+			return
+		}
+
+		// Copy frontend dist to web root /var/www/pekan-web
+		writeLog("5/6 Copying built assets to /var/www/pekan-web...")
+		_ = runCmd("rm", ".", "-rf", "/var/www/pekan-web/*")
+		if err := runCmd("cp", ".", "-r", "../frontend/dist/.", "/var/www/pekan-web/"); err != nil {
+			writeLog("Warning: copy to /var/www/pekan-web failed: %v. Trying fallback standard cp...", err)
+		}
+
+		// 5. Restart worker and AI processes (auto-restart by systemd)
+		writeLog("6/6 Restarting background services...")
+		_ = runCmd("pkill", ".", "-f", "pekan-worker")
+		_ = runCmd("pkill", ".", "-f", "pekan-ai")
+
+		writeLog("Update completed successfully! Exiting API service to trigger systemd auto-restart...")
+
+		s.updateMu.Lock()
+		s.updateState.Status = "success"
+		s.updateState.EndedAt = time.Now()
+		s.updateMu.Unlock()
+
+		// Graceful exit in 1 second so response can be sent to client
+		go func() {
+			time.Sleep(1 * time.Second)
+			log.Println("[Update] Exiting application to reload new binary...")
+			os.Exit(0)
+		}()
+	}()
+
+	return nil
+}
+
+func (s *Service) markFailed(err error) {
+	s.updateMu.Lock()
+	s.updateState.Status = "failed"
+	s.updateState.EndedAt = time.Now()
+	s.updateState.Error = err.Error()
+	s.updateMu.Unlock()
+}
+
+// GetUpdateStatus reads the update progress and logs.
+func (s *Service) GetUpdateStatus(ctx context.Context) (map[string]any, error) {
+	s.updateMu.Lock()
+	defer s.updateMu.Unlock()
+
+	// Read log file
+	logContent := ""
+	if data, err := os.ReadFile("logs/update.log"); err == nil {
+		logContent = string(data)
+	}
+
+	return map[string]any{
+		"status":     s.updateState.Status,
+		"started_at": s.updateState.StartedAt.Format(time.RFC3339),
+		"ended_at":   s.updateState.EndedAt.Format(time.RFC3339),
+		"error":      s.updateState.Error,
+		"logs":       logContent,
+	}, nil
 }
 

@@ -65,6 +65,12 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 				r.Put("/{key}", h.SetGlobalSetting)
 			})
 
+			r.Route("/updates", func(r chi.Router) {
+				r.Get("/check", h.CheckUpdate)
+				r.Post("/apply", h.ApplyUpdate)
+				r.Get("/status", h.GetUpdateStatus)
+			})
+
 			r.Route("/whatsapp/queue", func(r chi.Router) {
 				r.Get("/stats", h.GetWhatsAppQueueStats)
 				r.Get("/history", h.GetWhatsAppQueueHistory)
@@ -645,4 +651,30 @@ func (h *Handler) RetryWhatsAppQueueMessage(w http.ResponseWriter, r *http.Reque
 	}
 
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true}, middleware.GetRequestID(r.Context()))
+}
+
+func (h *Handler) CheckUpdate(w http.ResponseWriter, r *http.Request) {
+	out, err := h.service.CheckUpdate(r.Context())
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), middleware.GetRequestID(r.Context()))
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, out, middleware.GetRequestID(r.Context()))
+}
+
+func (h *Handler) ApplyUpdate(w http.ResponseWriter, r *http.Request) {
+	if err := h.service.ApplyUpdate(r.Context()); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), middleware.GetRequestID(r.Context()))
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"status": "started"}, middleware.GetRequestID(r.Context()))
+}
+
+func (h *Handler) GetUpdateStatus(w http.ResponseWriter, r *http.Request) {
+	out, err := h.service.GetUpdateStatus(r.Context())
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), middleware.GetRequestID(r.Context()))
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, out, middleware.GetRequestID(r.Context()))
 }

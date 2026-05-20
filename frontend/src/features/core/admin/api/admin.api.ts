@@ -383,3 +383,35 @@ export async function retryWhatsAppQueueMessage(id: string): Promise<{ success: 
   });
 }
 
+export type UpdateStatusInfo = {
+  current_commit: string;
+  current_date: string;
+  latest_commit: string;
+  latest_date: string;
+  latest_message: string;
+  update_available: boolean;
+  is_git_repo: boolean;
+};
+
+export type UpdateProgress = {
+  status: "idle" | "running" | "success" | "failed";
+  started_at: string;
+  ended_at: string;
+  error: string;
+  logs: string;
+};
+
+export async function checkUpdate(): Promise<UpdateStatusInfo> {
+  return adminFetch<UpdateStatusInfo>("/admin/updates/check");
+}
+
+export async function applyUpdate(): Promise<{ status: string }> {
+  return adminFetch<{ status: string }>("/admin/updates/apply", {
+    method: "POST"
+  });
+}
+
+export async function getUpdateStatus(): Promise<UpdateProgress> {
+  return adminFetch<UpdateProgress>("/admin/updates/status");
+}
+

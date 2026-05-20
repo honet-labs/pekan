@@ -88,6 +88,11 @@ func NewServer(cfg config.Config) (*Server, error) {
 		return nil, err
 	}
 
+	// Update 'pekanhonet' to 'pekan' in database automatically on startup for seamless migration
+	if _, err := conn.Exec("UPDATE public.tenants SET code = 'pekan' WHERE code = 'pekanhonet'"); err != nil {
+		log.Printf("[Startup] Warning: failed to auto-migrate tenant code from pekanhonet to pekan: %v", err)
+	}
+
 	storageProvider := storage.NewProvider(cfg)
 	rateLimitStore := middleware.RateLimitStore(middleware.NewMemoryRateLimitStore())
 	var rdb *redis.Client

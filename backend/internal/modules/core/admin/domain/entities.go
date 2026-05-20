@@ -150,3 +150,13 @@ type WhatsAppQueueStats struct {
 	AverageLatencyMs int64 `json:"average_latency_ms"`
 }
 
+type UpdateStatusInfo struct {
+	CurrentCommit   string `json:"current_commit"`
+	CurrentDate     string `json:"current_date"`
+	LatestCommit    string `json:"latest_commit"`
+	LatestDate      string `json:"latest_date"`
+	LatestMessage   string `json:"latest_message"`
+	UpdateAvailable bool   `json:"update_available"`
+	IsGitRepo       bool   `json:"is_git_repo"`
+}
+
