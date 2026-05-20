@@ -933,9 +933,9 @@ func waBotSystemPrompt(finContext *domain.FinancialContext, instructions string)
 		sb.WriteString("\n")
 	}
 
-	sb.WriteString("--- 10 TRANSAKSI TERAKHIR BULAN INI ---\n")
+	sb.WriteString("--- TRANSAKSI TERAKHIR (MAKSIMAL 100) ---\n")
 	if len(finContext.RecentTx) == 0 {
-		sb.WriteString("- Belum ada riwayat transaksi bulan ini.\n\n")
+		sb.WriteString("- Belum ada riwayat transaksi.\n\n")
 	} else {
 		for _, t := range finContext.RecentTx {
 			typeLabel := "Pengeluaran"

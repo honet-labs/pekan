@@ -417,14 +417,14 @@ func (r *RepositoryPG) GetFinancialContext(ctx context.Context, tenantID, userID
 			return fmt.Errorf("failed to get financial summary: %w", err)
 		}
 
-		// 2. Get recent transactions (limit 10) excluding deleted ones
+		// 2. Get recent transactions (limit 100) excluding deleted ones
 		const recentQ = `
 			SELECT t.id, t.amount_minor, t.type, t.description, COALESCE(c.name, 'Tanpa Kategori') as category_name, t.transaction_date
 			FROM finance_transactions t
 			LEFT JOIN finance_categories c ON t.category_id = c.id
 			WHERE t.deleted_at IS NULL
-			ORDER BY t.created_at DESC
-			LIMIT 10`
+			ORDER BY t.transaction_date DESC, t.created_at DESC
+			LIMIT 100`
 		
 		rows, err := tx.QueryContext(tenantCtx, recentQ)
 		if err != nil {
