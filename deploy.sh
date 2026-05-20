@@ -7,9 +7,9 @@
 
 set -e
 
-REMOTE_USER="administrator"
-REMOTE_HOST="192.168.201.18"
-REMOTE_PASSWORD='P@ssw0rd294!@#'
+REMOTE_USER="administrator" # Change this to your server user
+REMOTE_HOST="your_server_ip" # Change this to your server IP
+REMOTE_PASSWORD='your_server_password' # Change this to your server password
 
 echo "🚀 Production Deployment Starting..."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

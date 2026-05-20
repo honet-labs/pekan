@@ -8,8 +8,8 @@ Write-Host " (Automated)" -ForegroundColor Yellow
 Write-Host "--------------------------------------------" -ForegroundColor Gray
 Write-Host ""
 
-$remoteUser = "administrator"
-$remoteHost = "192.168.201.18"
+$remoteUser = "administrator" # Change this
+$remoteHost = "your_server_ip" # Change this
 $localProjectPath = (Get-Location).Path
 $packageName = "saas-pekan-deploy.tar.gz"
 

@@ -9,8 +9,8 @@
 
 set -e  # Exit on any error
 
-REMOTE_USER="administrator"
-REMOTE_HOST="192.168.201.18"
+REMOTE_USER="administrator" # Change this
+REMOTE_HOST="your_server_ip" # Change this
 REMOTE_PATH="/opt/pekan"
 LOCAL_PROJECT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
