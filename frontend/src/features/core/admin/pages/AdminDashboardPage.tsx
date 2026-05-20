@@ -217,7 +217,7 @@ export function AdminDashboardPage(): JSX.Element {
     } catch (e) { return []; }
   });
   
-  const [savingConfig, setSavingConfig] = useState<"smtp" | "telegram" | "wa" | "wa_fonnte" | "wa_waha" | "wa_gowa" | "gemini" | "openai" | "claude" | "sumopod" | "active_ai" | "active_wa_bot_ai" | "wa_active_provider" | "wa_bot_system_prompt" | "database" | null>(null);
+  const [savingConfig, setSavingConfig] = useState<"smtp" | "telegram" | "wa" | "wa_fonnte" | "wa_waha" | "wa_gowa" | "gemini" | "openai" | "claude" | "sumopod" | "active_ai" | "active_wa_bot_ai" | "wa_active_provider" | "wa_bot_system_prompt" | "wa_bot_phone_number" | "database" | null>(null);
   const [testingConfig, setTestingConfig] = useState<string | null>(null);
 
   // Test Connection Modal States
