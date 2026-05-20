@@ -35,11 +35,15 @@ import { ReceiptScanPage } from "../../features/finance/receipts/pages/ReceiptSc
 import { SettingsReceiptScanPage } from "../../features/finance/settings/pages/SettingsReceiptScanPage";
 import { AdminDashboardPage } from "../../features/core/admin/pages/AdminDashboardPage";
 import NotFoundPage from "../pages/NotFoundPage";
+import { useTenantStore } from "../../core/tenant/tenant-store";
 
 export function AppRouter(): JSX.Element {
+  const tenant = useTenantStore();
+  const activeCode = tenant.activeTenantCode || "default";
+
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/app/default/finance/dashboard" replace />} />
+      <Route path="/" element={<Navigate to={`/app/${activeCode}/finance/dashboard`} replace />} />
       <Route path="/app" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
