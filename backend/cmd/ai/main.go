@@ -15,6 +15,7 @@ import (
 	whatsappinfra "pekan/backend/internal/modules/finance/whatsapp/infra"
 	whatsappusecase "pekan/backend/internal/modules/finance/whatsapp/usecase"
 	"pekan/backend/internal/platform/audit"
+	"pekan/backend/internal/platform/security"
 )
 
 func main() {
@@ -34,6 +35,11 @@ func main() {
 	}
 	defer conn.Close()
 
+	cipher, err := security.NewCipher(cfg.JWTSecret)
+	if err != nil {
+		log.Fatalf("failed to create cipher: %v", err)
+	}
+
 	authorizer := access.NewAuthorizer()
 	auditLogger := audit.NewDBLogger(conn)
 
@@ -42,7 +48,7 @@ func main() {
 	adminUC := adminusecase.NewService(adminRepo, auditLogger, cfg.ReceiptScanSecret, nil, nil, conn)
 
 	// WhatsApp Chatbot Queue Service
-	whatsappRepo := whatsappinfra.NewRepositoryPG(conn)
+	whatsappRepo := whatsappinfra.NewRepositoryPG(conn, cipher)
 	whatsappUC := whatsappusecase.NewService(whatsappRepo, authorizer, adminUC)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

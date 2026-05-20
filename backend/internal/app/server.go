@@ -220,7 +220,7 @@ func NewServer(cfg config.Config) (*Server, error) {
 	dashboardUC := financedashboardusecase.NewService(dashboardRepo, authorizer, rdb)
 	dashboardHandler := financedashboardhttp.NewHandler(dashboardUC)
 
-	whatsappRepo := financewhatsappinfra.NewRepositoryPG(conn)
+	whatsappRepo := financewhatsappinfra.NewRepositoryPG(conn, cipher)
 	whatsappUC := financewhatsappusecase.NewService(whatsappRepo, authorizer, adminUC)
 	whatsappHandler := financewhatsapphttp.NewHandler(whatsappUC)
 	whatsappWebhookHandler := financewhatsapphttp.NewWebhookHandler(whatsappUC)

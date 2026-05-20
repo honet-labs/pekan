@@ -12,15 +12,17 @@ import (
 
 	"pekan/backend/internal/modules/finance/whatsapp/domain"
 	"pekan/backend/internal/platform/db"
+	"pekan/backend/internal/platform/security"
 	"pekan/backend/internal/platform/tenancy"
 )
 
 type RepositoryPG struct {
-	conn *sql.DB
+	conn   *sql.DB
+	cipher *security.Cipher
 }
 
-func NewRepositoryPG(conn *sql.DB) *RepositoryPG {
-	return &RepositoryPG{conn: conn}
+func NewRepositoryPG(conn *sql.DB, cipher *security.Cipher) *RepositoryPG {
+	return &RepositoryPG{conn: conn, cipher: cipher}
 }
 
 func (r *RepositoryPG) CreateOTPToken(ctx context.Context, in domain.OTPToken) error {
@@ -160,7 +162,15 @@ func (r *RepositoryPG) GetUserPhone(ctx context.Context, userID string) (string,
 		}
 		return "", err
 	}
-	return phone.String, nil
+	if phone.Valid {
+		if r.cipher != nil {
+			if dec, err := r.cipher.Decrypt(phone.String); err == nil && dec != "" {
+				return dec, nil
+			}
+		}
+		return phone.String, nil
+	}
+	return "", nil
 }
 
 func (r *RepositoryPG) CreateChatTransaction(ctx context.Context, tenantID, userID, tenantCode string, amount int64, typeStr, description, categoryName string, transactionDate string, items []domain.ChatItem) (string, error) {
