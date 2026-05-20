@@ -1,4 +1,4 @@
-# 🏢 PEKAN (Web Aplikasi Pencatatan Keuangan)
+# PEKAN (Web Aplikasi Pencatatan Keuangan)
 
 [![Go Version](https://img.shields.io/badge/Go-1.23-00ADD8?style=flat-square&logo=go)](https://golang.org/)
 [![React Version](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react)](https://react.dev/)
@@ -10,42 +10,42 @@
 
 ---
 
-## ✨ Fitur Utama
+## Fitur Utama
 
-### 1. 💼 Manajemen Multi-Workspace (Multi-Tenant)
+### 1. Manajemen Multi-Workspace (Multi-Tenant)
 * Isolasi data keuangan penuh antar workspace yang aman.
 * Pengaturan kuota pengguna, limit transaksi, dan status aktif.
 * Dashboard audit log global dan riwayat sistem real-time untuk administrator utama.
 
-### 2. 📊 Dashboard Keuangan Modern & Interaktif
+### 2. Dashboard Keuangan Modern & Interaktif
 * Visualisasi grafik performa arus kas (Cashflow), pendapatan, pengeluaran, transfer, dan pertumbuhan workspace menggunakan **Apache ECharts**.
 * Filter tangguh berdasarkan rentang tanggal dinamis dan opsi penyesuaian visualisasi visual beresolusi tinggi.
 
-### 3. 🧠 OCR Receipt Scanner Cerdas (Scan AI)
+### 3. OCR Receipt Scanner Cerdas (Scan AI)
 * Memungkinkan pengguna mengunggah foto struk belanja/nota transaksi fisik.
 * Memanfaatkan kekuatan LLM (Google Gemini, OpenAI, Claude) untuk membaca, mengekstrak rincian belanja, mendeteksi kategori pengeluaran, jumlah pajak, nama toko, hingga total nominal transaksi secara otomatis.
 * Pengguna dapat memeriksa hasil ekstraksi terlebih dahulu sebelum menyimpan transaksi secara resmi ke basis data keuangan.
 
-### 4. 💬 Asisten Keuangan WhatsApp & Chat Bot AI
+### 4. Asisten Keuangan WhatsApp & Chat Bot AI
 * Mengintegrasikan asisten keuangan interaktif melalui chat WhatsApp.
 * Mendukung deteksi perintah percakapan sehari-hari (seperti mencatat transaksi baru, mengecek sisa anggaran bulanan, memindahkan dana via transfer).
 * Memiliki antrean pemrosesan pesan berbasis background worker yang andal, dilengkapi dengan visualisasi latensi real-time, tingkat keberhasilan, dan grafik tren pemrosesan pesan di Dashboard Admin.
 * Dukungan multi-provider: WhatsApp Business Platform (Meta), Fonnte, WAHA, dan GOWA.
 
-### 5. 🔔 Sistem Notifikasi Multi-Saluran
+### 5. Sistem Notifikasi Multi-Saluran
 * Pengiriman OTP (pendaftaran & pemulihan akun) serta pengingat tagihan otomatis (billing reminders).
 * Mendukung integrasi dengan SMTP Server (Secure SSL/TLS & STARTTLS), Telegram Bot API, dan WhatsApp Provider.
 
-### 6. 🛠️ Utilitas Admin & Pemeliharaan Database
+### 6. Utilitas Admin & Pemeliharaan Database
 * Cadangkan database secara otomatis langsung dari panel admin (*SQL Dump Tool*).
 * Statistik performa ukuran tabel database PostgreSQL dan pertumbuhan historical data secara real-time.
 * Konfigurasi optimasi backend (Rate Limiting, Request Timeout, Max Payload Size) yang disimpan di database secara global.
 
 ---
 
-## 🛠️ Stack Teknologi
+## Stack Teknologi
 
-### 🟢 Backend
+### Backend
 * **Bahasa Pemrograman:** Go (Golang) 1.23+
 * **HTTP Router / Framework:** `go-chi/chi/v5`
 * **Driver Basis Data:** `jackc/pgx/v5` (PostgreSQL)
@@ -53,7 +53,7 @@
 * **Keamanan & Autentikasi:** `golang-jwt/jwt/v5` & `bcrypt`
 * **Pembuatan PDF:** `phpdave11/gofpdf`
 
-### 🔵 Frontend
+### Frontend
 * **UI Library:** React 18+ (dengan TypeScript)
 * **Build Tool:** Vite 5+
 * **Routing:** React Router DOM v6
@@ -62,7 +62,7 @@
 
 ---
 
-## 🏗️ Struktur Arsitektur (Clean Architecture)
+## Struktur Arsitektur (Clean Architecture)
 
 Proyek ini dirancang menggunakan prinsip **Clean Architecture & Domain-Driven Design (DDD)** untuk pemisahan fungsionalitas (*separation of concerns*) yang jelas dan kemudahan pengujian (*testability*):
 
@@ -91,13 +91,13 @@ PEKAN/
 
 ---
 
-## 🚀 Panduan Instalasi & Menjalankan Aplikasi
+## Panduan Instalasi & Menjalankan Aplikasi
 
 Ikuti panduan di bawah ini untuk menyiapkan dan menjalankan platform **PEKAN** di lingkungan pengembangan lokal (*local development*) Anda.
 
 ---
 
-### 📋 Prasyarat Sistem
+### Prasyarat Sistem
 
 Sebelum melakukan pemasangan, pastikan sistem komputer Anda memenuhi prasyarat berikut:
 
@@ -110,7 +110,7 @@ Sebelum melakukan pemasangan, pastikan sistem komputer Anda memenuhi prasyarat b
 
 ---
 
-### 🗄️ Langkah 1: Setup Basis Data (PostgreSQL)
+### Langkah 1: Setup Basis Data (PostgreSQL)
 
 1. **Buat Database Baru**:
    Masuk ke PostgreSQL CLI (`psql`) atau gunakan GUI editor (seperti DBeaver/pgAdmin), lalu buat database baru bernama `pekan`:
@@ -150,7 +150,7 @@ Sebelum melakukan pemasangan, pastikan sistem komputer Anda memenuhi prasyarat b
 
 ---
 
-### 🟢 Langkah 2: Konfigurasi & Jalankan Backend (Go)
+### Langkah 2: Konfigurasi & Jalankan Backend (Go)
 
 1. **Salin File Environment**:
    Salin berkas template konfigurasi lingkungan di dalam folder `backend`:
@@ -197,7 +197,7 @@ Sebelum melakukan pemasangan, pastikan sistem komputer Anda memenuhi prasyarat b
 
 ---
 
-### 🔵 Langkah 3: Konfigurasi & Jalankan Frontend (React + Vite)
+### Langkah 3: Konfigurasi & Jalankan Frontend (React + Vite)
 
 1. **Navigasi ke Direktori Frontend**:
    Buka terminal baru, lalu masuk ke folder `frontend`:
@@ -226,7 +226,7 @@ Sebelum melakukan pemasangan, pastikan sistem komputer Anda memenuhi prasyarat b
 
 ---
 
-### 🔑 Informasi Login Uji Coba (Demo Credentials)
+### Informasi Login Uji Coba (Demo Credentials)
 
 Jika Anda menjalankan langkah **Seeding Demo (Langkah 1.3)** di atas, Anda dapat langsung melakukan login ke sistem menggunakan kredensial pengujian berikut:
 
@@ -238,7 +238,7 @@ Jika Anda menjalankan langkah **Seeding Demo (Langkah 1.3)** di atas, Anda dapat
 
 ---
 
-## 🧪 Menjalankan Pengujian (Testing)
+## Menjalankan Pengujian (Testing)
 
 Proyek ini dilengkapi dengan skenario pengujian unit (*unit test*) untuk memverifikasi fungsionalitas kritis backend seperti otentikasi sesi, autorisasi RBAC, validasi token penyegaran (*refresh token rotation*), dan audit log.
 
@@ -250,7 +250,7 @@ go test ./tests/... -v
 
 ---
 
-## 🚀 Panduan Deployment ke Server Produksi
+## Panduan Deployment ke Server Produksi
 
 Bagi Anda yang ingin mendeploy sistem **PEKAN** ke server *staging* atau *production* (Ubuntu/Debian atau Rocky Linux), kami telah menyediakan skrip automasi penginstalan yang tangguh di direktori `deploy/`. Skrip tersebut akan mengonfigurasi Systemd service, Nginx reverse proxy, PostgreSQL, dan Redis secara otomatis:
 
@@ -260,13 +260,13 @@ Bagi Anda yang ingin mendeploy sistem **PEKAN** ke server *staging* atau *produc
 
 ---
 
-## 📄 Lisensi
+## Lisensi
 
 Proyek ini dirilis secara publik sebagai perangkat lunak open-source di bawah naungan lisensi **[Apache License 2.0](LICENSE)**. Anda bebas menggunakan, memodifikasi, mendistribusikan, dan menerapkan kode ini dalam proyek Anda, baik secara komersial maupun non-komersial, asalkan mematuhi seluruh syarat dan ketentuan lisensi Apache 2.0.
 
 ---
 
-## 👥 Kontribusi
+## Kontribusi
 
 Kontribusi dari komunitas sangat kami hargai! Jika Anda menemukan bug, ingin mengajukan fitur baru, atau meningkatkan kualitas dokumentasi ini, silakan ikuti alur berikut:
 1. **Fork** repositori ini.
