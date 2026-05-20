@@ -57,12 +57,15 @@ func (h *Handler) GetStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	session, err := h.service.GetConnectionStatus(r.Context(), tc.TenantID, tc.UserID)
+	botNumber := h.service.GetWhatsAppBotNumber(r.Context())
+
 	if err != nil {
 		if errors.Is(err, domain.ErrSessionNotFound) {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]interface{}{
 				"data": map[string]interface{}{
-					"connected": false,
+					"connected":        false,
+					"bot_phone_number": botNumber,
 				},
 			})
 			return
@@ -74,9 +77,10 @@ func (h *Handler) GetStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"data": map[string]interface{}{
-			"connected":    true,
-			"phone_number": session.PhoneNumber,
-			"last_active":  session.LastActive,
+			"connected":        true,
+			"phone_number":     session.PhoneNumber,
+			"last_active":      session.LastActive,
+			"bot_phone_number": botNumber,
 		},
 	})
 }

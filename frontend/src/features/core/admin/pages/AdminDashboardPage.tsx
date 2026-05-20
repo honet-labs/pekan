@@ -144,6 +144,7 @@ export function AdminDashboardPage(): JSX.Element {
   const [activeWaBotAI, setActiveWaBotAI] = useState("gemini");
   const [waActiveProvider, setWaActiveProvider] = useState("wa_waha");
   const [waBotSystemPrompt, setWaBotSystemPrompt] = useState("");
+  const [waBotPhoneNumber, setWaBotPhoneNumber] = useState("");
 
   // Track whether each AI key is already saved in DB (masked on read)
   const [geminiKeySaved, setGeminiKeySaved] = useState(false);
@@ -278,6 +279,11 @@ export function AdminDashboardPage(): JSX.Element {
       setWaBotSystemPrompt(waPromptVal.value);
     } else {
       setWaBotSystemPrompt(DEFAULT_WA_BOT_SYSTEM_PROMPT);
+    }
+
+    const waBotPhoneVal = await fetchSetting("wa_bot_phone_number");
+    if (waBotPhoneVal && waBotPhoneVal.value) {
+      setWaBotPhoneNumber(waBotPhoneVal.value);
     }
 
     const smtpVal = await fetchSetting("notification_smtp");
@@ -1037,7 +1043,7 @@ export function AdminDashboardPage(): JSX.Element {
     await saveAdminGlobalSetting(key, value, isEncrypted);
   };
 
-  const handleSaveNotificationConfig = async (provider: "smtp" | "telegram" | "wa" | "wa_fonnte" | "wa_waha" | "wa_gowa" | "gemini" | "openai" | "claude" | "sumopod" | "active_ai" | "active_wa_bot_ai" | "wa_active_provider" | "wa_bot_system_prompt") => {
+  const handleSaveNotificationConfig = async (provider: "smtp" | "telegram" | "wa" | "wa_fonnte" | "wa_waha" | "wa_gowa" | "gemini" | "openai" | "claude" | "sumopod" | "active_ai" | "active_wa_bot_ai" | "wa_active_provider" | "wa_bot_system_prompt" | "wa_bot_phone_number") => {
     setSavingConfig(provider);
     try {
       if (provider === "gemini") {
@@ -1057,6 +1063,8 @@ export function AdminDashboardPage(): JSX.Element {
         await saveAdminGlobalSetting("receipt_active_ai_provider", activeAI, false);
       } else if (provider === "active_wa_bot_ai") {
         await saveAdminGlobalSetting("wa_bot_active_ai_provider", activeWaBotAI, false);
+      } else if (provider === "wa_bot_phone_number") {
+        await saveAdminGlobalSetting("wa_bot_phone_number", waBotPhoneNumber, false);
       } else if (provider === "wa_bot_system_prompt") {
         await saveAdminGlobalSetting("wa_bot_system_instructions", waBotSystemPrompt, false);
       } else if (provider === "wa_active_provider") {
@@ -2521,6 +2529,27 @@ export function AdminDashboardPage(): JSX.Element {
                       </select>
                       <button className="btn btn-primary" onClick={() => handleSaveNotificationConfig("active_wa_bot_ai")} disabled={savingConfig === "active_wa_bot_ai"}>
                         {savingConfig === "active_wa_bot_ai" ? "Menyimpan..." : "Simpan Pilihan"}
+                      </button>
+                    </div>
+                 </div>
+               </div>
+ 
+               {/* Nomor WhatsApp Bot System */}
+               <div className="surface card shadow-soft" style={{ gridColumn: "1 / -1" }}>
+                 <h3 className="form-title">Nomor WhatsApp Bot System</h3>
+                 <div className="form-grid">
+                    <p className="form-section-desc">Masukkan nomor WhatsApp Bot sistem Anda (misal: +628123456789). Nomor ini akan ditampilkan kepada pengguna untuk membantu mereka mengetahui kemana mereka harus mengirim pesan/perintah login.</p>
+                    <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                      <input 
+                        type="text"
+                        className="input-control" 
+                        placeholder="Contoh: +628123456789" 
+                        value={waBotPhoneNumber} 
+                        onChange={e => setWaBotPhoneNumber(e.target.value)} 
+                        style={{ maxWidth: "300px" }} 
+                      />
+                      <button className="btn btn-primary" onClick={() => handleSaveNotificationConfig("wa_bot_phone_number")} disabled={savingConfig === "wa_bot_phone_number"}>
+                        {savingConfig === "wa_bot_phone_number" ? "Menyimpan..." : "Simpan Nomor Bot"}
                       </button>
                     </div>
                  </div>

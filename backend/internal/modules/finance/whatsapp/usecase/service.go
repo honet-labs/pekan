@@ -1215,4 +1215,9 @@ func (s *Service) ProcessWebChat(ctx context.Context, tenantID, userID, tenantCo
 	return reply, nil
 }
 
+func (s *Service) GetWhatsAppBotNumber(ctx context.Context) string {
+	num, _ := s.settings.GetGlobalSettingRaw(ctx, "wa_bot_phone_number")
+	return strings.TrimSpace(num)
+}
+
 

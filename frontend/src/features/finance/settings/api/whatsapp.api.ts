@@ -18,6 +18,7 @@ export type WhatsAppStatus = {
   connected: boolean;
   phone_number?: string;
   last_active?: string;
+  bot_phone_number?: string;
 };
 
 export async function checkWhatsAppStatus(): Promise<WhatsAppStatus> {
