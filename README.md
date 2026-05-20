@@ -1,4 +1,4 @@
-# 🏢 PEKAN (Pusat Kendali & Keuangan SaaS)
+# 🏢 PEKAN (Web Aplikasi Pencatatan Keuangan)
 
 [![Go Version](https://img.shields.io/badge/Go-1.23-00ADD8?style=flat-square&logo=go)](https://golang.org/)
 [![React Version](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react)](https://react.dev/)
@@ -6,7 +6,7 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15%2B-4169E1?style=flat-square&logo=postgresql)](https://www.postgresql.org/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](LICENSE)
 
-**PEKAN** (Pusat Kendali & Keuangan SaaS) adalah platform pengelolaan keuangan berskala korporat/SaaS modern yang dirancang dengan arsitektur tangguh, terukur, dan aman. Platform ini memadukan kekuatan **Go (Golang)** di bagian backend dengan **React + Vite** di bagian frontend, serta dilengkapi dengan fitur asisten keuangan cerdas berbasis **Kecerdasan Buatan (AI)** melalui integrasi **WhatsApp** dan **OCR Receipt Scanner**.
+**PEKAN** (Web Aplikasi Pencatatan Keuangan) adalah platform pengelolaan keuangan berskala korporat/SaaS modern yang dirancang dengan arsitektur tangguh, terukur, dan aman. Platform ini memadukan kekuatan **Go (Golang)** di bagian backend dengan **React + Vite** di bagian frontend, serta dilengkapi dengan fitur asisten keuangan cerdas berbasis **Kecerdasan Buatan (AI)** melalui integrasi **WhatsApp** dan **OCR Receipt Scanner**.
 
 ---
 

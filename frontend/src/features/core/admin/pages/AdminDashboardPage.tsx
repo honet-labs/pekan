@@ -1736,7 +1736,7 @@ export function AdminDashboardPage(): JSX.Element {
               activeTab === "database" ? "Kelola pengaturan koneksi PostgreSQL database Anda." :
               activeTab === "backups" ? "Kelola file dump database untuk keamanan data dan migrasi." :
               activeTab === "whatsapp" ? "Pantau statistik antrean pesan real-time, status pemrosesan AI, log error, dan retry manual." :
-              "Pusat kendali dan infrastruktur SaaS"
+              "Pusat kendali dan infrastruktur Pekan"
             }
             hideInfo={true}
           />
