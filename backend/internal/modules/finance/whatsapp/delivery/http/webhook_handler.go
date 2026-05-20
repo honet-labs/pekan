@@ -202,6 +202,10 @@ func (h *WebhookHandler) HandleIncomingMessage(w http.ResponseWriter, r *http.Re
 			logJSON("error", "login_failed", map[string]any{"sender": sender, "error": err.Error()})
 			
 			reply := "Gagal Menghubungkan Akun\n\nKode OTP tidak valid atau sudah kadaluwarsa. Silakan coba generate kode baru dari dasbor PEKAN."
+			if strings.Contains(strings.ToLower(err.Error()), "nomor") {
+				reply = "Gagal Menghubungkan Akun\n\n" + err.Error() + "."
+			}
+
 			_ = h.service.SendWhatsAppMessage(r.Context(), recipient, reply)
 		} else {
 			logJSON("info", "login_success", map[string]any{"sender": sender})

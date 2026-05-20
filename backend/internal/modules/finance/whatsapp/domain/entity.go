@@ -87,8 +87,9 @@ type Repository interface {
 	DeleteSessionByUser(ctx context.Context, tenantID, userID string) error
 	DeleteSessionByPhone(ctx context.Context, phoneNumber string) error
 
-	// Public Tenant Info
+	// Public Tenant Info & Users
 	GetTenantCode(ctx context.Context, tenantID string) (string, error)
+	GetUserPhone(ctx context.Context, userID string) (string, error)
 
 	// Transaction creation inside tenant schema
 	CreateChatTransaction(ctx context.Context, tenantID, userID, tenantCode string, amount int64, typeStr, description, categoryName string, transactionDate string, items []ChatItem) (string, error)

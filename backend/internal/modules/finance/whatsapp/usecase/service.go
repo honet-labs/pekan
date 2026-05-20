@@ -160,6 +160,31 @@ func (s *Service) ProcessLogin(ctx context.Context, phoneNumber, code string) er
 		return domain.ErrTokenNotFound
 	}
 
+	// 1.5. Validate phone number matches the user's registered phone
+	expectedPhone, err := s.repo.GetUserPhone(ctx, token.UserID)
+	if err != nil {
+		return fmt.Errorf("gagal memverifikasi profil pengguna: %w", err)
+	}
+	if expectedPhone == "" {
+		return fmt.Errorf("anda belum mengatur nomor handphone di profil Anda, harap isi Nomor HP di halaman WebUI Profil Anda")
+	}
+
+	// Normalize both phone numbers for comparison
+	cleanExpected := strings.TrimLeft(strings.ReplaceAll(expectedPhone, " ", ""), "+")
+	cleanReceived := strings.TrimLeft(strings.ReplaceAll(phoneNumber, " ", ""), "+")
+	
+	// If expected starts with 0 (e.g. 0812), change to 62
+	if strings.HasPrefix(cleanExpected, "0") {
+		cleanExpected = "62" + strings.TrimPrefix(cleanExpected, "0")
+	}
+	if strings.HasPrefix(cleanReceived, "0") {
+		cleanReceived = "62" + strings.TrimPrefix(cleanReceived, "0")
+	}
+
+	if cleanExpected != cleanReceived {
+		return fmt.Errorf("nomor WhatsApp pengirim tidak cocok dengan nomor HP yang terdaftar di profil Anda")
+	}
+
 	// 2. Delete any existing sessions for this phone number or user to allow seamless re-linking/switching
 	_ = s.repo.DeleteSessionByPhone(ctx, phoneNumber)
 	_ = s.repo.DeleteSessionByUser(ctx, token.TenantID, token.UserID)

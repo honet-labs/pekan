@@ -150,6 +150,19 @@ func (r *RepositoryPG) GetTenantCode(ctx context.Context, tenantID string) (stri
 	return code, nil
 }
 
+func (r *RepositoryPG) GetUserPhone(ctx context.Context, userID string) (string, error) {
+	var phone sql.NullString
+	const q = `SELECT phone FROM public.user_profiles WHERE user_id = $1`
+	err := r.conn.QueryRowContext(ctx, q, userID).Scan(&phone)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", nil
+		}
+		return "", err
+	}
+	return phone.String, nil
+}
+
 func (r *RepositoryPG) CreateChatTransaction(ctx context.Context, tenantID, userID, tenantCode string, amount int64, typeStr, description, categoryName string, transactionDate string, items []domain.ChatItem) (string, error) {
 	tc := tenancy.Context{
 		TenantID:   tenantID,

@@ -2924,7 +2924,6 @@ export function AdminDashboardPage(): JSX.Element {
                       <p className="stat-label" style={{ fontWeight: 600, color: "var(--muted)", margin: 0, textTransform: "uppercase", fontSize: "0.75rem", letterSpacing: "0.05em" }}>
                         Total Pesan Diproses
                       </p>
-                      <span style={{ fontSize: "1.2rem", opacity: 0.8 }}>📊</span>
                     </div>
                     <h2 className="stat-value text-indigo" style={{ fontSize: "2rem", fontWeight: 800, margin: "0.25rem 0", color: "#6366f1" }}>
                       {waQueueStats?.total_processed?.toLocaleString() || 0}
@@ -2967,7 +2966,6 @@ export function AdminDashboardPage(): JSX.Element {
                       <p className="stat-label" style={{ fontWeight: 600, color: "var(--muted)", margin: 0, textTransform: "uppercase", fontSize: "0.75rem", letterSpacing: "0.05em" }}>
                         Dalam Antrean (Pending)
                       </p>
-                      <span style={{ fontSize: "1.2rem", opacity: 0.8 }} className={waQueueStats?.total_pending && waQueueStats.total_pending > 0 ? "pulse-fast" : ""}>⏳</span>
                     </div>
                     <h2 className={`stat-value ${waQueueStats?.total_pending && waQueueStats.total_pending > 0 ? "text-amber pulse-fast" : "text-muted"}`} style={{ fontSize: "2rem", fontWeight: 800, margin: "0.25rem 0", color: waQueueStats?.total_pending && waQueueStats.total_pending > 0 ? "#f59e0b" : "var(--muted)" }}>
                       {waQueueStats?.total_pending || 0}
@@ -3010,7 +3008,6 @@ export function AdminDashboardPage(): JSX.Element {
                       <p className="stat-label" style={{ fontWeight: 600, color: "var(--muted)", margin: 0, textTransform: "uppercase", fontSize: "0.75rem", letterSpacing: "0.05em" }}>
                         Sedang Diproses (Active AI)
                       </p>
-                      <span style={{ fontSize: "1.2rem", opacity: 0.8 }} className={waQueueStats?.total_processing && waQueueStats.total_processing > 0 ? "pulse-fast" : ""}>🧠</span>
                     </div>
                     <h2 className={`stat-value ${waQueueStats?.total_processing && waQueueStats.total_processing > 0 ? "text-indigo pulse-fast" : "text-muted"}`} style={{ fontSize: "2rem", fontWeight: 800, margin: "0.25rem 0", color: waQueueStats?.total_processing && waQueueStats.total_processing > 0 ? "#4f46e5" : "var(--muted)" }}>
                       {waQueueStats?.total_processing || 0}
@@ -3053,7 +3050,6 @@ export function AdminDashboardPage(): JSX.Element {
                       <p className="stat-label" style={{ fontWeight: 600, color: "var(--muted)", margin: 0, textTransform: "uppercase", fontSize: "0.75rem", letterSpacing: "0.05em" }}>
                         Rata-rata Latensi AI
                       </p>
-                      <span style={{ fontSize: "1.2rem", opacity: 0.8 }}>⚡</span>
                     </div>
                     <h2 className="stat-value text-emerald" style={{ fontSize: "2rem", fontWeight: 800, margin: "0.25rem 0", color: "#10b981" }}>
                       {waQueueStats?.average_latency_ms ? `${(waQueueStats.average_latency_ms / 1000).toFixed(2)}s` : "0.00s"}
