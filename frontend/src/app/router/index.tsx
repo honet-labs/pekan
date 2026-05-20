@@ -40,11 +40,11 @@ import { useTenantStore } from "../../core/tenant/tenant-store";
 
 export function AppRouter(): JSX.Element {
   const tenant = useTenantStore();
-  const activeCode = tenant.activeTenantCode || "default";
+  const activeID = tenant.activeTenantID || "default";
 
   return (
     <Routes>
-      <Route path="/" element={<Navigate to={`/app/${activeCode}/finance/dashboard`} replace />} />
+      <Route path="/" element={<Navigate to={`/app/${activeID}/finance/dashboard`} replace />} />
       <Route path="/app" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />

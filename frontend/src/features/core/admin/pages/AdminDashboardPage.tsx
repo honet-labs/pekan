@@ -1455,7 +1455,7 @@ export function AdminDashboardPage(): JSX.Element {
       const res = await impersonateUser("00000000-0000-0000-0000-000000000000", tenantID, email);
       // res.access_token is still returned but no longer stored in localStorage (handled by cookies)
       success(`Beralih ke akun ${email}...`);
-      setTimeout(() => window.location.href = `/app/${code}/finance/dashboard`, 1200);
+      setTimeout(() => window.location.href = `/app/${tenantID}/finance/dashboard`, 1200);
     } catch (err) {
       error("Gagal melakukan impersonasi");
     }
@@ -3500,12 +3500,19 @@ export function AdminDashboardPage(): JSX.Element {
                           </span>
                           <span className="text-xs text-rose" style={{ fontWeight: 600 }}>Diperlukan sinkronisasi</span>
                         </>
-                      ) : updateInfo ? (
+                      ) : updateInfo?.is_git_repo ? (
                         <>
                           <span className="badge-status running" style={{ background: "#ecfdf5", color: "#10b981", fontSize: "0.85rem", padding: "4px 12px" }}>
                             UP TO DATE
                           </span>
                           <span className="text-xs text-emerald" style={{ fontWeight: 600 }}>Sistem sudah optimal</span>
+                        </>
+                      ) : updateInfo ? (
+                        <>
+                          <span className="badge-status pending" style={{ background: "rgba(245, 158, 11, 0.1)", color: "#f59e0b", fontSize: "0.85rem", padding: "4px 12px" }}>
+                            MANUAL
+                          </span>
+                          <span className="text-xs text-amber" style={{ fontWeight: 600 }}>Auto-update nonaktif</span>
                         </>
                       ) : (
                         <span className="text-xs opacity-50">Menunggu pemeriksaan...</span>

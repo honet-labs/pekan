@@ -326,7 +326,7 @@ export function ChatbotPage(): JSX.Element {
                     <div style={{
                       padding: "12px 16px",
                       borderRadius: isBot ? "16px 16px 16px 2px" : "16px 16px 2px 16px",
-                      background: isBot ? "var(--surface-soft)" : "linear-gradient(135deg, var(--primary), var(--primary-dark))",
+                      background: isBot ? "var(--surface-soft)" : "linear-gradient(135deg, var(--primary), var(--primary-strong))",
                       color: isBot ? "var(--text)" : "#fff",
                       border: isBot ? "1px solid var(--border)" : "none",
                       boxShadow: "0 2px 8px rgba(0,0,0,0.05)",

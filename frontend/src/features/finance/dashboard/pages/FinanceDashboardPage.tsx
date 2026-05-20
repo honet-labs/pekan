@@ -18,8 +18,7 @@ export function FinanceDashboardPage(): JSX.Element {
   const today = useMemo(() => new Date(), []);
   const [from, setFrom] = useState<string>(() => {
     const d = new Date();
-    d.setDate(d.getDate() - 30);
-    return formatDateInput(d);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
   });
   const [to, setTo] = useState<string>(() => formatDateInput(today));
   const [hoveredPieItem, setHoveredPieItem] = useState<{ name: string; value: number } | null>(null);

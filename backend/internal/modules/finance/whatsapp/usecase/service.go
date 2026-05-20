@@ -105,13 +105,25 @@ func (s *Service) Disconnect(ctx context.Context, tenantID, userID string) error
 
 func cleanPhoneNumber(phone string) string {
 	phone = strings.TrimSpace(phone)
-	phone = strings.ReplaceAll(phone, "+", "")
-	phone = strings.ReplaceAll(phone, "-", "")
-	phone = strings.ReplaceAll(phone, " ", "")
-	if strings.HasPrefix(phone, "08") {
-		phone = "628" + strings.TrimPrefix(phone, "08")
+	if strings.Contains(phone, "@") {
+		phone = strings.Split(phone, "@")[0]
 	}
-	return phone
+	var sb strings.Builder
+	for _, r := range phone {
+		if r >= '0' && r <= '9' {
+			sb.WriteRune(r)
+		}
+	}
+	digits := sb.String()
+	if strings.HasPrefix(digits, "620") {
+		digits = "0" + strings.TrimPrefix(digits, "620")
+	} else if strings.HasPrefix(digits, "62") {
+		digits = "0" + strings.TrimPrefix(digits, "62")
+	}
+	if strings.HasPrefix(digits, "8") {
+		digits = "0" + digits
+	}
+	return digits
 }
 
 func (s *Service) ConnectDirect(ctx context.Context, tenantID, userID, phoneNumber string) error {
@@ -170,19 +182,11 @@ func (s *Service) ProcessLogin(ctx context.Context, phoneNumber, code string) er
 	}
 
 	// Normalize both phone numbers for comparison
-	cleanExpected := strings.TrimLeft(strings.ReplaceAll(expectedPhone, " ", ""), "+")
-	cleanReceived := strings.TrimLeft(strings.ReplaceAll(phoneNumber, " ", ""), "+")
-	
-	// If expected starts with 0 (e.g. 0812), change to 62
-	if strings.HasPrefix(cleanExpected, "0") {
-		cleanExpected = "62" + strings.TrimPrefix(cleanExpected, "0")
-	}
-	if strings.HasPrefix(cleanReceived, "0") {
-		cleanReceived = "62" + strings.TrimPrefix(cleanReceived, "0")
-	}
+	cleanExpected := cleanPhoneNumber(expectedPhone)
+	cleanReceived := cleanPhoneNumber(phoneNumber)
 
 	if cleanExpected != cleanReceived {
-		return fmt.Errorf("nomor WhatsApp pengirim tidak cocok dengan nomor HP yang terdaftar di profil Anda")
+		return fmt.Errorf("nomor WhatsApp pengirim (%s) tidak cocok dengan nomor HP yang terdaftar di profil Anda (%s) (Raw Profil: %s)", cleanReceived, cleanExpected, expectedPhone)
 	}
 
 	// 2. Delete any existing sessions for this phone number or user to allow seamless re-linking/switching

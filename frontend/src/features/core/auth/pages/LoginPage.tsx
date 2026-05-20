@@ -105,7 +105,7 @@ export function LoginPage(): JSX.Element {
       }
       
       tenant.setTenant(ctx.active_tenant.id, ctx.active_tenant.code || ctx.active_tenant.id);
-      navigate(`/app/${ctx.active_tenant.code || ctx.active_tenant.id}/finance/dashboard`, { replace: true });
+      navigate(`/app/${ctx.active_tenant.id}/finance/dashboard`, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : t("errors.loginFailed"));
     } finally {
@@ -208,7 +208,7 @@ export function LoginPage(): JSX.Element {
       
       tenant.setTenant(ctx.active_tenant.id, ctx.active_tenant.code || ctx.active_tenant.id);
       
-      navigate(`/app/${ctx.active_tenant.code || ctx.active_tenant.id}/finance/dashboard`, { replace: true });
+      navigate(`/app/${ctx.active_tenant.id}/finance/dashboard`, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal mengganti password");
     } finally {
