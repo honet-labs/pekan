@@ -50,9 +50,9 @@ func (h *WebhookHandler) HandleIncomingMessage(w http.ResponseWriter, r *http.Re
 			mediaURL = r.FormValue("url")
 		}
 	} else {
-		// Handle JSON
 		bodyBytes, err := io.ReadAll(r.Body)
 		if err == nil && len(bodyBytes) > 0 {
+			fmt.Printf("[WA-WEBHOOK] RAW BODY: %s\n", string(bodyBytes))
 			var raw map[string]interface{}
 			if err := json.Unmarshal(bodyBytes, &raw); err == nil {
 				// Try generic / Fonnte format
