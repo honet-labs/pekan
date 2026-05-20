@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ============================================
-# Automated SaaS-PEKAN Production Deploy
+# Automated PEKAN Production Deploy
 # Server: 192.168.201.18
 # ============================================
 
@@ -28,19 +28,19 @@ run_remote_cmd() {
 }
 
 echo "📤 [1/6] Verifying file upload..."
-run_remote_cmd "ls -lh /tmp/deploy/saas-pekan.tar.gz && echo '✅ File ready'"
+run_remote_cmd "ls -lh /tmp/deploy/PEKAN.tar.gz && echo '✅ File ready'"
 
 echo ""
 echo "📦 [2/6] Extracting deployment package..."
-run_remote_cmd "cd /tmp/deploy && tar -xzf saas-pekan.tar.gz && ls -d saas-pekan 2>/dev/null || echo 'Extracting to current dir...'" 
+run_remote_cmd "cd /tmp/deploy && tar -xzf PEKAN.tar.gz && ls -d PEKAN 2>/dev/null || echo 'Extracting to current dir...'" 
 
 echo ""
 echo "⚙️  [3/6] Running deployment script..."
 run_remote_cmd "
 set -e
 cd /tmp/deploy
-if [ -d 'saas-pekan' ]; then
-    cd saas-pekan
+if [ -d 'PEKAN' ]; then
+    cd PEKAN
 fi
 
 echo '  → Making installer executable...'

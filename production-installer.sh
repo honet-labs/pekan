@@ -148,7 +148,7 @@ verify_deployment() {
 }
 
 # Main Execution Flow
-log_header "🚀 SaaS-PEKAN PRODUCTION INSTALLER"
+log_header "🚀 PEKAN PRODUCTION INSTALLER"
 log_info "Starting production deployment..."
 
 check_prerequisites

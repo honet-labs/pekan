@@ -1,4 +1,4 @@
-# PEKAN SaaS Technical Blueprint (Modular Multi-Tenant)
+# PEKAN Technical Blueprint (Modular Multi-Tenant)
 
 ## 1) System Architecture (End-to-End)
 

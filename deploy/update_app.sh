@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Update Script for Pekan SaaS Platform
+# Update Script for PEKAN Platform
 # This script updates the code and rebuilds everything while keeping existing .env config.
 
 set -Eeuo pipefail

@@ -1,4 +1,4 @@
-# Security Architecture Review - PEKAN SaaS
+# Security Architecture Review - PEKAN
 
 ## 1) Ancaman Utama dan Prioritas
 

@@ -46,7 +46,7 @@ cd /opt/pekan
 # On local Windows PowerShell:
 $remoteUser = "administrator"
 $remoteHost = "192.168.201.18"
-$localPath = "C:\Users\LT470s\Documents\HOME_DATA\HONET\project\saas-pekan"
+$localPath = "C:\Users\LT470s\Documents\HOME_DATA\HONET\project\PEKAN"
 $remotePath = "/opt/pekan"
 
 # Using SCP (if OpenSSH installed):

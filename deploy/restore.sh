@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Full Restore Script for Pekan SaaS Platform
+# Full Restore Script for PEKAN Platform
 
 set -Eeuo pipefail
 

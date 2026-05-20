@@ -1,4 +1,4 @@
-$path = "c:\Users\yusha\Documents\HOME_DATA\HONET\Project\saas-pekan\frontend\src"
+$path = "c:\Users\yusha\Documents\HOME_DATA\HONET\Project\PEKAN\frontend\src"
 $files = Get-ChildItem -Path $path -Filter *.tsx -Recurse
 $files += Get-ChildItem -Path $path -Filter *.ts -Recurse
 

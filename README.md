@@ -1,4 +1,4 @@
-# 🏢 PEKAN SaaS (Pusat Kendali & Keuangan SaaS)
+# 🏢 PEKAN (Pusat Kendali & Keuangan SaaS)
 
 [![Go Version](https://img.shields.io/badge/Go-1.23-00ADD8?style=flat-square&logo=go)](https://golang.org/)
 [![React Version](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react)](https://react.dev/)
@@ -6,7 +6,7 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15%2B-4169E1?style=flat-square&logo=postgresql)](https://www.postgresql.org/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](LICENSE)
 
-**PEKAN SaaS** (Pusat Kendali & Keuangan SaaS) adalah platform pengelolaan keuangan berskala korporat/SaaS modern yang dirancang dengan arsitektur tangguh, terukur, dan aman. Platform ini memadukan kekuatan **Go (Golang)** di bagian backend dengan **React + Vite** di bagian frontend, serta dilengkapi dengan fitur asisten keuangan cerdas berbasis **Kecerdasan Buatan (AI)** melalui integrasi **WhatsApp** dan **OCR Receipt Scanner**.
+**PEKAN** (Pusat Kendali & Keuangan SaaS) adalah platform pengelolaan keuangan berskala korporat/SaaS modern yang dirancang dengan arsitektur tangguh, terukur, dan aman. Platform ini memadukan kekuatan **Go (Golang)** di bagian backend dengan **React + Vite** di bagian frontend, serta dilengkapi dengan fitur asisten keuangan cerdas berbasis **Kecerdasan Buatan (AI)** melalui integrasi **WhatsApp** dan **OCR Receipt Scanner**.
 
 ---
 
@@ -67,7 +67,7 @@
 Proyek ini dirancang menggunakan prinsip **Clean Architecture & Domain-Driven Design (DDD)** untuk pemisahan fungsionalitas (*separation of concerns*) yang jelas dan kemudahan pengujian (*testability*):
 
 ```text
-saas-pekan/
+PEKAN/
 ├── backend/
 │   ├── cmd/
 │   │   ├── api/            # Titik masuk (Entry point) HTTP REST API Server
@@ -93,7 +93,7 @@ saas-pekan/
 
 ## 🚀 Panduan Instalasi & Menjalankan Aplikasi
 
-Ikuti panduan di bawah ini untuk menyiapkan dan menjalankan platform **PEKAN SaaS** di lingkungan pengembangan lokal (*local development*) Anda.
+Ikuti panduan di bawah ini untuk menyiapkan dan menjalankan platform **PEKAN** di lingkungan pengembangan lokal (*local development*) Anda.
 
 ---
 
@@ -252,7 +252,7 @@ go test ./tests/... -v
 
 ## 🚀 Panduan Deployment ke Server Produksi
 
-Bagi Anda yang ingin mendeploy sistem **PEKAN SaaS** ke server *staging* atau *production* (Ubuntu/Debian atau Rocky Linux), kami telah menyediakan skrip automasi penginstalan yang tangguh di direktori `deploy/`. Skrip tersebut akan mengonfigurasi Systemd service, Nginx reverse proxy, PostgreSQL, dan Redis secara otomatis:
+Bagi Anda yang ingin mendeploy sistem **PEKAN** ke server *staging* atau *production* (Ubuntu/Debian atau Rocky Linux), kami telah menyediakan skrip automasi penginstalan yang tangguh di direktori `deploy/`. Skrip tersebut akan mengonfigurasi Systemd service, Nginx reverse proxy, PostgreSQL, dan Redis secara otomatis:
 
 * **Ubuntu / Debian Server**: `deploy/install_server.sh`
 * **Rocky Linux Server**: `deploy/install_server_rocky.sh`

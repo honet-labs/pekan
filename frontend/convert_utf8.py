@@ -27,4 +27,4 @@ def convert_to_utf8(directory):
                 except Exception as e:
                     print(f"Failed to convert {filepath}: {e}")
 
-convert_to_utf8(r'c:\Users\yusha\Documents\HOME_DATA\HONET\Project\saas-pekan\frontend\src')
+convert_to_utf8(r'c:\Users\yusha\Documents\HOME_DATA\HONET\Project\PEKAN\frontend\src')

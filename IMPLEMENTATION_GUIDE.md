@@ -1,4 +1,4 @@
-# PEKAN SaaS Enhancement Implementation Guide
+# PEKAN Enhancement Implementation Guide
 
 ## Summary of Changes
 

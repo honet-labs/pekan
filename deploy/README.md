@@ -1,6 +1,6 @@
-# Pekan SaaS Deployment & Operations Guide
+# PEKAN Deployment & Operations Guide
 
-Dokumentasi ini menjelaskan penggunaan skrip otomatisasi di folder `deploy/` untuk instalasi, pembaruan, pencadangan, dan pemeliharaan platform Pekan SaaS.
+Dokumentasi ini menjelaskan penggunaan skrip otomatisasi di folder `deploy/` untuk instalasi, pembaruan, pencadangan, dan pemeliharaan platform PEKAN.
 
 ---
 

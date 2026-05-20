@@ -1,6 +1,6 @@
-# System Requirements & Tech Stack - PEKAN SaaS
+# System Requirements & Tech Stack - PEKAN
 
-This document outlines the recommended specifications and technology stack for deploying and running the PEKAN SaaS platform.
+This document outlines the recommended specifications and technology stack for deploying and running the PEKAN platform.
 
 ## 🚀 Technology Stack
 

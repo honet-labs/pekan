@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Clean Uninstall Script for Pekan SaaS Platform
+# Clean Uninstall Script for PEKAN Platform
 # This script will remove all components, data, and configurations.
 
 set -Eeuo pipefail

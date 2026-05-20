@@ -1,4 +1,4 @@
-# PEKAN SaaS PostgreSQL Schema (Tenant-Aware)
+# PEKAN PostgreSQL Schema (Tenant-Aware)
 
 ## 1) Desain Umum
 

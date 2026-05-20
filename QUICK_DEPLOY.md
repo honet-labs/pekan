@@ -15,8 +15,8 @@ ssh administrator@192.168.201.18
 
 # On server:
 cd /tmp
-git clone <your-repo-url> saas-pekan
-cd saas-pekan
+git clone <your-repo-url> PEKAN
+cd PEKAN
 
 # 2. Run deployment
 sudo chmod +x deploy/install_server.sh
@@ -34,26 +34,26 @@ systemctl status pekan-api
 
 ```powershell
 # 1. Create remote directory
-ssh administrator@192.168.201.18 'mkdir -p /tmp/saas-pekan'
+ssh administrator@192.168.201.18 'mkdir -p /tmp/PEKAN'
 
 # 2. Upload entire project (Windows - using tar):
-$projectPath = "C:\Users\LT470s\Documents\HOME_DATA\HONET\project\saas-pekan"
+$projectPath = "C:\Users\LT470s\Documents\HOME_DATA\HONET\project\PEKAN"
 $remoteUser = "administrator"
 $remoteHost = "192.168.201.18"
 
 # Create tar archive
 Push-Location $projectPath
-tar -czf saas-pekan.tar.gz --exclude=node_modules --exclude=dist --exclude=.git --exclude=.env *
+tar -czf PEKAN.tar.gz --exclude=node_modules --exclude=dist --exclude=.git --exclude=.env *
 Pop-Location
 
 # Upload
-scp -C "$projectPath\saas-pekan.tar.gz" "$remoteUser@$remoteHost:/tmp/"
+scp -C "$projectPath\PEKAN.tar.gz" "$remoteUser@$remoteHost:/tmp/"
 
 # 3. Extract and deploy on server
 ssh -t $remoteUser@$remoteHost "
   cd /tmp
-  tar -xzf saas-pekan.tar.gz -C saas-pekan/ --strip-components=1 || tar -xzf saas-pekan.tar.gz
-  cd saas-pekan
+  tar -xzf PEKAN.tar.gz -C PEKAN/ --strip-components=1 || tar -xzf PEKAN.tar.gz
+  cd PEKAN
   sudo chmod +x deploy/install_server.sh
   sudo bash deploy/install_server.sh --app-env production --http-port 8080
 "

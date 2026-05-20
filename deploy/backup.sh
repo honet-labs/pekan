@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Full Backup Script for Pekan SaaS Platform
+# Full Backup Script for PEKAN Platform
 
 set -Eeuo pipefail
 

@@ -263,7 +263,7 @@ func (s *Service) TestNotification(ctx context.Context, provider string, configJ
 		return errors.New("provider not supported for testing")
 	}
 
-	return drv.Send(ctx, destination, "Pesan Uji Coba dari Pekan SaaS Admin Panel. Jika Anda menerima pesan ini, konfigurasi Anda sudah benar.")
+	return drv.Send(ctx, destination, "Pesan Uji Coba dari PEKAN Admin Panel. Jika Anda menerima pesan ini, konfigurasi Anda sudah benar.")
 }
 
 type DatabaseConfig struct {

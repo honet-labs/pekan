@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ============================================
-# SaaS-PEKAN Production Deployment Script
+# PEKAN Production Deployment Script
 # Environment: Production
 # Server: 192.168.201.18
 # Date: 2026-04-03

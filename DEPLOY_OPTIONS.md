@@ -36,13 +36,13 @@ echo "Waiting for file upload from your computer..."
 ### Step 3: Upload in NEW Terminal/PowerShell
 ```powershell
 # NEW Terminal window:
-cd c:\Users\LT470s\Documents\HOME_DATA\HONET\project\saas-pekan
-scp -C saas-pekan-deploy.tar.gz administrator@192.168.201.18:/tmp/
+cd c:\Users\LT470s\Documents\HOME_DATA\HONET\project\PEKAN
+scp -C PEKAN-deploy.tar.gz administrator@192.168.201.18:/tmp/
 ```
 
 ### Step 4: Back to SSH Terminal - Extract & Deploy
 ```bash
-tar -xzf /tmp/saas-pekan-deploy.tar.gz -C /opt/pekan/ --strip-components=1
+tar -xzf /tmp/PEKAN-deploy.tar.gz -C /opt/pekan/ --strip-components=1
 cd /opt/pekan
 chmod +x deploy/install_server.sh
 sudo bash deploy/install_server.sh --app-env production --http-port 8080
@@ -148,7 +148,7 @@ Web UI: 200 OK
 
 **Just run:**
 ```powershell
-cd c:\Users\LT470s\Documents\HOME_DATA\HONET\project\saas-pekan
+cd c:\Users\LT470s\Documents\HOME_DATA\HONET\project\PEKAN
 .\INSTANT_DEPLOY.ps1
 ```
 

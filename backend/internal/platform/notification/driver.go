@@ -79,7 +79,7 @@ func (d *SMTPDriver) Send(ctx context.Context, destination string, message strin
 		if err != nil {
 			return err
 		}
-		msg := []byte(fmt.Sprintf("To: %s\r\nSubject: Pekan SaaS Notification\r\n\r\n%s", to, message))
+		msg := []byte(fmt.Sprintf("To: %s\r\nSubject: PEKAN Notification\r\n\r\n%s", to, message))
 		if _, err = w.Write(msg); err != nil {
 			return err
 		}

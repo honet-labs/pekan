@@ -1,9 +1,9 @@
 # ============================================
-# SaaS-PEKAN Production Deployment Script
+# PEKAN Production Deployment Script
 # One-Command Deploy to: 192.168.201.18
 # ============================================
 
-Write-Host "SaaS-PEKAN Production Deployment" -ForegroundColor Cyan -NoNewline
+Write-Host "PEKAN Production Deployment" -ForegroundColor Cyan -NoNewline
 Write-Host " (Automated)" -ForegroundColor Yellow
 Write-Host "--------------------------------------------" -ForegroundColor Gray
 Write-Host ""
@@ -11,7 +11,7 @@ Write-Host ""
 $remoteUser = "administrator" # Change this
 $remoteHost = "your_server_ip" # Change this
 $localProjectPath = (Get-Location).Path
-$packageName = "saas-pekan-deploy.tar.gz"
+$packageName = "PEKAN-deploy.tar.gz"
 
 # Step 1: Create deployment package
 Write-Host "Step 1/4: Creating deployment package..." -ForegroundColor Green
@@ -49,7 +49,7 @@ mkdir -p /opt/pekan
 cd /opt/pekan
 
 echo "   - Extracting files..."
-tar -xzf /tmp/saas-pekan-deploy.tar.gz
+tar -xzf /tmp/PEKAN-deploy.tar.gz
 
 echo "   - Running server setup..."
 chmod +x deploy/install_server.sh
