@@ -1,0 +1,16 @@
+[Unit]
+Description=PEKAN API Service
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/pekan/backend
+EnvironmentFile=/opt/pekan/backend/.env
+ExecStart=/opt/pekan/bin/pekan-api
+Restart=always
+RestartSec=5
+User=pekan
+Group=pekan
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,528 @@
+openapi: 3.0.3
+info:
+  title: PEKAN API
+  version: 1.0.0
+  description: Modular multi-tenant SaaS API for PEKAN.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+paths:
+  /healthz:
+    get:
+      security: []
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+  /auth/login:
+    post:
+      security: []
+      summary: Login and issue access + refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+                tenant_id: { type: string, format: uuid }
+            example:
+              email: owner@pekan.local
+              password: password
+              tenant_id: 11111111-1111-1111-1111-111111111111
+      responses:
+        '200':
+          description: Token pair
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+              example:
+                data:
+                  access_token: jwt_access_token
+                  refresh_token: refresh_token
+                  token_type: Bearer
+                  access_token_expires_at: "2026-03-24T10:00:00Z"
+                  refresh_token_expires_at: "2026-04-23T10:00:00Z"
+                  user_id: 22222222-2222-2222-2222-222222222222
+                  email: owner@pekan.local
+                  active_tenant_id: 11111111-1111-1111-1111-111111111111
+                  permissions: [finance.transactions.read]
+                  features: [finance.transactions.read]
+                  modules: [finance]
+                meta:
+                  request_id: req_xxx
+                  timestamp: "2026-03-24T09:45:00Z"
+        '429':
+          description: Too many requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auth/refresh:
+    post:
+      security: []
+      summary: Rotate refresh token and issue new tokens
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token: { type: string }
+      responses:
+        '200':
+          description: Rotated token pair
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '401':
+          description: Invalid/expired/reused refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auth/logout:
+    post:
+      summary: Revoke refresh token session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token: { type: string }
+      responses:
+        '200':
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+  /auth/logout-all:
+    post:
+      summary: Revoke all sessions for current user
+      responses:
+        '200':
+          description: Logged out from all devices/sessions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+  /me/context:
+    get:
+      summary: Get current user context for active tenant
+      responses:
+        '200':
+          description: User context
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+  /tenants/{tenantID}/switch:
+    post:
+      summary: Switch active tenant and issue new token pair
+      parameters:
+        - in: path
+          name: tenantID
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: New token pair
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+  /tenants/{tenantID}/entitlements/effective:
+    get:
+      summary: Get effective modules/features for tenant
+      parameters:
+        - in: path
+          name: tenantID
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Effective entitlements
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+              example:
+                data:
+                  tenant_id: 11111111-1111-1111-1111-111111111111
+                  modules: [finance, finance.masterdata, finance.transactions]
+                  features: [finance.masterdata.read, finance.masterdata.write, finance.transactions.read, finance.transactions.write]
+                meta:
+                  request_id: req_xxx
+                  timestamp: "2026-03-24T09:45:00Z"
+  /tenants/{tenantID}/feature-overrides:
+    post:
+      summary: Set feature override for tenant
+      parameters:
+        - in: path
+          name: tenantID
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [feature_code, is_enabled]
+              properties:
+                feature_code: { type: string }
+                is_enabled: { type: boolean }
+                reason: { type: string }
+                expires_at: { type: string, format: date-time, nullable: true }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+  /finance/accounts:
+    get:
+      summary: List finance accounts
+      responses:
+        '200':
+          description: List accounts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+              example:
+                data:
+                  items:
+                    - id: 55555555-5555-5555-5555-555555555555
+                      name: Cash Wallet
+                      account_type: cash
+                      currency: IDR
+                      opening_balance_minor: 0
+                      is_active: true
+                meta:
+                  request_id: req_xxx
+                  timestamp: "2026-03-24T09:45:00Z"
+    post:
+      summary: Create finance account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, account_type, currency]
+              properties:
+                name: { type: string }
+                account_type: { type: string, enum: [cash, bank, ewallet, credit] }
+                currency: { type: string, minLength: 3, maxLength: 3 }
+                opening_balance_minor: { type: integer, format: int64 }
+            example:
+              name: Wallet A
+              account_type: cash
+              currency: IDR
+              opening_balance_minor: 0
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+              example:
+                data:
+                  id: 99f7d4b4-4fcb-44af-a35e-2e4cbf8d0f98
+                  name: Wallet A
+                  account_type: cash
+                  currency: IDR
+                  opening_balance_minor: 0
+                  is_active: true
+                meta:
+                  request_id: req_xxx
+                  timestamp: "2026-03-24T09:45:00Z"
+  /finance/categories:
+    get:
+      summary: List finance categories
+      responses:
+        '200':
+          description: List categories
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+    post:
+      summary: Create finance category
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, category_type]
+              properties:
+                name: { type: string }
+                category_type: { type: string, enum: [income, expense] }
+                parent_id: { type: string, format: uuid, nullable: true }
+            example:
+              name: Transport
+              category_type: expense
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+  /finance/transactions:
+    get:
+      summary: List transactions
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: page_size
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - in: query
+          name: type
+          schema: { type: string, enum: [income, expense, transfer] }
+        - in: query
+          name: from
+          schema: { type: string, format: date }
+        - in: query
+          name: to
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: List transactions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+    post:
+      summary: Create transaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTransactionRequest'
+            example:
+              account_id: 55555555-5555-5555-5555-555555555555
+              category_id: 66666666-6666-6666-6666-666666666666
+              type: expense
+              amount_minor: 120000
+              currency: IDR
+              transaction_date: "2026-03-24"
+              description: Belanja bulanan
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+  /finance/transactions/{transactionID}:
+    get:
+      summary: Get transaction detail
+      parameters:
+        - in: path
+          name: transactionID
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+    put:
+      summary: Update transaction
+      parameters:
+        - in: path
+          name: transactionID
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTransactionRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+    delete:
+      summary: Delete transaction
+      parameters:
+        - in: path
+          name: transactionID
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+  /finance/transactions/{transactionID}/attachments:
+    post:
+      summary: Upload transaction attachment
+      parameters:
+        - in: path
+          name: transactionID
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Attachment uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+  /finance/transactions/{transactionID}/attachments/{attachmentID}/download:
+    get:
+      summary: Download transaction attachment
+      parameters:
+        - in: path
+          name: transactionID
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: attachmentID
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Binary file stream
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+  /finance/transactions/{transactionID}/attachments/{attachmentID}/scan-status:
+    patch:
+      summary: Set attachment scan status (admin/worker callback)
+      parameters:
+        - in: path
+          name: transactionID
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: attachmentID
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scan_status]
+              properties:
+                scan_status:
+                  type: string
+                  enum: [pending, clean, infected, failed]
+                reason:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Envelope:
+      type: object
+      properties:
+        data:
+          type: object
+        meta:
+          type: object
+          properties:
+            request_id: { type: string }
+            timestamp: { type: string, format: date-time }
+    CreateTransactionRequest:
+      type: object
+      required: [account_id, type, amount_minor, currency, transaction_date]
+      properties:
+        account_id:
+          type: string
+          format: uuid
+        category_id:
+          type: string
+          format: uuid
+          nullable: true
+        type:
+          type: string
+          enum: [income, expense, transfer]
+        amount_minor:
+          type: integer
+          format: int64
+          minimum: 1
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+        transaction_date:
+          type: string
+          format: date
+        description:
+          type: string
+          nullable: true
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+        meta:
+          type: object
+          properties:
+            request_id: { type: string }
+            timestamp: { type: string, format: date-time }

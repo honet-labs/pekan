@@ -1,0 +1,40 @@
+# Environment & Secrets
+*.env
+*.env.*
+!.env.example
+!.env.server.example
+
+# Database Dumps & Patches
+*.sql
+*.db
+*.sqlite
+
+# Archives & Backup Packages
+*.tar.gz
+*.zip
+*.rar
+*.tgz
+
+# Backend (Go)
+backend/bin/
+backend/data/
+backend/tmp/
+backend/logs/
+backend/dist/
+backend/backend.exe
+
+# Frontend (Node / React)
+frontend/node_modules/
+frontend/dist/
+frontend/.next/
+frontend/out/
+.next/
+node_modules/
+
+# OS & IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace

@@ -1,0 +1,60 @@
+package main
+
+import (
+	"context"
+	"log"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"pekan/backend/internal/platform/config"
+	"pekan/backend/internal/platform/db"
+	"pekan/backend/internal/platform/access"
+	admininfra "pekan/backend/internal/modules/core/admin/infra"
+	adminusecase "pekan/backend/internal/modules/core/admin/usecase"
+	whatsappinfra "pekan/backend/internal/modules/finance/whatsapp/infra"
+	whatsappusecase "pekan/backend/internal/modules/finance/whatsapp/usecase"
+	"pekan/backend/internal/platform/audit"
+)
+
+func main() {
+	cfg := config.Load()
+	if err := cfg.Validate(); err != nil {
+		log.Fatalf("invalid configuration: %v", err)
+	}
+
+	conn, err := db.NewPostgres(cfg.DatabaseURL, db.PoolConfig{
+		MaxOpenConns:    cfg.DBMaxOpenConns,
+		MaxIdleConns:    cfg.DBMaxIdleConns,
+		ConnMaxLifetime: cfg.DBConnMaxLifetime,
+		ConnMaxIdleTime: cfg.DBConnMaxIdleTime,
+	})
+	if err != nil {
+		log.Fatalf("failed to connect database: %v", err)
+	}
+	defer conn.Close()
+
+	authorizer := access.NewAuthorizer()
+	auditLogger := audit.NewDBLogger(conn)
+
+	// Admin service (rdb and storage are nil as they are not needed for GetGlobalSettingRaw)
+	adminRepo := admininfra.NewRepositoryPG(conn)
+	adminUC := adminusecase.NewService(adminRepo, auditLogger, cfg.ReceiptScanSecret, nil, nil, conn)
+
+	// WhatsApp Chatbot Queue Service
+	whatsappRepo := whatsappinfra.NewRepositoryPG(conn)
+	whatsappUC := whatsappusecase.NewService(whatsappRepo, authorizer, adminUC)
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	log.Printf("[PEKAN-AI] Asynchronous AI Queue Worker Service started")
+	
+	// Start worker goroutines
+	whatsappUC.StartQueueWorker(ctx, 4) // Running 4 concurrent worker threads!
+
+	// Block main thread until context is cancelled
+	<-ctx.Done()
+
+	log.Printf("[PEKAN-AI] AI Queue Worker stopping gracefully")
+}

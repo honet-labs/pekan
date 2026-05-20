@@ -1,0 +1,49 @@
+--- a/backend/internal/modules/core/auth/delivery/http/handler.go
++++ b/backend/internal/modules/core/auth/delivery/http/handler.go
+@@ -113,6 +113,7 @@
+ 		Permissions:           out.Access.Permissions,
+ 		Features:              out.Access.Features,
+ 		Modules:               out.Access.Modules,
++		MustChangePassword:    out.User.MustChangePassword,
+ 	}, middleware.GetRequestID(r.Context()))
+ }
+ 
+@@ -248,7 +249,42 @@
+ 		Permissions:           out.Access.Permissions,
+ 		Features:              out.Access.Features,
+ 		Modules:               out.Access.Modules,
++		MustChangePassword:    out.User.MustChangePassword,
+ 	}, middleware.GetRequestID(r.Context()))
+ }
++
++func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
++	tc, err := middleware.GetTokenContext(r.Context())
++	if err != nil {
++		httpx.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized", middleware.GetRequestID(r.Context()))
++		return
++	}
++
++	var req ChangePasswordRequest
++	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
++		httpx.WriteError(w, http.StatusBadRequest, "INVALID_REQUEST", "invalid payload", middleware.GetRequestID(r.Context()))
++		return
++	}
++
++	if len(req.NewPassword) < 8 {
++		httpx.WriteError(w, http.StatusBadRequest, "INVALID_REQUEST", "password must be at least 8 characters", middleware.GetRequestID(r.Context()))
++		return
++	}
++
++	ctx := withAuditContext(r.Context(), r, tc.TenantID, tc.UserID)
++	// We reuse ResetPassword usecase logic for simplicity as it handles hashing and updating
++	err = h.service.ResetPassword(ctx, tc.Email, tc.TenantID, req.NewPassword)
++	if err != nil {
++		httpx.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), middleware.GetRequestID(r.Context()))
++		return
++	}
++
++	httpx.WriteJSON(w, http.StatusOK, map[string]any{
++		"success": true,
++		"message": "Password changed successfully",
++	}, middleware.GetRequestID(r.Context()))
++}
