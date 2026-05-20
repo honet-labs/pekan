@@ -128,6 +128,11 @@ export function AppShell(): JSX.Element {
               {t("nav.reports")}
             </NavLink>
           ) : null}
+          {modules.has("finance.dashboard") && permissions.has("finance.dashboard.read") ? (
+            <NavLink to="finance/chatbot" className={({ isActive }) => `app-nav-link${isActive ? " is-active" : ""}`} onClick={() => setSidebarOpen(false)}>
+              {t("nav.chatbot")}
+            </NavLink>
+          ) : null}
           {canOpenSettings ? (
             <>
               <button 

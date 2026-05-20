@@ -29,3 +29,11 @@ export async function disconnectWhatsApp(): Promise<void> {
     method: "DELETE"
   });
 }
+
+export async function sendChatbotMessage(message: string): Promise<string> {
+  const res = await apiFetch<{ reply: string }>("/settings/whatsapp/chat", {
+    method: "POST",
+    body: JSON.stringify({ message })
+  });
+  return res?.reply || "";
+}

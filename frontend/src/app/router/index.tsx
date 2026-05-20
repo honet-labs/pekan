@@ -34,6 +34,7 @@ import { ProfilePage } from "../../features/core/profile/pages/ProfilePage";
 import { ReceiptScanPage } from "../../features/finance/receipts/pages/ReceiptScanPage";
 import { SettingsReceiptScanPage } from "../../features/finance/settings/pages/SettingsReceiptScanPage";
 import { AdminDashboardPage } from "../../features/core/admin/pages/AdminDashboardPage";
+import { ChatbotPage } from "../../features/finance/chatbot/pages/ChatbotPage";
 import NotFoundPage from "../pages/NotFoundPage";
 import { useTenantStore } from "../../core/tenant/tenant-store";
 
@@ -211,6 +212,16 @@ export function AppRouter(): JSX.Element {
             <FeatureGuard feature="finance.reports.read">
               <PermissionGuard permission="finance.reports.read">
                 <ReportsPage />
+              </PermissionGuard>
+            </FeatureGuard>
+          }
+        />
+        <Route
+          path="finance/chatbot"
+          element={
+            <FeatureGuard feature="finance.dashboard.read">
+              <PermissionGuard permission="finance.dashboard.read">
+                <ChatbotPage />
               </PermissionGuard>
             </FeatureGuard>
           }

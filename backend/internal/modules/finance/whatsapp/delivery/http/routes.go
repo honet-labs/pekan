@@ -10,5 +10,6 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 		r.Post("/connect", h.Connect)
 		r.Get("/status", h.GetStatus)
 		r.Delete("/disconnect", h.Disconnect)
+		r.Post("/chat", h.WebChat)
 	})
 }

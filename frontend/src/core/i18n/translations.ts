@@ -11,7 +11,7 @@ export const translations: Record<Locale, Record<string, string>> = {
     "nav.reminders": "Reminders",
     "nav.masterData": "Data Master",
     "nav.reports": "Reports",
-
+    "nav.chatbot": "AI Assistant",
     "nav.receiptScan": "Scan Receipt",
     "nav.notifications": "Notifications",
     "nav.settings": "Settings",
@@ -604,6 +604,7 @@ export const translations: Record<Locale, Record<string, string>> = {
     "nav.reminders": "Pengingat",
     "nav.masterData": "Data Master",
     "nav.reports": "Laporan",
+    "nav.chatbot": "Asisten AI",
     "nav.receiptScan": "Scan Struk",
     "nav.notifications": "Notifikasi",
     "nav.settings": "Pengaturan",

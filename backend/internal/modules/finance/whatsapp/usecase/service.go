@@ -1201,3 +1201,18 @@ Do not include markdown fences. Return PURE JSON only.`
 	return out, nil
 }
 
+func (s *Service) ProcessWebChat(ctx context.Context, tenantID, userID, tenantCode, message string) (string, error) {
+	finContext, err := s.repo.GetFinancialContext(ctx, tenantID, userID, tenantCode)
+	if err != nil {
+		s.logJSON("warn", "web_chat_fetch_financial_context_failed", map[string]any{"tenant_id": tenantID, "user_id": userID, "error": err.Error()})
+		finContext = &domain.FinancialContext{}
+	}
+
+	reply, err := s.generateInteractiveResponseWithLLM(ctx, message, finContext)
+	if err != nil {
+		return "", err
+	}
+	return reply, nil
+}
+
+

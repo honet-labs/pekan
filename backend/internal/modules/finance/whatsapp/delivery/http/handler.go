@@ -139,3 +139,39 @@ func (h *Handler) Connect(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 }
+
+func (h *Handler) WebChat(w http.ResponseWriter, r *http.Request) {
+	tc, err := tenancy.FromContext(r.Context())
+	if err != nil {
+		http.Error(w, `{"error":{"code":"UNAUTHORIZED","message":"missing or invalid authentication context"}}`, http.StatusUnauthorized)
+		return
+	}
+
+	var req struct {
+		Message string `json:"message"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":{"code":"BAD_REQUEST","message":"invalid payload"}}`, http.StatusBadRequest)
+		return
+	}
+
+	if req.Message == "" {
+		http.Error(w, `{"error":{"code":"BAD_REQUEST","message":"message is required"}}`, http.StatusBadRequest)
+		return
+	}
+
+	reply, err := h.service.ProcessWebChat(r.Context(), tc.TenantID, tc.UserID, tc.TenantCode, req.Message)
+	if err != nil {
+		log.Printf("[ERROR] failed to process web chat: %v", err)
+		http.Error(w, `{"error":{"code":"INTERNAL_ERROR","message":"failed to generate ai reply"}}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"data": map[string]interface{}{
+			"reply": reply,
+		},
+	})
+}
+
