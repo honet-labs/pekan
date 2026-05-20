@@ -1226,7 +1226,12 @@ Do not include markdown fences. Return PURE JSON only.`
 	return out, nil
 }
 
-func (s *Service) ProcessWebChat(ctx context.Context, tenantID, userID, tenantCode, message string) (string, error) {
+func (s *Service) ProcessWebChat(ctx context.Context, tenantID, userID, message string) (string, error) {
+	tenantCode, err := s.repo.GetTenantCode(ctx, tenantID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get tenant code: %w", err)
+	}
+
 	finContext, err := s.repo.GetFinancialContext(ctx, tenantID, userID, tenantCode)
 	if err != nil {
 		s.logJSON("warn", "web_chat_fetch_financial_context_failed", map[string]any{"tenant_id": tenantID, "user_id": userID, "error": err.Error()})

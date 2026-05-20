@@ -164,7 +164,7 @@ func (h *Handler) WebChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reply, err := h.service.ProcessWebChat(r.Context(), tc.TenantID, tc.UserID, tc.TenantCode, req.Message)
+	reply, err := h.service.ProcessWebChat(r.Context(), tc.TenantID, tc.UserID, req.Message)
 	if err != nil {
 		log.Printf("[ERROR] failed to process web chat: %v", err)
 		http.Error(w, `{"error":{"code":"INTERNAL_ERROR","message":"failed to generate ai reply"}}`, http.StatusInternalServerError)
