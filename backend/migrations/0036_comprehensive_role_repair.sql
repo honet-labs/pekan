@@ -18,7 +18,11 @@ BEGIN
             CONTINUE;
         END IF;
 
-        v_schema_name := 'wkspid_pekan_' || tenant_record.code;
+        IF tenant_record.code = 'pekan' OR tenant_record.code = 'pekanhonet' THEN
+            v_schema_name := 'wkspid_pekan_pekanhonet';
+        ELSE
+            v_schema_name := 'wkspid_pekan_' || tenant_record.code;
+        END IF;
         
         -- Check if schema exists
         IF EXISTS (SELECT 1 FROM information_schema.schemata s WHERE s.schema_name = v_schema_name) THEN
