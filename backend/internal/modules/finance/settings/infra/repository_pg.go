@@ -808,14 +808,14 @@ func (r *RepositoryPG) ListAuditLogs(ctx context.Context, filter domain.AuditLog
 	var total int64
 
 	err := db.WithTenantTx(ctx, r.conn, func(tx *sql.Tx) error {
-		clauses := []string{"1=1"}
-		args := []any{}
-		idx := 1
+		clauses := []string{"l.tenant_id = $1"}
+		args := []any{filter.TenantID}
+		idx := 2
 
 		if filter.ActorUserID != nil && strings.TrimSpace(*filter.ActorUserID) != "" {
 			search := strings.TrimSpace(*filter.ActorUserID)
 			clauses = append(clauses, fmt.Sprintf(`(
-				l.user_id::text ILIKE $%d
+				l.actor_user_id::text ILIKE $%d
 				OR COALESCE(NULLIF(up.username, ''), NULLIF(u.full_name, ''), NULLIF(u.email, ''), '') ILIKE $%d
 			)`, idx, idx))
 			args = append(args, "%"+search+"%")
@@ -844,8 +844,8 @@ func (r *RepositoryPG) ListAuditLogs(ctx context.Context, filter domain.AuditLog
 
 		where := strings.Join(clauses, " AND ")
 		joins := `
-FROM finance_audit_logs l
-LEFT JOIN public.users u ON u.id = l.user_id
+FROM public.audit_logs l
+LEFT JOIN public.users u ON u.id = l.actor_user_id
 LEFT JOIN public.user_profiles up ON up.user_id = u.id`
 
 		countQuery := "SELECT COUNT(1) " + joins + " WHERE " + where
@@ -858,10 +858,10 @@ LEFT JOIN public.user_profiles up ON up.user_id = u.id`
 		dataArgs = append(dataArgs, filter.PageSize, offset)
 		dataQuery := fmt.Sprintf(`
 SELECT
-  l.id, l.user_id,
-  COALESCE(NULLIF(up.username, ''), NULLIF(u.full_name, ''), NULLIF(u.email, ''), l.user_id::text) AS actor_user_name,
-  l.action, l.entity_type, l.entity_id,
-  l.old_value, l.new_value, host(l.ip_address), l.user_agent, l.created_at
+  l.id, l.actor_user_id,
+  COALESCE(NULLIF(up.username, ''), NULLIF(u.full_name, ''), NULLIF(u.email, ''), l.actor_user_id::text) AS actor_user_name,
+  l.action, l.resource_type, l.resource_id,
+  l.before_json, l.after_json, host(l.ip_address), l.user_agent, l.created_at
 %s
 WHERE %s
 ORDER BY l.created_at DESC
