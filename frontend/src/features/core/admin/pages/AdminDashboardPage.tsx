@@ -53,6 +53,7 @@ export function AdminDashboardPage(): JSX.Element {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [tenantsExpanded, setTenantsExpanded] = useState(true);
   const [systemExpanded, setSystemExpanded] = useState(true);
+  const [statsExpanded, setStatsExpanded] = useState(true);
   
   const [tenants, setTenants] = useState<TenantListItem[]>([]);
   const [logs, setLogs] = useState<AuditLog[]>([]);
@@ -1704,7 +1705,24 @@ export function AdminDashboardPage(): JSX.Element {
             </div>
           )}
 
-          <button className={`app-nav-link ${activeTab === "stats" ? "is-active" : ""}`} onClick={() => { setActiveTab("stats"); setSidebarOpen(false); }}>{t("admin.nav_stats")}</button>
+          <button 
+            type="button" 
+            className={`app-nav-link sidebar-expand-btn ${(activeTab === "stats" || activeTab === "whatsapp") ? "is-expanded" : ""}`}
+            onClick={() => setStatsExpanded(!statsExpanded)}
+            style={{ width: "100%", textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between" }}
+          >
+            <span>Statistik</span>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style={{ transform: statsExpanded ? "rotate(180deg)" : "none", transition: "transform 0.2s", opacity: 0.7 }}>
+              <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z" />
+            </svg>
+          </button>
+          
+          {statsExpanded && (
+            <div className="sidebar-sub-nav">
+              <button className={`app-nav-link sub-link ${activeTab === "stats" ? "is-active" : ""}`} onClick={() => { setActiveTab("stats"); setSidebarOpen(false); }}>Growth Workspace and User</button>
+              <button className={`app-nav-link sub-link ${activeTab === "whatsapp" ? "is-active" : ""}`} onClick={() => { setActiveTab("whatsapp"); setSidebarOpen(false); }}>Chat AI Queue</button>
+            </div>
+          )}
           
           {/* System Group */}
           <button 
@@ -1726,7 +1744,6 @@ export function AdminDashboardPage(): JSX.Element {
               <button className={`app-nav-link sub-link ${activeTab === "backups" ? "is-active" : ""}`} onClick={() => { setActiveTab("backups"); setSidebarOpen(false); }}>Backup & Restore</button>
               <button className={`app-nav-link sub-link ${activeTab === "updates" ? "is-active" : ""}`} onClick={() => { setActiveTab("updates"); setSidebarOpen(false); }}>System Update</button>
               <button className={`app-nav-link sub-link ${activeTab === "ai" ? "is-active" : ""}`} onClick={() => { setActiveTab("ai"); setSidebarOpen(false); }}>AI Settings</button>
-              <button className={`app-nav-link sub-link ${activeTab === "whatsapp" ? "is-active" : ""}`} onClick={() => { setActiveTab("whatsapp"); setSidebarOpen(false); }}>Chat AI Queue</button>
               <button className={`app-nav-link sub-link ${activeTab === "notifications" ? "is-active" : ""}`} onClick={() => { setActiveTab("notifications"); setSidebarOpen(false); }}>Notification Providers</button>
               <button className={`app-nav-link sub-link ${activeTab === "database" ? "is-active" : ""}`} onClick={() => { setActiveTab("database"); setSidebarOpen(false); }}>Database Config</button>
               <button className={`app-nav-link sub-link ${activeTab === "storage" ? "is-active" : ""}`} onClick={() => { setActiveTab("storage"); setSidebarOpen(false); }}>Storage & Cloud</button>
@@ -1791,7 +1808,7 @@ export function AdminDashboardPage(): JSX.Element {
               activeTab === "tenants" ? t("admin.tenants.title") : 
               activeTab === "add_tenant" ? t("admin.tenants.add") : 
               activeTab === "logs" ? t("admin.logs.title") : 
-              activeTab === "stats" ? t("admin.nav_stats") : 
+              activeTab === "stats" ? "Growth Workspace and User" : 
               activeTab === "server" ? t("admin.nav_server") : 
               activeTab === "notifications" ? t("admin.notifications.title") :
               activeTab === "database" ? "Database Configuration" :
