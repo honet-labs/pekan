@@ -29,9 +29,12 @@ export function SavingsForm({ initialValue, submitLabel, onSubmit, onCancel }: P
     current_amount_minor: initialValue?.current_amount_minor?.toString() ?? "0"
   });
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     setError(null);
     try {
       await onSubmit({
@@ -44,6 +47,8 @@ export function SavingsForm({ initialValue, submitLabel, onSubmit, onCancel }: P
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : t("errors.saveDataFailed"));
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -130,8 +135,8 @@ export function SavingsForm({ initialValue, submitLabel, onSubmit, onCancel }: P
         </label>
         {error ? <p className="alert error">{error}</p> : null}
         <div className="form-actions" style={{ marginTop: "1rem" }}>
-          <button className="btn btn-primary" type="submit">
-            {submitLabel}
+          <button className="btn btn-primary" type="submit" disabled={isSubmitting}>
+            {isSubmitting ? t("common.loading") : submitLabel}
           </button>
           {onCancel && (
             <button className="btn btn-secondary" type="button" onClick={onCancel}>

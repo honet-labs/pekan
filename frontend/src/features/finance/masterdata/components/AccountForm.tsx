@@ -17,9 +17,12 @@ export function AccountForm({ disabled, onSubmit }: Props): JSX.Element {
     opening_balance_minor: 0
   });
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     setError(null);
     try {
       await onSubmit(form);
@@ -31,6 +34,8 @@ export function AccountForm({ disabled, onSubmit }: Props): JSX.Element {
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : t("errors.createAccountFailed"));
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -87,8 +92,8 @@ export function AccountForm({ disabled, onSubmit }: Props): JSX.Element {
         />
       </label>
       {error ? <p className="alert error">{error}</p> : null}
-      <button className="btn btn-primary" type="submit" disabled={disabled}>
-        {t("accounts.form.save")}
+      <button className="btn btn-primary" type="submit" disabled={disabled || isSubmitting}>
+        {isSubmitting ? t("common.loading") : t("accounts.form.save")}
       </button>
     </form>
   );

@@ -28,6 +28,7 @@ export function ReminderCreatePage(): JSX.Element {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (saving) return;
     setSaving(true);
     try {
       await create({

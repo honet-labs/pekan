@@ -86,6 +86,7 @@ export function TransactionForm({
   );
   const [files, setFiles] = useState<File[]>(initialFiles);
   const [error, setError] = useState<ReactNode | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!accounts.length || form.account_id) {
@@ -147,6 +148,8 @@ export function TransactionForm({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     setError(null);
 
     let categoryID: string | null = null;
@@ -166,6 +169,7 @@ export function TransactionForm({
     const normalizedSavingsIDs = form.type === "savings" ? selectedSavingsIDs : [];
     if (form.type === "savings" && normalizedSavingsIDs.length === 0) {
       setError(t("transactions.form.savingsRequired"));
+      setIsSubmitting(false);
       return;
     }
 
@@ -189,6 +193,7 @@ export function TransactionForm({
           </button>
         </span>
       );
+      setIsSubmitting(false);
       return;
     }
 
@@ -211,10 +216,12 @@ export function TransactionForm({
       const message = err instanceof Error ? err.message : t("errors.saveTransactionFailed");
       if (files.length > 0 && isIgnorableFileRequirementError(message)) {
         setError(null);
+        setIsSubmitting(false);
         return;
       }
       setError(message);
     }
+    setIsSubmitting(false);
   }
 
   return (
@@ -460,8 +467,8 @@ export function TransactionForm({
 
         {error ? <p className="alert error">{error}</p> : null}
         <div className="form-actions" style={{ marginTop: "1rem" }}>
-          <button className="btn btn-primary" type="submit">
-            {submitLabel ?? t("transactions.form.save")}
+          <button className="btn btn-primary" type="submit" disabled={isSubmitting}>
+            {isSubmitting ? t("common.loading") : (submitLabel ?? t("transactions.form.save"))}
           </button>
           {onCancel && (
             <button className="btn btn-secondary-outline" type="button" onClick={onCancel}>

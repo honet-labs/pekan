@@ -43,6 +43,7 @@ export function BudgetForm({ categories, initialValue, initialCategoryName, subm
     return initialCategoryName ?? initialValue?.category_name ?? "";
   });
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const categoryOptions = useMemo(
     () => categories.filter((category) => category.category_type === "expense"),
@@ -51,6 +52,8 @@ export function BudgetForm({ categories, initialValue, initialCategoryName, subm
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     setError(null);
     const matchedCategory = categoryOptions.find((category) => category.id === selectedCategoryID);
     const normalizedCategoryName = customCategoryName.trim();
@@ -66,6 +69,8 @@ export function BudgetForm({ categories, initialValue, initialCategoryName, subm
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : t("errors.saveDataFailed"));
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -197,8 +202,8 @@ export function BudgetForm({ categories, initialValue, initialCategoryName, subm
         </label>
         {error ? <p className="alert error">{error}</p> : null}
         <div className="form-actions" style={{ marginTop: "1rem" }}>
-          <button className="btn btn-primary" type="submit">
-            {submitLabel}
+          <button className="btn btn-primary" type="submit" disabled={isSubmitting}>
+            {isSubmitting ? t("common.loading") : submitLabel}
           </button>
           {onCancel && (
             <button className="btn btn-secondary" type="button" onClick={onCancel}>

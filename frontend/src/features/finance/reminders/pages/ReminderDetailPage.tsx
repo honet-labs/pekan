@@ -77,6 +77,7 @@ export function ReminderDetailPage(): JSX.Element {
     if (!reminderID) {
       return;
     }
+    if (saving) return;
     setSaving(true);
     setError(null);
     try {
