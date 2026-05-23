@@ -77,6 +77,53 @@ export function AppShell(): JSX.Element {
     }
   }
 
+  // Automatic 10-minute inactivity session timeout
+  useEffect(() => {
+    let timeoutId: number | undefined;
+
+    const handleTimeoutLogout = async () => {
+      try {
+        if (auth.refreshToken) {
+          await logout(auth.refreshToken);
+        }
+      } catch (err) {
+        console.error("Inactivity logout error:", err);
+      } finally {
+        auth.clear();
+        access.clearAccess();
+        navigate("/login", { replace: true });
+      }
+    };
+
+    const resetTimer = () => {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+      timeoutId = window.setTimeout(() => {
+        handleTimeoutLogout().catch(() => undefined);
+      }, 10 * 60 * 1000); // 10 minutes
+    };
+
+    const events = ["mousemove", "mousedown", "keypress", "scroll", "touchstart"];
+
+    // Initialize timer
+    resetTimer();
+
+    // Attach listeners
+    events.forEach((event) => {
+      window.addEventListener(event, resetTimer);
+    });
+
+    return () => {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+      events.forEach((event) => {
+        window.removeEventListener(event, resetTimer);
+      });
+    };
+  }, [auth.refreshToken, navigate]);
+
   return (
     <div className={`app-shell${sidebarOpen ? " sidebar-open" : ""}`}>
       <aside className="app-sidebar">
