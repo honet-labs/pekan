@@ -180,7 +180,11 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (LoginOutput, error)
 	log.Printf("[Auth] TRACE: Login usecase completed successfully")
 
 	if s.audit != nil {
-		_ = s.audit.Write(ctx, "auth.login.success", "user", user.ID, nil, map[string]any{
+		loginCtx := audit.WithContext(ctx, audit.AuditContext{
+			TenantID:    actualTenantID,
+			ActorUserID: user.ID,
+		})
+		_ = s.audit.Write(loginCtx, "auth.login.success", "user", user.ID, nil, map[string]any{
 			"tenant_id": actualTenantID,
 			"email":     user.Email,
 		})
@@ -199,7 +203,10 @@ func (s *Service) recordFailedLogin(ctx context.Context, email, tenantID, reason
 		_, _, _ = s.sessionStore.RecordFailedLogin(ctx, email, tenantID)
 	}
 	if s.audit != nil {
-		_ = s.audit.Write(ctx, "auth.login.failure", "auth", "", nil, map[string]any{
+		failCtx := audit.WithContext(ctx, audit.AuditContext{
+			TenantID: tenantID,
+		})
+		_ = s.audit.Write(failCtx, "auth.login.failure", "auth", "", nil, map[string]any{
 			"email":     email,
 			"tenant_id": tenantID,
 			"reason":    reason,
