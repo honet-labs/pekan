@@ -57,11 +57,18 @@ func main() {
 
 	log.Printf("[PEKAN-AI] Asynchronous AI Queue Worker Service started")
 	
-	// Start worker goroutines (configurable via AI_QUEUE_WORKERS env var, default to 4)
+	// Start worker goroutines (configurable via database global settings, fallback to env var, default to 4)
 	numWorkers := 4
-	if envVal := os.Getenv("AI_QUEUE_WORKERS"); envVal != "" {
-		if val, err := strconv.Atoi(envVal); err == nil && val > 0 {
+	dbVal, err := adminUC.GetGlobalSettingRaw(ctx, "ai_queue_workers")
+	if err == nil && dbVal != "" {
+		if val, err := strconv.Atoi(dbVal); err == nil && val > 0 {
 			numWorkers = val
+		}
+	} else {
+		if envVal := os.Getenv("AI_QUEUE_WORKERS"); envVal != "" {
+			if val, err := strconv.Atoi(envVal); err == nil && val > 0 {
+				numWorkers = val
+			}
 		}
 	}
 	log.Printf("[PEKAN-AI] Running %d concurrent worker threads!", numWorkers)
