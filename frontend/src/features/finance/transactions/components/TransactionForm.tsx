@@ -225,7 +225,6 @@ export function TransactionForm({
         return;
       }
       setError(message);
-    }
     } finally {
       isSubmittingRef.current = false;
       setIsSubmitting(false);
