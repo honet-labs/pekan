@@ -22,21 +22,36 @@ export function ChatbotPage(): JSX.Element {
   const [waStatus, setWaStatus] = useState<WhatsAppStatus | null>(null);
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [inputMessage, setInputMessage] = useState("");
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const storageKey = `pekan_chatbot_history_${tenantCode}`;
+  
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }));
+      }
+    } catch (e) {
+      console.error("Failed to parse chat history", e);
+    }
+    return [{
+      id: "welcome",
+      sender: "bot",
+      text: "👋 **Halo! Saya Asisten AI Pekan.**\n\nSaya siap membantu Anda memantau keuangan, menganalisis pengeluaran, mengecek anggaran, dan memberikan tips finansial terbaik secara langsung.\n\n*Silakan tanyakan apa saja mengenai catatan keuangan Anda!*",
+      timestamp: new Date()
+    }];
+  });
+
   const [sending, setSending] = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Initialize with welcome message
+  // Save chat history to localStorage whenever it changes
   useEffect(() => {
-    setChatHistory([
-      {
-        id: "welcome",
-        sender: "bot",
-        text: "👋 **Halo! Saya Asisten AI Pekan.**\n\nSaya siap membantu Anda memantau keuangan, menganalisis pengeluaran, mengecek anggaran, dan memberikan tips finansial terbaik secara langsung.\n\n*Silakan tanyakan apa saja mengenai catatan keuangan Anda!*",
-        timestamp: new Date()
-      }
-    ]);
+    localStorage.setItem(storageKey, JSON.stringify(chatHistory));
+  }, [chatHistory, storageKey]);
+
+  useEffect(() => {
     loadWhatsAppStatus();
   }, []);
 
