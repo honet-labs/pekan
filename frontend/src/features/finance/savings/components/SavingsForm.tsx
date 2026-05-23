@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, useRef } from "react";
 import { SavingsPayload } from "../api/savings.types";
 import { useI18n } from "../../../../core/i18n/i18n";
 
@@ -30,10 +30,12 @@ export function SavingsForm({ initialValue, submitLabel, onSubmit, onCancel }: P
   });
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    if (isSubmitting) return;
+    if (isSubmittingRef.current || isSubmitting) return;
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
     setError(null);
     try {
@@ -48,6 +50,7 @@ export function SavingsForm({ initialValue, submitLabel, onSubmit, onCancel }: P
     } catch (err) {
       setError(err instanceof Error ? err.message : t("errors.saveDataFailed"));
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   }

@@ -1,4 +1,4 @@
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { FinanceAccount, FinanceCategory } from "../../masterdata/api/masterdata.types";
 import { CreateTransactionPayload, TransactionItem, TransactionType } from "../api/transaction.types";
@@ -87,6 +87,7 @@ export function TransactionForm({
   const [files, setFiles] = useState<File[]>(initialFiles);
   const [error, setError] = useState<ReactNode | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   useEffect(() => {
     if (!accounts.length || form.account_id) {
@@ -148,7 +149,8 @@ export function TransactionForm({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    if (isSubmitting) return;
+    if (isSubmittingRef.current || isSubmitting) return;
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
     setError(null);
 
@@ -169,6 +171,7 @@ export function TransactionForm({
     const normalizedSavingsIDs = form.type === "savings" ? selectedSavingsIDs : [];
     if (form.type === "savings" && normalizedSavingsIDs.length === 0) {
       setError(t("transactions.form.savingsRequired"));
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
       return;
     }
@@ -193,6 +196,7 @@ export function TransactionForm({
           </button>
         </span>
       );
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
       return;
     }
@@ -216,12 +220,16 @@ export function TransactionForm({
       const message = err instanceof Error ? err.message : t("errors.saveTransactionFailed");
       if (files.length > 0 && isIgnorableFileRequirementError(message)) {
         setError(null);
+        isSubmittingRef.current = false;
         setIsSubmitting(false);
         return;
       }
       setError(message);
     }
-    setIsSubmitting(false);
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
+    }
   }
 
   return (

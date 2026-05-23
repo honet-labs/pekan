@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useReminders } from "../hooks/useReminders";
 import { useI18n } from "../../../../core/i18n/i18n";
@@ -25,10 +25,12 @@ export function ReminderCreatePage(): JSX.Element {
   const { create } = useReminders();
   const [form, setForm] = useState(initialForm);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (saving) return;
+    if (savingRef.current || saving) return;
+    savingRef.current = true;
     setSaving(true);
     try {
       await create({
@@ -47,6 +49,7 @@ export function ReminderCreatePage(): JSX.Element {
     } catch (err) {
       showError(err instanceof Error ? err.message : t("errors.loadRemindersFailed"));
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
