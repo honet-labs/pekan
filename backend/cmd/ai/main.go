@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 
 	"pekan/backend/internal/platform/config"
@@ -56,8 +57,15 @@ func main() {
 
 	log.Printf("[PEKAN-AI] Asynchronous AI Queue Worker Service started")
 	
-	// Start worker goroutines
-	whatsappUC.StartQueueWorker(ctx, 4) // Running 4 concurrent worker threads!
+	// Start worker goroutines (configurable via AI_QUEUE_WORKERS env var, default to 4)
+	numWorkers := 4
+	if envVal := os.Getenv("AI_QUEUE_WORKERS"); envVal != "" {
+		if val, err := strconv.Atoi(envVal); err == nil && val > 0 {
+			numWorkers = val
+		}
+	}
+	log.Printf("[PEKAN-AI] Running %d concurrent worker threads!", numWorkers)
+	whatsappUC.StartQueueWorker(ctx, numWorkers)
 
 	// Block main thread until context is cancelled
 	<-ctx.Done()
