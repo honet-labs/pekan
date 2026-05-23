@@ -218,8 +218,11 @@ export function AdminDashboardPage(): JSX.Element {
     } catch (e) { return []; }
   });
   
-  const [savingConfig, setSavingConfig] = useState<"smtp" | "telegram" | "wa" | "wa_fonnte" | "wa_waha" | "wa_gowa" | "gemini" | "openai" | "claude" | "sumopod" | "active_ai" | "active_wa_bot_ai" | "wa_active_provider" | "wa_bot_system_prompt" | "wa_bot_phone_number" | "database" | null>(null);
+  const [savingConfig, setSavingConfig] = useState<"smtp" | "telegram" | "wa" | "wa_fonnte" | "wa_waha" | "wa_gowa" | "gemini" | "openai" | "claude" | "sumopod" | "active_ai" | "active_wa_bot_ai" | "wa_active_provider" | "wa_bot_system_prompt" | "wa_bot_phone_number" | "ai_queue_workers" | "database" | null>(null);
   const [testingConfig, setTestingConfig] = useState<string | null>(null);
+
+  // WhatsApp bot concurrency state
+  const [aiQueueWorkers, setAiQueueWorkers] = useState("4");
 
   // Test Connection Modal States
   const [showTestModal, setShowTestModal] = useState(false);
@@ -285,6 +288,13 @@ export function AdminDashboardPage(): JSX.Element {
     const waBotPhoneVal = await fetchSetting("wa_bot_phone_number");
     if (waBotPhoneVal && waBotPhoneVal.value) {
       setWaBotPhoneNumber(waBotPhoneVal.value);
+    }
+
+    const aiQueueWorkersVal = await fetchSetting("ai_queue_workers");
+    if (aiQueueWorkersVal && aiQueueWorkersVal.value) {
+      setAiQueueWorkers(aiQueueWorkersVal.value);
+    } else {
+      setAiQueueWorkers("4");
     }
 
     const smtpVal = await fetchSetting("notification_smtp");
@@ -1044,7 +1054,7 @@ export function AdminDashboardPage(): JSX.Element {
     await saveAdminGlobalSetting(key, value, isEncrypted);
   };
 
-  const handleSaveNotificationConfig = async (provider: "smtp" | "telegram" | "wa" | "wa_fonnte" | "wa_waha" | "wa_gowa" | "gemini" | "openai" | "claude" | "sumopod" | "active_ai" | "active_wa_bot_ai" | "wa_active_provider" | "wa_bot_system_prompt" | "wa_bot_phone_number") => {
+  const handleSaveNotificationConfig = async (provider: "smtp" | "telegram" | "wa" | "wa_fonnte" | "wa_waha" | "wa_gowa" | "gemini" | "openai" | "claude" | "sumopod" | "active_ai" | "active_wa_bot_ai" | "wa_active_provider" | "wa_bot_system_prompt" | "wa_bot_phone_number" | "ai_queue_workers") => {
     setSavingConfig(provider);
     try {
       if (provider === "gemini") {
@@ -1070,6 +1080,8 @@ export function AdminDashboardPage(): JSX.Element {
         await saveAdminGlobalSetting("wa_bot_system_instructions", waBotSystemPrompt, false);
       } else if (provider === "wa_active_provider") {
         await saveAdminGlobalSetting("notification_wa_active_provider", waActiveProvider, false);
+      } else if (provider === "ai_queue_workers") {
+        await saveAdminGlobalSetting("ai_queue_workers", aiQueueWorkers, false);
       } else {
         const waKey = provider === "smtp" ? "notification_smtp" : provider === "telegram" ? "notification_telegram" : `notification_${provider}`;
         let config = {};
@@ -2567,6 +2579,29 @@ export function AdminDashboardPage(): JSX.Element {
                       />
                       <button className="btn btn-primary" onClick={() => handleSaveNotificationConfig("wa_bot_phone_number")} disabled={savingConfig === "wa_bot_phone_number"}>
                         {savingConfig === "wa_bot_phone_number" ? "Menyimpan..." : "Simpan Nomor Bot"}
+                      </button>
+                    </div>
+                 </div>
+               </div>
+
+               {/* Jumlah Worker Antrean AI (Concurreny/Parallel Workers) */}
+               <div className="surface card shadow-soft" style={{ gridColumn: "1 / -1" }}>
+                 <h3 className="form-title">Jumlah Worker Antrean AI (Concurrency)</h3>
+                 <div className="form-grid">
+                    <p className="form-section-desc">Atur berapa banyak pesan WhatsApp yang akan diproses secara bersamaan (paralel) oleh asisten AI. Default adalah 4. Anda dapat meningkatkannya menjadi 10 atau lebih sesuai dengan volume chat Anda tanpa membutuhkan core CPU yang tinggi. (Perlu merestart service worker AI setelah menyimpan).</p>
+                    <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                      <input 
+                        type="number"
+                        min="1"
+                        max="50"
+                        className="input-control" 
+                        placeholder="Contoh: 10" 
+                        value={aiQueueWorkers} 
+                        onChange={e => setAiQueueWorkers(e.target.value)} 
+                        style={{ maxWidth: "300px" }} 
+                      />
+                      <button className="btn btn-primary" onClick={() => handleSaveNotificationConfig("ai_queue_workers")} disabled={savingConfig === "ai_queue_workers"}>
+                        {savingConfig === "ai_queue_workers" ? "Menyimpan..." : "Simpan Jumlah Worker"}
                       </button>
                     </div>
                  </div>
