@@ -1923,6 +1923,7 @@ export function AdminDashboardPage(): JSX.Element {
               activeTab === "updates" ? "System Auto-Updater" :
               activeTab === "branding" ? "Platform Identity & Branding" :
               activeTab === "ai" ? "AI Settings & Provider Configuration" :
+              activeTab === "optimization" ? (t("admin.nav_optimization") || "Optimasi & Performa") :
               t("admin.nav_dashboard")
             }
             description={
@@ -1938,6 +1939,7 @@ export function AdminDashboardPage(): JSX.Element {
               activeTab === "updates" ? "Periksa, unduh, dan pasang pembaruan kode aplikasi Pekan langsung dari GitHub secara aman." :
               activeTab === "branding" ? "Kustomisasi nama platform, favicon, logo, dan URL akses publik eksternal." :
               activeTab === "ai" ? "Kelola konfigurasi provider AI, system prompt, dan pengaturan worker antrean AI." :
+              activeTab === "optimization" ? "Kelola limitasi rate limiting, batas waktu (timeout) koneksi API, dan konfigurasi performa sistem." :
               "Pusat kendali dan infrastruktur Pekan"
             }
             hideInfo={true}

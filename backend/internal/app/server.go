@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 
@@ -132,8 +133,20 @@ func NewServer(cfg config.Config) (*Server, error) {
 
 	adminRepo := admininfra.NewRepositoryPG(conn)
 
-	// Load Storage Configuration from Database if available to override Environment Variables
+	// Load Optimization Config from Database if available to override Environment Variables
 	ctx := context.Background()
+	if optRaw, _, err := adminRepo.GetGlobalSetting(ctx, "optimization_config"); err == nil && optRaw != "" {
+		var optMap map[string]string
+		if json.Unmarshal([]byte(optRaw), &optMap) == nil {
+			if limitStr, ok := optMap["api_rate_limit"]; ok && limitStr != "" {
+				if limitVal, err := strconv.Atoi(limitStr); err == nil && limitVal >= 0 {
+					cfg.APIRateLimitPerMinute = limitVal
+				}
+			}
+		}
+	}
+
+	// Load Storage Configuration from Database if available to override Environment Variables
 	if activeProv, _, err := adminRepo.GetGlobalSetting(ctx, "storage_active_provider"); err == nil && activeProv != "" {
 		cfg.StorageProvider = activeProv
 		if activeProv == "s3" {
