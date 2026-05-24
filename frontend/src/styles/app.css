@@ -2634,4 +2634,22 @@ button.app-nav-link {
   opacity: 0.8;
 }
 
+/* Chatbot Responsive Styles */
+.chatbot-container {
+  display: flex;
+  flex-direction: column;
+  height: 650px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+@media (max-width: 768px) {
+  .chatbot-container {
+    height: 62dvh !important;
+    min-height: 380px !important;
+    max-height: 650px !important;
+  }
+}
+
+
 

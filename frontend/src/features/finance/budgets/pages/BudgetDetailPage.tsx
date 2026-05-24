@@ -52,8 +52,8 @@ export function BudgetDetailPage(): JSX.Element {
     }
     try {
       await updateBudget(budgetID, payload);
-      await load();
-      success(t("common.updateSuccess") || "Data berhasil diperbarui");
+      setFlashToast({ message: t("common.updateSuccess") || "Data berhasil diperbarui", type: "success" });
+      navigate(`/app/${tenantCode ?? "default"}/finance/budgets`);
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : t("errors.loadBudgetsFailed");
       showError(errMsg);
@@ -113,6 +113,7 @@ export function BudgetDetailPage(): JSX.Element {
               start_date: item.start_date,
               end_date: item.end_date ?? "",
               alert_threshold_pct: item.alert_threshold_pct ?? 80,
+              notes: item.notes ?? "",
               status: item.status
             }}
             initialCategoryName={item.category_name ?? ""}

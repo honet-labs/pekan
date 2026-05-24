@@ -26,11 +26,11 @@ func (r *RepositoryPG) Create(ctx context.Context, in domain.Report) (domain.Rep
 		in.ID = uuid.NewString()
 		const q = `
 INSERT INTO finance_reports (
-  id, report_type, format, status, params, storage_provider, storage_key, created_by, created_at, updated_at
-) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`
+  id, tenant_id, report_type, format, status, params, storage_provider, storage_key, created_by, created_at, updated_at
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`
 
 		_, err := tx.ExecContext(ctx, q,
-			in.ID, in.ReportType, in.Format, in.Status, in.Params, in.StorageProvider, in.StorageKey,
+			in.ID, in.TenantID, in.ReportType, in.Format, in.Status, in.Params, in.StorageProvider, in.StorageKey,
 			in.CreatedBy, in.CreatedAt, in.UpdatedAt,
 		)
 		if err != nil {

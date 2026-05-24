@@ -248,7 +248,7 @@ export function ChatbotPage(): JSX.Element {
       </div>
 
       {activeTab === "web" ? (
-        <div className="card surface" style={{ display: "flex", flexDirection: "column", height: "650px", padding: 0, overflow: "hidden", border: "1px solid var(--border)" }}>
+        <div className="card surface chatbot-container" style={{ padding: 0 }}>
           {/* Header Panel */}
           <div style={{
             display: "flex",
