@@ -4,11 +4,13 @@ import { useAccessStore } from "../../core/access/access-store";
 import { logout, getMeProfile } from "../../core/auth/auth-api";
 import { useAuthStore } from "../../core/auth/auth-store";
 import { useI18n } from "../../core/i18n/i18n";
+import { useBrandingStore } from "../../core/branding/branding-store";
 
 export function AppShell(): JSX.Element {
   const access = useAccessStore();
   const auth = useAuthStore();
   const navigate = useNavigate();
+  const branding = useBrandingStore();
   const { tenantCode } = useParams();
   const { t, locale, setLocale } = useI18n();
   const { modules, permissions } = access;
@@ -127,27 +129,31 @@ export function AppShell(): JSX.Element {
   return (
     <div className={`app-shell${sidebarOpen ? " sidebar-open" : ""}`}>
       <aside className="app-sidebar">
-        <div className="sidebar-header">
+        <div className="sidebar-header" style={{ marginBottom: "2.5rem", paddingBottom: "1.2rem", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
-              <rect width="32" height="32" rx="8" fill="url(#logo_grad)" />
-              <path d="M12 6H21C22.1046 6 23 6.89543 23 8V19C23 19.5523 22.5523 20 22 20H12C11.4477 20 11 19.5523 11 19V7C11 6.44772 11.4477 6 12 6Z" fill="#F8FAFC" />
-              <line x1="14" y1="9" x2="20" y2="9" stroke="#0D9488" strokeWidth="1.5" strokeLinecap="round" />
-              <line x1="14" y1="12" x2="20" y2="12" stroke="#0D9488" strokeWidth="1.5" strokeLinecap="round" />
-              <line x1="14" y1="15" x2="18" y2="15" stroke="#D97706" strokeWidth="1.5" strokeLinecap="round" />
-              <path d="M8 12H20C21.1046 12 22 12.8954 22 14V23C22 24.1046 21.1046 25 20 25H8C6.89543 25 6 24.1046 6 23V14C6 12.8954 6.89543 12 8 12Z" fill="#0F766E" stroke="#0D9488" strokeWidth="1" />
-              <path d="M18 15.5H22V21.5H18C16.3431 21.5 15 20.1569 15 18.5C15 16.8431 16.3431 15.5 18 15.5Z" fill="#11395F" />
-              <circle cx="18" cy="18.5" r="1.75" fill="#D97706" />
-              <defs>
-                <linearGradient id="logo_grad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-                  <stop stopColor="#0f766e" />
-                  <stop offset="1" stopColor="#0d9488" />
-                </linearGradient>
-              </defs>
-            </svg>
+            {branding.logo ? (
+              <img src={branding.logo} alt="Logo" style={{ width: "32px", height: "32px", borderRadius: "8px", objectFit: "contain", flexShrink: 0 }} />
+            ) : (
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+                <rect width="32" height="32" rx="8" fill="url(#logo_grad)" />
+                <path d="M12 6H21C22.1046 6 23 6.89543 23 8V19C23 19.5523 22.5523 20 22 20H12C11.4477 20 11 19.5523 11 19V7C11 6.44772 11.4477 6 12 6Z" fill="#F8FAFC" />
+                <line x1="14" y1="9" x2="20" y2="9" stroke="#0D9488" strokeWidth="1.5" strokeLinecap="round" />
+                <line x1="14" y1="12" x2="20" y2="12" stroke="#0D9488" strokeWidth="1.5" strokeLinecap="round" />
+                <line x1="14" y1="15" x2="18" y2="15" stroke="#D97706" strokeWidth="1.5" strokeLinecap="round" />
+                <path d="M8 12H20C21.1046 12 22 12.8954 22 14V23C22 24.1046 21.1046 25 20 25H8C6.89543 25 6 24.1046 6 23V14C6 12.8954 6.89543 12 8 12Z" fill="#0F766E" stroke="#0D9488" strokeWidth="1" />
+                <path d="M18 15.5H22V21.5H18C16.3431 21.5 15 20.1569 15 18.5C15 16.8431 16.3431 15.5 18 15.5Z" fill="#11395F" />
+                <circle cx="18" cy="18.5" r="1.75" fill="#D97706" />
+                <defs>
+                  <linearGradient id="logo_grad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#0f766e" />
+                    <stop offset="1" stopColor="#0d9488" />
+                  </linearGradient>
+                </defs>
+              </svg>
+            )}
             <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
-              <h2 className="brand" style={{ margin: 0, fontSize: "1.35rem", fontWeight: 700, letterSpacing: "0.5px", lineHeight: 1.2 }}>{t("app.brand")}</h2>
-              <p className="sidebar-caption" style={{ margin: 0, fontSize: "0.68rem", opacity: 0.8, lineHeight: 1.2, marginTop: "2px" }}>{t("app.subtitle")}</p>
+              <h2 className="brand" style={{ margin: 0, fontSize: "1.35rem", fontWeight: 700, letterSpacing: "0.5px", lineHeight: 1.2 }}>{branding.app_name || t("app.brand")}</h2>
+              <p className="sidebar-caption" style={{ margin: 0, fontSize: "0.68rem", opacity: 0.8, lineHeight: 1.2, marginTop: "2px" }}>{branding.page_title || t("app.subtitle")}</p>
             </div>
           </div>
           <button type="button" className="btn btn-ghost-inline sidebar-close-btn" onClick={() => setSidebarOpen(false)} aria-label={t("common.closeMenu")}>
@@ -304,23 +310,27 @@ export function AppShell(): JSX.Element {
           </svg>
         </button>
         <strong className="mobile-brand" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <svg width="24" height="24" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
-            <rect width="32" height="32" rx="8" fill="url(#logo_grad_mobile)" />
-            <path d="M12 6H21C22.1046 6 23 6.89543 23 8V19C23 19.5523 22.5523 20 22 20H12C11.4477 20 11 19.5523 11 19V7C11 6.44772 11.4477 6 12 6Z" fill="#F8FAFC" />
-            <line x1="14" y1="9" x2="20" y2="9" stroke="#0D9488" strokeWidth="1.5" strokeLinecap="round" />
-            <line x1="14" y1="12" x2="20" y2="12" stroke="#0D9488" strokeWidth="1.5" strokeLinecap="round" />
-            <line x1="14" y1="15" x2="18" y2="15" stroke="#D97706" strokeWidth="1.5" strokeLinecap="round" />
-            <path d="M8 12H20C21.1046 12 22 12.8954 22 14V23C22 24.1046 21.1046 25 20 25H8C6.89543 25 6 24.1046 6 23V14C6 12.8954 6.89543 12 8 12Z" fill="#0F766E" stroke="#0D9488" strokeWidth="1" />
-            <path d="M18 15.5H22V21.5H18C16.3431 21.5 15 20.1569 15 18.5C15 16.8431 16.3431 15.5 18 15.5Z" fill="#11395F" />
-            <circle cx="18" cy="18.5" r="1.75" fill="#D97706" />
-            <defs>
-              <linearGradient id="logo_grad_mobile" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-                <stop stopColor="#0f766e" />
-                <stop offset="1" stopColor="#0d9488" />
-              </linearGradient>
-            </defs>
-          </svg>
-          {t("app.brand")}
+          {branding.logo ? (
+            <img src={branding.logo} alt="Logo" style={{ width: "24px", height: "24px", borderRadius: "6px", objectFit: "contain", flexShrink: 0 }} />
+          ) : (
+            <svg width="24" height="24" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+              <rect width="32" height="32" rx="8" fill="url(#logo_grad_mobile)" />
+              <path d="M12 6H21C22.1046 6 23 6.89543 23 8V19C23 19.5523 22.5523 20 22 20H12C11.4477 20 11 19.5523 11 19V7C11 6.44772 11.4477 6 12 6Z" fill="#F8FAFC" />
+              <line x1="14" y1="9" x2="20" y2="9" stroke="#0D9488" strokeWidth="1.5" strokeLinecap="round" />
+              <line x1="14" y1="12" x2="20" y2="12" stroke="#0D9488" strokeWidth="1.5" strokeLinecap="round" />
+              <line x1="14" y1="15" x2="18" y2="15" stroke="#D97706" strokeWidth="1.5" strokeLinecap="round" />
+              <path d="M8 12H20C21.1046 12 22 12.8954 22 14V23C22 24.1046 21.1046 25 20 25H8C6.89543 25 6 24.1046 6 23V14C6 12.8954 6.89543 12 8 12Z" fill="#0F766E" stroke="#0D9488" strokeWidth="1" />
+              <path d="M18 15.5H22V21.5H18C16.3431 21.5 15 20.1569 15 18.5C15 16.8431 16.3431 15.5 18 15.5Z" fill="#11395F" />
+              <circle cx="18" cy="18.5" r="1.75" fill="#D97706" />
+              <defs>
+                <linearGradient id="logo_grad_mobile" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#0f766e" />
+                  <stop offset="1" stopColor="#0d9488" />
+                </linearGradient>
+              </defs>
+            </svg>
+          )}
+          {branding.app_name || t("app.brand")}
         </strong>
       </header>
 

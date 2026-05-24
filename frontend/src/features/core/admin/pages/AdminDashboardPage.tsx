@@ -20,6 +20,7 @@ import { useToast } from "../../../../core/hooks/useToast";
 import { ToastContainer } from "../../../../core/components/Toast";
 import { useI18n } from "../../../../core/i18n/i18n";
 import { useDebounce } from "../../../../core/hooks/useDebounce";
+import { useBrandingStore } from "../../../../core/branding/branding-store";
 import { DeleteConfirmModal } from "../../../../core/components/DeleteConfirmModal";
 import { PasswordStrength } from "../../../../core/components/PasswordStrength";
 import { BackToTop } from "../../../../core/components/BackToTop";
@@ -43,6 +44,7 @@ Tugas Anda adalah membalas pesan pengguna WhatsApp secara interaktif. Pengguna s
 export function AdminDashboardPage(): JSX.Element {
   const { t, locale, setLocale } = useI18n();
   const { toasts, success, error, remove } = useToast();
+  const brandingGlobal = useBrandingStore();
   
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem("pekan_admin_token"));
   const [secret, setSecret] = useState("");
@@ -174,6 +176,12 @@ export function AdminDashboardPage(): JSX.Element {
 
   const [registrationEnabled, setRegistrationEnabled] = useState(true);
   const [registrationOTPMethod, setRegistrationOTPMethod] = useState("email");
+
+  const [brandingAppName, setBrandingAppName] = useState("PEKAN");
+  const [brandingPageTitle, setBrandingPageTitle] = useState("PEKAN - Catatan Keuangan dan Dompet");
+  const [brandingLogo, setBrandingLogo] = useState("");
+  const [brandingFavicon, setBrandingFavicon] = useState("");
+  const [brandingPublicUrl, setBrandingPublicUrl] = useState("");
   
   const [aiModels, setAiModels] = useState<{id: string, label: string}[]>(() => {
     const saved = localStorage.getItem("admin_ai_models");
@@ -352,6 +360,21 @@ export function AdminDashboardPage(): JSX.Element {
 
     const optVal = await fetchSetting("optimization_config");
     if (optVal && optVal.value) { try { setOptConfig(JSON.parse(optVal.value)); } catch {/* */} }
+
+    const brandNameVal = await fetchSetting("branding_app_name");
+    if (brandNameVal && brandNameVal.value) setBrandingAppName(brandNameVal.value);
+
+    const brandTitleVal = await fetchSetting("branding_page_title");
+    if (brandTitleVal && brandTitleVal.value) setBrandingPageTitle(brandTitleVal.value);
+
+    const brandLogoVal = await fetchSetting("branding_logo");
+    if (brandLogoVal && brandLogoVal.value) setBrandingLogo(brandLogoVal.value);
+
+    const brandFavVal = await fetchSetting("branding_favicon");
+    if (brandFavVal && brandFavVal.value) setBrandingFavicon(brandFavVal.value);
+
+    const brandUrlVal = await fetchSetting("branding_public_url");
+    if (brandUrlVal && brandUrlVal.value) setBrandingPublicUrl(brandUrlVal.value);
   };
 
   useEffect(() => {
@@ -372,7 +395,7 @@ export function AdminDashboardPage(): JSX.Element {
       } else {
         if (refreshInterval.current) clearInterval(refreshInterval.current);
       }
-      if (activeTab === "notifications" || activeTab === "database" || activeTab === "ai" || activeTab === "storage" || activeTab === "optimization") {
+      if (activeTab === "notifications" || activeTab === "database" || activeTab === "ai" || activeTab === "storage" || activeTab === "optimization" || activeTab === "branding") {
         loadGlobalSettings();
       }
       if (activeTab === "dbtool") {
@@ -1224,6 +1247,54 @@ export function AdminDashboardPage(): JSX.Element {
     }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'favicon') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const limit = type === 'logo' ? 1024 * 1024 : 100 * 1024;
+    if (file.size > limit) {
+      error(`Ukuran file terlalu besar. Maksimum untuk ${type} adalah ${type === 'logo' ? '1MB' : '100KB'}.`);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      if (type === 'logo') {
+        setBrandingLogo(base64);
+      } else {
+        setBrandingFavicon(base64);
+      }
+      success(`${type === 'logo' ? 'Logo' : 'Favicon'} berhasil dimuat! Klik Simpan untuk menyimpan.`);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveBranding = async () => {
+    setSavingConfig("branding" as any);
+    try {
+      await saveAdminGlobalSetting("branding_app_name", brandingAppName, false);
+      await saveAdminGlobalSetting("branding_page_title", brandingPageTitle, false);
+      await saveAdminGlobalSetting("branding_logo", brandingLogo, false);
+      await saveAdminGlobalSetting("branding_favicon", brandingFavicon, false);
+      await saveAdminGlobalSetting("branding_public_url", brandingPublicUrl, false);
+      
+      brandingGlobal.setBranding({
+        app_name: brandingAppName,
+        page_title: brandingPageTitle,
+        logo: brandingLogo,
+        favicon: brandingFavicon,
+        public_url: brandingPublicUrl
+      });
+
+      success("Platform Identity & Branding berhasil disimpan.");
+    } catch (err) {
+      error("Gagal menyimpan branding: " + (err instanceof Error ? err.message : "Error"));
+    } finally {
+      setSavingConfig(null);
+    }
+  };
+
   const handleExecuteQuery = async () => {
     if (!sqlQuery.trim()) return;
     setIsExecutingQuery(true);
@@ -1682,27 +1753,31 @@ export function AdminDashboardPage(): JSX.Element {
   return (
     <div className={`app-shell admin-layout ${sidebarOpen ? "sidebar-open" : ""}`}>
       <aside className="app-sidebar">
-        <div className="sidebar-header">
+        <div className="sidebar-header" style={{ marginBottom: "2.5rem", paddingBottom: "1.2rem", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
-              <rect width="32" height="32" rx="8" fill="url(#logo_grad_admin)" />
-              <path d="M12 6H21C22.1046 6 23 6.89543 23 8V19C23 19.5523 22.5523 20 22 20H12C11.4477 20 11 19.5523 11 19V7C11 6.44772 11.4477 6 12 6Z" fill="#F8FAFC" />
-              <line x1="14" y1="9" x2="20" y2="9" stroke="#0D9488" strokeWidth="1.5" strokeLinecap="round" />
-              <line x1="14" y1="12" x2="20" y2="12" stroke="#0D9488" strokeWidth="1.5" strokeLinecap="round" />
-              <line x1="14" y1="15" x2="18" y2="15" stroke="#D97706" strokeWidth="1.5" strokeLinecap="round" />
-              <path d="M8 12H20C21.1046 12 22 12.8954 22 14V23C22 24.1046 21.1046 25 20 25H8C6.89543 25 6 24.1046 6 23V14C6 12.8954 6.89543 12 8 12Z" fill="#0F766E" stroke="#0D9488" strokeWidth="1" />
-              <path d="M18 15.5H22V21.5H18C16.3431 21.5 15 20.1569 15 18.5C15 16.8431 16.3431 15.5 18 15.5Z" fill="#11395F" />
-              <circle cx="18" cy="18.5" r="1.75" fill="#D97706" />
-              <defs>
-                <linearGradient id="logo_grad_admin" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-                  <stop stopColor="#0f766e" />
-                  <stop offset="1" stopColor="#0d9488" />
-                </linearGradient>
-              </defs>
-            </svg>
+            {brandingGlobal.logo ? (
+              <img src={brandingGlobal.logo} alt="Logo" style={{ width: "32px", height: "32px", borderRadius: "8px", objectFit: "contain", flexShrink: 0 }} />
+            ) : (
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+                <rect width="32" height="32" rx="8" fill="url(#logo_grad_admin)" />
+                <path d="M12 6H21C22.1046 6 23 6.89543 23 8V19C23 19.5523 22.5523 20 22 20H12C11.4477 20 11 19.5523 11 19V7C11 6.44772 11.4477 6 12 6Z" fill="#F8FAFC" />
+                <line x1="14" y1="9" x2="20" y2="9" stroke="#0D9488" strokeWidth="1.5" strokeLinecap="round" />
+                <line x1="14" y1="12" x2="20" y2="12" stroke="#0D9488" strokeWidth="1.5" strokeLinecap="round" />
+                <line x1="14" y1="15" x2="18" y2="15" stroke="#D97706" strokeWidth="1.5" strokeLinecap="round" />
+                <path d="M8 12H20C21.1046 12 22 12.8954 22 14V23C22 24.1046 21.1046 25 20 25H8C6.89543 25 6 24.1046 6 23V14C6 12.8954 6.89543 12 8 12Z" fill="#0F766E" stroke="#0D9488" strokeWidth="1" />
+                <path d="M18 15.5H22V21.5H18C16.3431 21.5 15 20.1569 15 18.5C15 16.8431 16.3431 15.5 18 15.5Z" fill="#11395F" />
+                <circle cx="18" cy="18.5" r="1.75" fill="#D97706" />
+                <defs>
+                  <linearGradient id="logo_grad_admin" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#0f766e" />
+                    <stop offset="1" stopColor="#0d9488" />
+                  </linearGradient>
+                </defs>
+              </svg>
+            )}
             <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
-              <h2 className="brand" style={{ margin: 0, fontSize: "1.35rem", fontWeight: 700, letterSpacing: "0.5px", lineHeight: 1.2 }}>{t("app.brand")}</h2>
-              <p className="sidebar-caption" style={{ margin: 0, fontSize: "0.68rem", opacity: 0.8, lineHeight: 1.2, marginTop: "2px" }}>{t("admin.brand_tag")}</p>
+              <h2 className="brand" style={{ margin: 0, fontSize: "1.35rem", fontWeight: 700, letterSpacing: "0.5px", lineHeight: 1.2 }}>{brandingGlobal.app_name || t("app.brand")}</h2>
+              <p className="sidebar-caption" style={{ margin: 0, fontSize: "0.68rem", opacity: 0.8, lineHeight: 1.2, marginTop: "2px" }}>{brandingGlobal.page_title || t("admin.brand_tag")}</p>
             </div>
           </div>
           <button type="button" className="btn btn-ghost-inline sidebar-close-btn" onClick={() => setSidebarOpen(false)} aria-label={t("common.closeMenu")}>
@@ -1777,7 +1852,8 @@ export function AdminDashboardPage(): JSX.Element {
               <button className={`app-nav-link sub-link ${activeTab === "notifications" ? "is-active" : ""}`} onClick={() => { setActiveTab("notifications"); setSidebarOpen(false); }}>Notification Providers</button>
               <button className={`app-nav-link sub-link ${activeTab === "database" ? "is-active" : ""}`} onClick={() => { setActiveTab("database"); setSidebarOpen(false); }}>Database Config</button>
               <button className={`app-nav-link sub-link ${activeTab === "storage" ? "is-active" : ""}`} onClick={() => { setActiveTab("storage"); setSidebarOpen(false); }}>Storage & Cloud</button>
-              <button className={`app-nav-link sub-link ${activeTab === "optimization" ? "is-active" : ""}`} onClick={() => { setActiveTab("optimization"); setSidebarOpen(false); }}>Optimasi & Performa</button>
+              <button className={`app-nav-link sub-link ${activeTab === "optimization" ? "is-active" : ""}`} onClick={() => { setActiveTab("optimization"); setSidebarOpen(false); }}>{t("admin.nav_optimization") || "Optimasi & Performa"}</button>
+              <button className={`app-nav-link sub-link ${activeTab === "branding" ? "is-active" : ""}`} onClick={() => { setActiveTab("branding"); setSidebarOpen(false); }}>Platform Branding</button>
               <button className={`app-nav-link sub-link ${activeTab === "dbtool" ? "is-active" : ""}`} onClick={() => { setActiveTab("dbtool"); setSidebarOpen(false); }}>Database Size & Growth</button>
             </div>
           )}
@@ -1845,6 +1921,8 @@ export function AdminDashboardPage(): JSX.Element {
               activeTab === "backups" ? "Backup & Restore" :
               activeTab === "whatsapp" ? "Chat AI Queue & Statistics" :
               activeTab === "updates" ? "System Auto-Updater" :
+              activeTab === "branding" ? "Platform Identity & Branding" :
+              activeTab === "ai" ? "AI Settings & Provider Configuration" :
               t("admin.nav_dashboard")
             }
             description={
@@ -1858,6 +1936,8 @@ export function AdminDashboardPage(): JSX.Element {
               activeTab === "backups" ? "Kelola file dump database untuk keamanan data dan migrasi." :
               activeTab === "whatsapp" ? "Pantau statistik antrean pesan real-time, status pemrosesan AI, log error, dan retry manual." :
               activeTab === "updates" ? "Periksa, unduh, dan pasang pembaruan kode aplikasi Pekan langsung dari GitHub secara aman." :
+              activeTab === "branding" ? "Kustomisasi nama platform, favicon, logo, dan URL akses publik eksternal." :
+              activeTab === "ai" ? "Kelola konfigurasi provider AI, system prompt, dan pengaturan worker antrean AI." :
               "Pusat kendali dan infrastruktur Pekan"
             }
             hideInfo={true}
@@ -2543,85 +2623,64 @@ export function AdminDashboardPage(): JSX.Element {
 
           {activeTab === "ai" && (
             <div className="card-grid tight">
-               {/* Active AI Provider Selection for Scan Receipt */}
-               <div className="surface card shadow-soft" style={{ gridColumn: "1 / -1" }}>
-                 <h3 className="form-title">Provider AI Aktif (Scan Receipt)</h3>
-                 <div className="form-grid">
-                    <p className="form-section-desc">Pilih provider mana yang akan digunakan secara global untuk fitur Scan Receipt.</p>
-                    <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                      <select className="input-control" value={activeAI} onChange={e => setActiveAI(e.target.value)} style={{ maxWidth: "300px" }}>
-                        <option value="gemini">Google Gemini</option>
-                        <option value="openai">OpenAI (ChatGPT)</option>
-                        <option value="claude">Anthropic Claude</option>
-                        <option value="sumopod">Sumopod (Custom)</option>
-                      </select>
-                      <button className="btn btn-primary" onClick={() => handleSaveNotificationConfig("active_ai")} disabled={savingConfig === "active_ai"}>
-                        {savingConfig === "active_ai" ? "Menyimpan..." : "Simpan Pilihan"}
-                      </button>
-                    </div>
+               {/* Top 2x2 compact grid for quick settings */}
+               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: "1.5rem", gridColumn: "1 / -1" }}>
+                 {/* Active AI Provider Selection for Scan Receipt */}
+                 <div className="surface card shadow-soft">
+                   <h3 className="form-title">Provider AI Aktif (Scan Receipt)</h3>
+                   <p className="form-section-desc">Pilih provider global untuk fitur Scan Receipt.</p>
+                   <div style={{ display: "flex", gap: "10px", alignItems: "center", marginTop: "0.8rem" }}>
+                     <select className="input-control" value={activeAI} onChange={e => setActiveAI(e.target.value)} style={{ flex: 1 }}>
+                       <option value="gemini">Google Gemini</option>
+                       <option value="openai">OpenAI (ChatGPT)</option>
+                       <option value="claude">Anthropic Claude</option>
+                       <option value="sumopod">Sumopod (Custom)</option>
+                     </select>
+                     <button className="btn btn-primary" onClick={() => handleSaveNotificationConfig("active_ai")} disabled={savingConfig === "active_ai"}>
+                       {savingConfig === "active_ai" ? "Menyimpan..." : "Simpan Pilihan"}
+                     </button>
+                   </div>
                  </div>
-               </div>
 
-               {/* Active AI Provider Selection for Chat Bot AI */}
-               <div className="surface card shadow-soft" style={{ gridColumn: "1 / -1" }}>
-                 <h3 className="form-title">Provider AI Aktif untuk Chat Bot AI (WhatsApp)</h3>
-                 <div className="form-grid">
-                    <p className="form-section-desc">Pilih provider mana yang akan digunakan secara global untuk fitur Chat Bot AI WhatsApp.</p>
-                    <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                      <select className="input-control" value={activeWaBotAI} onChange={e => setActiveWaBotAI(e.target.value)} style={{ maxWidth: "300px" }}>
-                        <option value="gemini">Google Gemini</option>
-                        <option value="openai">OpenAI (ChatGPT)</option>
-                        <option value="claude">Anthropic Claude</option>
-                        <option value="sumopod">Sumopod (Custom)</option>
-                      </select>
-                      <button className="btn btn-primary" onClick={() => handleSaveNotificationConfig("active_wa_bot_ai")} disabled={savingConfig === "active_wa_bot_ai"}>
-                        {savingConfig === "active_wa_bot_ai" ? "Menyimpan..." : "Simpan Pilihan"}
-                      </button>
-                    </div>
+                 {/* Active AI Provider Selection for Chat Bot AI */}
+                 <div className="surface card shadow-soft">
+                   <h3 className="form-title">Provider AI Chat Bot (WhatsApp)</h3>
+                   <p className="form-section-desc">Pilih provider global untuk fitur Chat Bot AI WhatsApp.</p>
+                   <div style={{ display: "flex", gap: "10px", alignItems: "center", marginTop: "0.8rem" }}>
+                     <select className="input-control" value={activeWaBotAI} onChange={e => setActiveWaBotAI(e.target.value)} style={{ flex: 1 }}>
+                       <option value="gemini">Google Gemini</option>
+                       <option value="openai">OpenAI (ChatGPT)</option>
+                       <option value="claude">Anthropic Claude</option>
+                       <option value="sumopod">Sumopod (Custom)</option>
+                     </select>
+                     <button className="btn btn-primary" onClick={() => handleSaveNotificationConfig("active_wa_bot_ai")} disabled={savingConfig === "active_wa_bot_ai"}>
+                       {savingConfig === "active_wa_bot_ai" ? "Menyimpan..." : "Simpan Pilihan"}
+                     </button>
+                   </div>
                  </div>
-               </div>
- 
-               {/* Nomor WhatsApp Bot System */}
-               <div className="surface card shadow-soft" style={{ gridColumn: "1 / -1" }}>
-                 <h3 className="form-title">Nomor WhatsApp Bot System</h3>
-                 <div className="form-grid">
-                    <p className="form-section-desc">Masukkan nomor WhatsApp Bot sistem Anda (misal: +628123456789). Nomor ini akan ditampilkan kepada pengguna untuk membantu mereka mengetahui kemana mereka harus mengirim pesan/perintah login.</p>
-                    <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                      <input 
-                        type="text"
-                        className="input-control" 
-                        placeholder="Contoh: +628123456789" 
-                        value={waBotPhoneNumber} 
-                        onChange={e => setWaBotPhoneNumber(e.target.value)} 
-                        style={{ maxWidth: "300px" }} 
-                      />
-                      <button className="btn btn-primary" onClick={() => handleSaveNotificationConfig("wa_bot_phone_number")} disabled={savingConfig === "wa_bot_phone_number"}>
-                        {savingConfig === "wa_bot_phone_number" ? "Menyimpan..." : "Simpan Nomor Bot"}
-                      </button>
-                    </div>
-                 </div>
-               </div>
 
-               {/* Jumlah Worker Antrean AI (Concurreny/Parallel Workers) */}
-               <div className="surface card shadow-soft" style={{ gridColumn: "1 / -1" }}>
-                 <h3 className="form-title">Jumlah Worker Antrean AI (Concurrency)</h3>
-                 <div className="form-grid">
-                    <p className="form-section-desc">Atur berapa banyak pesan WhatsApp yang akan diproses secara bersamaan (paralel) oleh asisten AI. Default adalah 4. Anda dapat meningkatkannya menjadi 10 atau lebih sesuai dengan volume chat Anda tanpa membutuhkan core CPU yang tinggi. (Perlu merestart service worker AI setelah menyimpan).</p>
-                    <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                      <input 
-                        type="number"
-                        min="1"
-                        max="50"
-                        className="input-control" 
-                        placeholder="Contoh: 10" 
-                        value={aiQueueWorkers} 
-                        onChange={e => setAiQueueWorkers(e.target.value)} 
-                        style={{ maxWidth: "300px" }} 
-                      />
-                      <button className="btn btn-primary" onClick={() => handleSaveNotificationConfig("ai_queue_workers")} disabled={savingConfig === "ai_queue_workers"}>
-                        {savingConfig === "ai_queue_workers" ? "Menyimpan..." : "Simpan Jumlah Worker"}
-                      </button>
-                    </div>
+                 {/* Nomor WhatsApp Bot System */}
+                 <div className="surface card shadow-soft">
+                   <h3 className="form-title">Nomor WhatsApp Bot System</h3>
+                   <p className="form-section-desc">Nomor WA Bot yang ditampilkan ke pengguna untuk mengirim pesan/perintah.</p>
+                   <div style={{ display: "flex", gap: "10px", alignItems: "center", marginTop: "0.8rem" }}>
+                     <input type="text" className="input-control" placeholder="+628123456789" value={waBotPhoneNumber} onChange={e => setWaBotPhoneNumber(e.target.value)} style={{ flex: 1 }} />
+                     <button className="btn btn-primary" onClick={() => handleSaveNotificationConfig("wa_bot_phone_number")} disabled={savingConfig === "wa_bot_phone_number"}>
+                       {savingConfig === "wa_bot_phone_number" ? "Menyimpan..." : "Simpan Nomor Bot"}
+                     </button>
+                   </div>
+                 </div>
+
+                 {/* Jumlah Worker Antrean AI */}
+                 <div className="surface card shadow-soft">
+                   <h3 className="form-title">Worker Antrean AI (Concurrency)</h3>
+                   <p className="form-section-desc">Jumlah pesan paralel yang diproses AI. Default: 4. Restart worker setelah ubah.</p>
+                   <div style={{ display: "flex", gap: "10px", alignItems: "center", marginTop: "0.8rem" }}>
+                     <input type="number" min="1" max="50" className="input-control" placeholder="10" value={aiQueueWorkers} onChange={e => setAiQueueWorkers(e.target.value)} style={{ flex: 1, maxWidth: "120px" }} />
+                     <button className="btn btn-primary" onClick={() => handleSaveNotificationConfig("ai_queue_workers")} disabled={savingConfig === "ai_queue_workers"}>
+                       {savingConfig === "ai_queue_workers" ? "Menyimpan..." : "Simpan Jumlah Worker"}
+                     </button>
+                   </div>
                  </div>
                </div>
 
@@ -2650,6 +2709,8 @@ export function AdminDashboardPage(): JSX.Element {
                   </div>
                 </div>
 
+                {/* AI Provider API Keys — 2-col grid */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: "1.5rem", gridColumn: "1 / -1" }}>
                 {/* Gemini Config */}
                <div className="surface card shadow-soft">
                  <div className="form-header-with-badge">
@@ -2751,6 +2812,7 @@ export function AdminDashboardPage(): JSX.Element {
                     </div>
                  </form>
                </div>
+                </div>
             </div>
           )}
 
@@ -3647,6 +3709,151 @@ export function AdminDashboardPage(): JSX.Element {
                     </div>
                   )}
                   <div ref={terminalLogEndRef} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "branding" && (
+            <div className="branding-view">
+              <div className="card-grid two-col" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "2rem" }}>
+                {/* Form Column */}
+                <div className="surface card shadow-soft" style={{ padding: "2rem", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+                  <h3 className="form-title" style={{ margin: 0, borderBottom: "1px solid rgba(0,0,0,0.05)", paddingBottom: "0.8rem" }}>Kustomisasi Identitas</h3>
+                  
+                  <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
+                    <label className="form-field" style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      <strong>Nama Aplikasi</strong>
+                      <input 
+                        type="text" 
+                        className="input-control" 
+                        value={brandingAppName} 
+                        onChange={(e) => setBrandingAppName(e.target.value)} 
+                        placeholder="PEKAN"
+                        style={{ padding: "0.6rem 0.8rem", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.12)" }}
+                      />
+                    </label>
+
+                    <label className="form-field" style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      <strong>Tagline / Deskripsi</strong>
+                      <input 
+                        type="text" 
+                        className="input-control" 
+                        value={brandingPageTitle} 
+                        onChange={(e) => setBrandingPageTitle(e.target.value)} 
+                        placeholder="Catatan Keuangan & Dompet Digital"
+                        style={{ padding: "0.6rem 0.8rem", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.12)" }}
+                      />
+                    </label>
+
+                    <label className="form-field" style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      <strong>URL Publik Eksternal</strong>
+                      <input 
+                        type="text" 
+                        className="input-control" 
+                        value={brandingPublicUrl} 
+                        onChange={(e) => setBrandingPublicUrl(e.target.value)} 
+                        placeholder="https://pekan.app"
+                        style={{ padding: "0.6rem 0.8rem", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.12)" }}
+                      />
+                      <small className="text-muted" style={{ fontSize: "0.75rem", marginTop: "2px" }}>
+                        URL domain publik untuk akses guest/workspace luar.
+                      </small>
+                    </label>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                      <div className="form-field" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        <strong>Upload Logo</strong>
+                        <div style={{ position: "relative", overflow: "hidden", display: "inline-block" }}>
+                          <button className="btn btn-secondary-outline" style={{ width: "100%", padding: "0.5rem", fontSize: "0.85rem" }} type="button">Pilih Logo</button>
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            onChange={(e) => handleFileChange(e, 'logo')} 
+                            style={{ position: "absolute", left: 0, top: 0, opacity: 0, cursor: "pointer", width: "100%", height: "100%" }}
+                          />
+                        </div>
+                        <small className="text-muted" style={{ fontSize: "0.7rem" }}>Maks. 1MB (Rasio 1:1)</small>
+                      </div>
+
+                      <div className="form-field" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        <strong>Upload Favicon</strong>
+                        <div style={{ position: "relative", overflow: "hidden", display: "inline-block" }}>
+                          <button className="btn btn-secondary-outline" style={{ width: "100%", padding: "0.5rem", fontSize: "0.85rem" }} type="button">Pilih Favicon</button>
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            onChange={(e) => handleFileChange(e, 'favicon')} 
+                            style={{ position: "absolute", left: 0, top: 0, opacity: 0, cursor: "pointer", width: "100%", height: "100%" }}
+                          />
+                        </div>
+                        <small className="text-muted" style={{ fontSize: "0.7rem" }}>Maks. 100KB (.png/.ico)</small>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: "10px", marginTop: "1rem" }}>
+                    <button 
+                      className="btn btn-primary" 
+                      onClick={handleSaveBranding} 
+                      disabled={savingConfig === "branding"}
+                      style={{ padding: "0.7rem 1.5rem" }}
+                    >
+                      {savingConfig === "branding" ? "Menyimpan..." : "Simpan Perubahan"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Preview Column */}
+                <div className="surface card shadow-soft" style={{ padding: "2rem", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+                  <h3 className="form-title" style={{ margin: 0, borderBottom: "1px solid rgba(0,0,0,0.05)", paddingBottom: "0.8rem" }}>
+                    Pratinjau Langsung (Live Preview)
+                  </h3>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+                    {/* Browser Tab Preview */}
+                    <div>
+                      <span className="text-xs text-muted" style={{ fontWeight: 600, display: "block", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Tab Browser</span>
+                      <div style={{ background: "#e2e8f0", borderRadius: "8px", padding: "12px", border: "1px solid rgba(0,0,0,0.1)", display: "flex", alignItems: "center", gap: "10px" }}>
+                        <div style={{ display: "flex", gap: "4px" }}>
+                          <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#ef4444" }}></span>
+                          <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#f59e0b" }}></span>
+                          <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#10b981" }}></span>
+                        </div>
+                        <div style={{ background: "#ffffff", borderRadius: "6px 6px 0 0", padding: "6px 14px", border: "1px solid rgba(0,0,0,0.08)", borderBottom: "none", display: "flex", alignItems: "center", gap: "8px", fontSize: "0.8rem", maxWidth: "250px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {brandingFavicon ? (
+                            <img src={brandingFavicon} alt="Favicon" style={{ width: "16px", height: "16px", objectFit: "contain", borderRadius: "2px" }} />
+                          ) : (
+                            <span style={{ width: "16px", height: "16px", background: "url('/favicon.ico') no-repeat center/contain", display: "block" }}>🪙</span>
+                          )}
+                          <strong style={{ fontWeight: 600, color: "#1e293b" }}>{brandingPageTitle || "PEKAN - Catatan Keuangan dan Dompet"}</strong>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Sidebar Mockup Preview */}
+                    <div>
+                      <span className="text-xs text-muted" style={{ fontWeight: 600, display: "block", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Sidebar Dashboard</span>
+                      <div style={{ background: "#0f766e", color: "#ffffff", borderRadius: "12px", padding: "1.5rem", boxShadow: "inset 0 4px 20px rgba(0,0,0,0.25)" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "1rem" }}>
+                          {brandingLogo ? (
+                            <img src={brandingLogo} alt="Logo" style={{ width: "36px", height: "36px", borderRadius: "8px", objectFit: "contain", background: "rgba(255,255,255,0.1)", padding: "2px" }} />
+                          ) : (
+                            <div style={{ width: "36px", height: "36px", borderRadius: "8px", background: "linear-gradient(135deg, #0d9488, #0f766e)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem", fontWeight: "bold" }}>P</div>
+                          )}
+                          <div style={{ display: "flex", flexDirection: "column" }}>
+                            <strong style={{ fontSize: "1.2rem", fontWeight: 700, letterSpacing: "0.5px" }}>{brandingAppName || "PEKAN"}</strong>
+                            <span style={{ fontSize: "0.7rem", opacity: 0.8, marginTop: "1px" }}>{brandingPageTitle || "Catatan Keuangan & Dompet"}</span>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "1rem", opacity: 0.65 }}>
+                          <span style={{ height: "14px", background: "rgba(255,255,255,0.15)", borderRadius: "4px", width: "70%" }}></span>
+                          <span style={{ height: "14px", background: "rgba(255,255,255,0.15)", borderRadius: "4px", width: "50%" }}></span>
+                          <span style={{ height: "14px", background: "rgba(255,255,255,0.15)", borderRadius: "4px", width: "60%" }}></span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

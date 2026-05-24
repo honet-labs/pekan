@@ -678,3 +678,26 @@ func (h *Handler) GetUpdateStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.WriteJSON(w, http.StatusOK, out, middleware.GetRequestID(r.Context()))
 }
+
+func (h *Handler) GetPublicBranding(w http.ResponseWriter, r *http.Request) {
+	appName, _, _ := h.service.GetGlobalSetting(r.Context(), "branding_app_name")
+	pageTitle, _, _ := h.service.GetGlobalSetting(r.Context(), "branding_page_title")
+	logo, _, _ := h.service.GetGlobalSetting(r.Context(), "branding_logo")
+	favicon, _, _ := h.service.GetGlobalSetting(r.Context(), "branding_favicon")
+	publicURL, _, _ := h.service.GetGlobalSetting(r.Context(), "branding_public_url")
+
+	if appName == "" {
+		appName = "PEKAN"
+	}
+	if pageTitle == "" {
+		pageTitle = "PEKAN - Catatan Keuangan dan Dompet"
+	}
+
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{
+		"app_name":   appName,
+		"page_title": pageTitle,
+		"logo":       logo,
+		"favicon":    favicon,
+		"public_url": publicURL,
+	}, middleware.GetRequestID(r.Context()))
+}

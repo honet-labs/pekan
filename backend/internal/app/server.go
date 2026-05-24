@@ -254,6 +254,7 @@ func NewServer(cfg config.Config) (*Server, error) {
 		r.Group(func(r chi.Router) {
 			authHandler.RegisterPublicRoutes(r)
 			adminHandler.RegisterRoutes(r)
+			r.Get("/branding", adminHandler.GetPublicBranding)
 		})
 		
 		r.Post("/webhook/whatsapp", whatsappWebhookHandler.HandleIncomingMessage)
