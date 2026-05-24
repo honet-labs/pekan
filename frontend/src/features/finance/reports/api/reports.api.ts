@@ -38,7 +38,7 @@ export async function createTransactionsReport(payload: CreateTransactionsReport
   });
 }
 
-export async function downloadReport(report: Report): Promise<void> {
+export async function getReportBlob(report: Report): Promise<{ blob: Blob; url: string }> {
   const response = await fetch(`${API_BASE_URL}/finance/reports/${report.id}/download`, {
     credentials: "include"
   });
@@ -46,6 +46,12 @@ export async function downloadReport(report: Report): Promise<void> {
     throw new Error("Failed to download report");
   }
   const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  return { blob, url };
+}
+
+export async function downloadReport(report: Report): Promise<void> {
+  const { blob } = await getReportBlob(report);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;

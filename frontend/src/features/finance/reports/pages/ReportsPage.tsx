@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { downloadReport } from "../api/reports.api";
+import { useState } from "react";
+import { downloadReport, getReportBlob } from "../api/reports.api";
 import { Report } from "../api/reports.types";
 import { useReports } from "../hooks/useReports";
 import { useI18n } from "../../../../core/i18n/i18n";
@@ -32,6 +32,13 @@ export function ReportsPage(): JSX.Element {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<Report | null>(null);
   const { t } = useI18n();
+
+  // Preview States
+  const [previewingReport, setPreviewingReport] = useState<Report | null>(null);
+  const [previewData, setPreviewData] = useState<{ headers: string[]; rows: string[][] } | null>(null);
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -66,6 +73,69 @@ export function ReportsPage(): JSX.Element {
     } finally {
       setDownloading(null);
     }
+  };
+
+  const handlePreview = async (report: Report) => {
+    setPreviewingReport(report);
+    setPreviewLoading(true);
+    setPreviewError(null);
+    setPreviewData(null);
+    setPreviewPdfUrl(null);
+
+    try {
+      const { blob, url } = await getReportBlob(report);
+
+      if (report.format === "pdf") {
+        setPreviewPdfUrl(url);
+      } else if (report.format === "csv") {
+        const text = await blob.text();
+        const lines = text.split("\n");
+        const parsedRows = lines
+          .map(line => {
+            const result: string[] = [];
+            let current = "";
+            let inQuotes = false;
+            for (let i = 0; i < line.length; i++) {
+              const char = line[i];
+              if (char === '"') {
+                inQuotes = !inQuotes;
+              } else if (char === ',' && !inQuotes) {
+                result.push(current.trim().replace(/^"|"$/g, ""));
+                current = "";
+              } else {
+                current += char;
+              }
+            }
+            result.push(current.trim().replace(/^"|"$/g, ""));
+            return result;
+          })
+          .filter(row => row.length > 0 && row.some(cell => cell !== ""));
+
+        if (parsedRows.length > 0) {
+          const headers = parsedRows[0];
+          const rows = parsedRows.slice(1);
+          setPreviewData({ headers, rows });
+        } else {
+          setPreviewError("File CSV kosong.");
+        }
+      } else {
+        setPreviewError("Format file tidak didukung untuk pratinjau.");
+      }
+    } catch (err) {
+      setPreviewError(err instanceof Error ? err.message : "Gagal memuat pratinjau");
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const handleClosePreview = () => {
+    if (previewPdfUrl) {
+      URL.revokeObjectURL(previewPdfUrl);
+    }
+    setPreviewingReport(null);
+    setPreviewData(null);
+    setPreviewPdfUrl(null);
+    setPreviewError(null);
   };
 
   const handleDeleteClick = (report: Report) => {
@@ -262,7 +332,16 @@ export function ReportsPage(): JSX.Element {
                       <td data-label={t("reports.table.status")}>{item.status}</td>
                       <td data-label={t("reports.table.created")}>{new Date(item.created_at).toLocaleString()}</td>
                       <td data-label={t("reports.table.action")}>
-                        <div className="inline-buttons">
+                        <div className="inline-buttons" style={{ display: "flex", gap: "0.25rem" }}>
+                          <button
+                            className="btn btn-ghost-inline"
+                            type="button"
+                            onClick={() => handlePreview(item)}
+                            disabled={item.status !== "ready" || downloading === item.id}
+                            title={t("reports.preview")}
+                          >
+                            {t("reports.preview")}
+                          </button>
                           <button
                             className="btn btn-ghost-inline"
                             type="button"
@@ -304,6 +383,7 @@ export function ReportsPage(): JSX.Element {
         </div>
       </div>
 
+      {/* Delete Confirmation Modal */}
       <DeleteConfirmModal
         isOpen={deleteConfirmOpen}
         title={t("reports.delete.title")}
@@ -312,6 +392,98 @@ export function ReportsPage(): JSX.Element {
         onConfirm={handleConfirmDelete}
         onCancel={handleCancelDelete}
       />
+
+      {/* Report Preview Modal */}
+      {previewingReport && (
+        <div className="modal-overlay" style={{ display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={handleClosePreview}>
+          <div className="modal-content" style={{ maxWidth: "1000px", width: "95%", maxHeight: "90vh", display: "flex", flexDirection: "column" }} onClick={(e) => e.stopPropagation()}>
+            <header className="modal-header">
+              <h2>
+                {t("reports.preview.title")} - {t(`reports.type.${previewingReport.report_type}`)} ({previewingReport.format.toUpperCase()})
+              </h2>
+              <button type="button" className="btn-icon" onClick={handleClosePreview} title={t("common.close")}>
+                ✕
+              </button>
+            </header>
+
+            <div className="modal-body" style={{ overflowY: "auto", flex: 1, padding: "1.5rem" }}>
+              {previewLoading ? (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "300px" }}>
+                  <style>{`
+                    @keyframes spin {
+                      0% { transform: rotate(0deg); }
+                      100% { transform: rotate(360deg); }
+                    }
+                  `}</style>
+                  <div className="spinner" style={{ border: "4px solid var(--surface-soft)", width: "40px", height: "40px", borderRadius: "50%", borderLeftColor: "var(--primary)", animation: "spin 1s linear infinite" }}></div>
+                  <p style={{ marginTop: "1rem", color: "var(--muted)", fontWeight: "500" }}>{t("common.loading")}</p>
+                </div>
+              ) : previewError ? (
+                <div className="alert error">{previewError}</div>
+              ) : previewingReport.format === "csv" && previewData ? (
+                <div className="data-table-wrap" style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: "6px" }}>
+                  <table className="data-table" style={{ fontSize: "0.85rem", width: "100%" }}>
+                    <thead>
+                      <tr>
+                        {previewData.headers.map((h, i) => (
+                          <th key={i} style={{ background: "var(--surface-soft)", position: "sticky", top: 0 }}>{h.replace(/_/g, " ").toUpperCase()}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {previewData.rows.map((row, rowIndex) => (
+                        <tr key={rowIndex}>
+                          {row.map((cell, cellIndex) => {
+                            const header = previewData.headers[cellIndex];
+                            const isAmount = header.includes("amount_minor") || header.includes("limit_minor");
+                            let cellVal = cell;
+                            if (isAmount && !isNaN(Number(cell))) {
+                              cellVal = (Number(cell) / 100).toLocaleString(undefined, { minimumFractionDigits: 2 });
+                            }
+                            return <td key={cellIndex}>{cellVal}</td>;
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : previewingReport.format === "pdf" && previewPdfUrl ? (
+                <div style={{ width: "100%", height: "550px", display: "flex", flexDirection: "column" }}>
+                  <iframe
+                    src={previewPdfUrl}
+                    title="PDF Preview"
+                    width="100%"
+                    height="100%"
+                    style={{ border: "1px solid var(--border)", borderRadius: "6px", flex: 1 }}
+                  />
+                  <div style={{ display: "flex", justifyContent: "center", marginTop: "1rem" }}>
+                    <a
+                      href={previewPdfUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn btn-ghost"
+                      style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem 1rem", border: "1px solid var(--border)", borderRadius: "6px", textDecoration: "none" }}
+                    >
+                      {t("reports.preview.openNewTab")}
+                    </a>
+                  </div>
+                </div>
+              ) : (
+                <div className="alert error">Format tidak didukung untuk pratinjau.</div>
+              )}
+            </div>
+
+            <footer className="modal-footer" style={{ borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end", gap: "0.75rem", padding: "1rem" }}>
+              <button type="button" className="btn btn-secondary" onClick={handleClosePreview}>
+                {t("common.close")}
+              </button>
+              <button type="button" className="btn btn-primary" onClick={() => { handleDownload(previewingReport); handleClosePreview(); }}>
+                {t("reports.download")}
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
 
       <ToastContainer toasts={toasts} onRemove={removeToast} />
     </section>
