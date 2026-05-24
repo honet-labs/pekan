@@ -235,6 +235,7 @@ export function ReportsPage(): JSX.Element {
                 <tr>
                   <th style={{ width: "180px" }}>{t("reports.table.id")}</th>
                   <th>{t("reports.table.type")}</th>
+                  <th>{t("reports.table.format")}</th>
                   <th>{t("reports.table.status")}</th>
                   <th>{t("reports.table.created")}</th>
                   <th>{t("reports.table.action")}</th>
@@ -249,6 +250,7 @@ export function ReportsPage(): JSX.Element {
                       <td><Skeleton width="100%" height="1rem" /></td>
                       <td><Skeleton width="100%" height="1rem" /></td>
                       <td><Skeleton width="100%" height="1rem" /></td>
+                      <td><Skeleton width="100%" height="1rem" /></td>
                     </tr>
                   ))
                 ) : (
@@ -256,6 +258,7 @@ export function ReportsPage(): JSX.Element {
                     <tr key={item.id}>
                       <td data-label={t("reports.table.id")} style={{ maxWidth: "180px" }}><span className="report-id-text" style={{ wordBreak: "break-all", fontSize: "0.75rem", color: "var(--muted)", opacity: 0.8 }}>{item.id}</span></td>
                       <td data-label={t("reports.table.type")}>{t(`reports.type.${item.report_type}`)}</td>
+                      <td data-label={t("reports.table.format")}><span className="type-pill" style={{ textTransform: "uppercase", padding: "2px 8px", borderRadius: "4px", fontSize: "0.8rem", background: "var(--surface-soft)", color: "var(--text)", border: "1px solid var(--border)" }}>{item.format}</span></td>
                       <td data-label={t("reports.table.status")}>{item.status}</td>
                       <td data-label={t("reports.table.created")}>{new Date(item.created_at).toLocaleString()}</td>
                       <td data-label={t("reports.table.action")}>
@@ -285,7 +288,7 @@ export function ReportsPage(): JSX.Element {
                 )}
                 {!items.length && !loading ? (
                   <tr>
-                    <td colSpan={5}>{t("common.noItems")}</td>
+                    <td colSpan={6}>{t("common.noItems")}</td>
                   </tr>
                 ) : null}
               </tbody>
