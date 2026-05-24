@@ -1,0 +1,15 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="64" height="64" rx="16" fill="url(#logo_grad_fav)" />
+  <path d="M18 16H34C40.6274 16 46 21.3726 46 28C46 34.6274 40.6274 40 34 40H26V49C26 49.5523 25.5523 50 25 50H19C18.4477 50 18 49.5523 18 49V17C18 16.4477 18.4477 16 19 16Z" fill="white" />
+  <circle cx="26" cy="22" r="3" fill="#d97706" />
+  <circle cx="34" cy="22" r="3" fill="#d97706" />
+  <circle cx="26" cy="28" r="3" fill="#d97706" />
+  <circle cx="34" cy="28" r="3" fill="#d97706" />
+  <path d="M25 34L30 29L35 34L43 26" stroke="#d97706" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+  <defs>
+    <linearGradient id="logo_grad_fav" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0f766e" />
+      <stop offset="1" stop-color="#0d9488" />
+    </linearGradient>
+  </defs>
+</svg>

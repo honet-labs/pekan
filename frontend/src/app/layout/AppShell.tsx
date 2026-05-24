@@ -128,9 +128,26 @@ export function AppShell(): JSX.Element {
     <div className={`app-shell${sidebarOpen ? " sidebar-open" : ""}`}>
       <aside className="app-sidebar">
         <div className="sidebar-header">
-          <div>
-            <h2 className="brand">{t("app.brand")}</h2>
-            <p className="sidebar-caption">{t("app.subtitle")}</p>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+              <rect width="32" height="32" rx="8" fill="url(#logo_grad)" />
+              <path d="M9 8H17C20.3137 8 23 10.6863 23 14C23 17.3137 20.3137 20 17 20H13V24.5C13 24.7761 12.7761 25 12.5 25H9.5C9.22386 25 9 24.7761 9 24.5V8.5C9 8.22386 9.22386 8 9.5 8H9Z" fill="white" />
+              <circle cx="13" cy="11" r="1.5" fill="#d97706" />
+              <circle cx="17" cy="11" r="1.5" fill="#d97706" />
+              <circle cx="13" cy="14" r="1.5" fill="#d97706" />
+              <circle cx="17" cy="14" r="1.5" fill="#d97706" />
+              <path d="M12.5 17L15 14.5L17.5 17L21.5 13" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <defs>
+                <linearGradient id="logo_grad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#0f766e" />
+                  <stop offset="1" stopColor="#0d9488" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <div>
+              <h2 className="brand" style={{ margin: 0, fontSize: "1.35rem", fontWeight: 700, letterSpacing: "0.5px" }}>{t("app.brand")}</h2>
+              <p className="sidebar-caption" style={{ margin: 0, fontSize: "0.75rem", opacity: 0.8 }}>{t("app.subtitle")}</p>
+            </div>
           </div>
           <button type="button" className="btn btn-ghost-inline sidebar-close-btn" onClick={() => setSidebarOpen(false)} aria-label={t("common.closeMenu")}>
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -285,7 +302,24 @@ export function AppShell(): JSX.Element {
             <path d="M3 6h18v2H3V6Zm0 5h18v2H3v-2Zm0 5h18v2H3v-2Z" />
           </svg>
         </button>
-        <strong className="mobile-brand">{t("app.brand")}</strong>
+        <strong className="mobile-brand" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <svg width="24" height="24" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+            <rect width="32" height="32" rx="8" fill="url(#logo_grad_mobile)" />
+            <path d="M9 8H17C20.3137 8 23 10.6863 23 14C23 17.3137 20.3137 20 17 20H13V24.5C13 24.7761 12.7761 25 12.5 25H9.5C9.22386 25 9 24.7761 9 24.5V8.5C9 8.22386 9.22386 8 9.5 8H9Z" fill="white" />
+            <circle cx="13" cy="11" r="1.5" fill="#d97706" />
+            <circle cx="17" cy="11" r="1.5" fill="#d97706" />
+            <circle cx="13" cy="14" r="1.5" fill="#d97706" />
+            <circle cx="17" cy="14" r="1.5" fill="#d97706" />
+            <path d="M12.5 17L15 14.5L17.5 17L21.5 13" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <defs>
+              <linearGradient id="logo_grad_mobile" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+                <stop stopColor="#0f766e" />
+                <stop offset="1" stopColor="#0d9488" />
+              </linearGradient>
+            </defs>
+          </svg>
+          {t("app.brand")}
+        </strong>
       </header>
 
       <div className="app-main">
