@@ -198,11 +198,13 @@ export function ChatbotPage(): JSX.Element {
   ];
 
   return (
-    <section className="page-section" style={{ maxWidth: "1000px", margin: "0 auto", marginTop: "-1.5rem", paddingTop: "0" }}>
-      <PageHeader 
-        title="Asisten AI Pekan" 
-        description="Portal konsultasi keuangan cerdas Anda. Pilih untuk berinteraksi langsung di aplikasi ini atau integrasikan dengan nomor WhatsApp Anda." 
-      />
+    <section className="page-section" style={{ maxWidth: "1000px", margin: "0 auto" }}>
+      <div className="chatbot-header-wrapper" style={{ marginBottom: "-0.5rem" }}>
+        <PageHeader 
+          title="Asisten AI Pekan" 
+          description="Portal konsultasi keuangan cerdas Anda. Pilih untuk berinteraksi langsung di aplikasi ini atau integrasikan dengan nomor WhatsApp Anda." 
+        />
+      </div>
 
       {/* Tabs */}
       <div style={{
@@ -210,8 +212,8 @@ export function ChatbotPage(): JSX.Element {
         background: "var(--surface-soft)",
         padding: "4px",
         borderRadius: "10px",
-        marginTop: "1.5rem",
-        marginBottom: "1.5rem",
+        marginTop: "0.5rem",
+        marginBottom: "1rem",
         border: "1px solid var(--border)",
         maxWidth: "fit-content"
       }}>

@@ -178,7 +178,7 @@ export function AdminDashboardPage(): JSX.Element {
   const [registrationOTPMethod, setRegistrationOTPMethod] = useState("email");
 
   const [brandingAppName, setBrandingAppName] = useState("PEKAN");
-  const [brandingPageTitle, setBrandingPageTitle] = useState("PEKAN - Catatan Keuangan dan Dompet");
+  const [brandingPageTitle, setBrandingPageTitle] = useState("PENCATATAN KEUANGAN");
   const [brandingLogo, setBrandingLogo] = useState("");
   const [brandingFavicon, setBrandingFavicon] = useState("");
   const [brandingPublicUrl, setBrandingPublicUrl] = useState("");
@@ -3741,7 +3741,7 @@ export function AdminDashboardPage(): JSX.Element {
                         className="input-control" 
                         value={brandingPageTitle} 
                         onChange={(e) => setBrandingPageTitle(e.target.value)} 
-                        placeholder="Catatan Keuangan & Dompet Digital"
+                        placeholder="PENCATATAN KEUANGAN"
                         style={{ padding: "0.6rem 0.8rem", borderRadius: "8px", border: "1px solid rgba(0,0,0,0.12)" }}
                       />
                     </label>
@@ -3826,7 +3826,7 @@ export function AdminDashboardPage(): JSX.Element {
                           ) : (
                             <span style={{ width: "16px", height: "16px", background: "url('/favicon.ico') no-repeat center/contain", display: "block" }}>🪙</span>
                           )}
-                          <strong style={{ fontWeight: 600, color: "#1e293b" }}>{brandingPageTitle || "PEKAN - Catatan Keuangan dan Dompet"}</strong>
+                          <strong style={{ fontWeight: 600, color: "#1e293b" }}>{brandingPageTitle || "PENCATATAN KEUANGAN"}</strong>
                         </div>
                       </div>
                     </div>
@@ -3843,7 +3843,7 @@ export function AdminDashboardPage(): JSX.Element {
                           )}
                           <div style={{ display: "flex", flexDirection: "column" }}>
                             <strong style={{ fontSize: "1.2rem", fontWeight: 700, letterSpacing: "0.5px" }}>{brandingAppName || "PEKAN"}</strong>
-                            <span style={{ fontSize: "0.7rem", opacity: 0.8, marginTop: "1px" }}>{brandingPageTitle || "Catatan Keuangan & Dompet"}</span>
+                            <span style={{ fontSize: "0.7rem", opacity: 0.8, marginTop: "1px" }}>{brandingPageTitle || "PENCATATAN KEUANGAN"}</span>
                           </div>
                         </div>
                         <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "1rem", opacity: 0.65 }}>

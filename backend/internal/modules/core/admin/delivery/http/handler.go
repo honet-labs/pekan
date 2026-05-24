@@ -690,7 +690,7 @@ func (h *Handler) GetPublicBranding(w http.ResponseWriter, r *http.Request) {
 		appName = "PEKAN"
 	}
 	if pageTitle == "" {
-		pageTitle = "PEKAN - Catatan Keuangan dan Dompet"
+		pageTitle = "PENCATATAN KEUANGAN"
 	}
 
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{

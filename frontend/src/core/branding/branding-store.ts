@@ -74,7 +74,7 @@ const brandingActions = {
 
 let state: BrandingState = {
   app_name: "PEKAN",
-  page_title: "PEKAN - Catatan Keuangan dan Dompet",
+  page_title: "PENCATATAN KEUANGAN",
   logo: "",
   favicon: "",
   public_url: "",
