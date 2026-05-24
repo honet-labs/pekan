@@ -198,7 +198,7 @@ export function ChatbotPage(): JSX.Element {
   ];
 
   return (
-    <section className="page-section" style={{ maxWidth: "1000px", margin: "0 auto" }}>
+    <section className="page-section" style={{ maxWidth: "1000px", margin: "0 auto", marginTop: "0", paddingTop: "0" }}>
       <PageHeader 
         title="Asisten AI Pekan" 
         description="Portal konsultasi keuangan cerdas Anda. Pilih untuk berinteraksi langsung di aplikasi ini atau integrasikan dengan nomor WhatsApp Anda." 
