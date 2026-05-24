@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"net"
 	"strings"
 )
 
@@ -32,6 +33,23 @@ func (l *DBLogger) Write(ctx context.Context, action, resourceType, resourceID s
 	beforeJSON, _ := marshalJSON(maskedBefore)
 	afterJSON, _ := marshalJSON(maskedAfter)
 
+	var ipVal any = nil
+	if tc.IPAddress != "" {
+		cleanIP := strings.TrimSpace(tc.IPAddress)
+		// Extract first IP if it is comma-separated (e.g. from X-Forwarded-For)
+		if idx := strings.Index(cleanIP, ","); idx != -1 {
+			cleanIP = strings.TrimSpace(cleanIP[:idx])
+		}
+		// Strip port if present
+		if host, _, err := net.SplitHostPort(cleanIP); err == nil {
+			cleanIP = host
+		}
+		// Parse IP to validate it is a real IP string (IPv4/IPv6)
+		if parsedIP := net.ParseIP(cleanIP); parsedIP != nil {
+			ipVal = parsedIP.String()
+		}
+	}
+
 	const q = `
 INSERT INTO audit_logs (
   tenant_id, actor_user_id, action, resource_type, resource_id, before_json, after_json, request_id, ip_address, user_agent, created_at
@@ -46,7 +64,7 @@ INSERT INTO audit_logs (
 		beforeJSON,
 		afterJSON,
 		nullIfEmpty(tc.RequestID),
-		nullIfEmpty(tc.IPAddress),
+		ipVal,
 		nullIfEmpty(tc.UserAgent),
 	)
 	return err

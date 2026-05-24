@@ -808,34 +808,6 @@ func (r *RepositoryPG) ListAuditLogs(ctx context.Context, filter domain.AuditLog
 	var total int64
 
 	err := db.WithTenantTx(ctx, r.conn, func(tx *sql.Tx) error {
-		// DIAGNOSTIC LOGGING - START
-		fmt.Printf("[DIAGNOSTIC] === AUDIT LOGS DATABASE CHECK ===\n")
-		var totalAll int64
-		_ = tx.QueryRowContext(ctx, "SELECT COUNT(1) FROM public.audit_logs").Scan(&totalAll)
-		fmt.Printf("[DIAGNOSTIC] Total rows in public.audit_logs: %d\n", totalAll)
-
-		var tenantCount int64
-		_ = tx.QueryRowContext(ctx, "SELECT COUNT(DISTINCT tenant_id) FROM public.audit_logs").Scan(&tenantCount)
-		fmt.Printf("[DIAGNOSTIC] Number of unique tenant_ids in audit_logs: %d\n", tenantCount)
-
-		rowsD, errD := tx.QueryContext(ctx, "SELECT id, COALESCE(tenant_id::text, 'NULL'), action FROM public.audit_logs ORDER BY created_at DESC LIMIT 5")
-		if errD == nil {
-			fmt.Printf("[DIAGNOSTIC] Last 5 audit logs:\n")
-			for rowsD.Next() {
-				var id int64
-				var tid, action string
-				if errS := rowsD.Scan(&id, &tid, &action); errS == nil {
-					fmt.Printf("[DIAGNOSTIC]   - ID: %d, TenantID: %s, Action: %s\n", id, tid, action)
-				}
-			}
-			rowsD.Close()
-		} else {
-			fmt.Printf("[DIAGNOSTIC] Diag query error: %v\n", errD)
-		}
-		fmt.Printf("[DIAGNOSTIC] Expected TenantID: %s\n", filter.TenantID)
-		fmt.Printf("[DIAGNOSTIC] ==================================\n")
-		// DIAGNOSTIC LOGGING - END
-
 		clauses := []string{"l.tenant_id = $1"}
 		args := []any{filter.TenantID}
 		idx := 2
