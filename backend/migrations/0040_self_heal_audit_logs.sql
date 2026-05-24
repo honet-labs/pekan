@@ -59,14 +59,14 @@ BEGIN
             CONTINUE;
         END IF;
 
-        IF tenant_record.code = 'pekan' OR tenant_record.code = 'pekanhonet' THEN
+        IF LOWER(tenant_record.code) = 'pekan' OR LOWER(tenant_record.code) = 'pekanhonet' THEN
             v_schema_name := 'wkspid_pekan_pekanhonet';
         ELSE
-            v_schema_name := 'wkspid_pekan_' || tenant_record.code;
+            v_schema_name := 'wkspid_pekan_' || LOWER(tenant_record.code);
         END IF;
         
         -- Check if schema exists and has roles table
-        IF EXISTS (SELECT 1 FROM information_schema.schemata s WHERE s.schema_name = v_schema_name) THEN
+        IF EXISTS (SELECT 1 FROM information_schema.schemata s WHERE LOWER(s.schema_name) = LOWER(v_schema_name)) THEN
             RAISE NOTICE '=== Aligning finance permissions in schema: % ===', v_schema_name;
 
             -- Get role IDs for owner and admin in the tenant schema

@@ -182,21 +182,11 @@ export async function listAuditLogs(params: {
   if (params.from) query.set("from", params.from);
   if (params.to) query.set("to", params.to);
   const suffix = query.toString();
-  try {
-    const data = await apiFetch<{ items: AuditLogEntry[]; pagination: { page: number; page_size: number; total: number } }>(
-      `/finance/settings/audit-logs${suffix ? `?${suffix}` : ""}`
-    );
-    return {
-      items: Array.isArray(data?.items) ? data.items : [],
-      pagination: data?.pagination ?? { page: 1, page_size: params.page_size ?? 50, total: 0 }
-    };
-  } catch (err) {
-    if (isRecoverableReadError(err)) {
-      return {
-        items: [],
-        pagination: { page: params.page ?? 1, page_size: params.page_size ?? 50, total: 0 }
-      };
-    }
-    throw err;
-  }
+  const data = await apiFetch<{ items: AuditLogEntry[]; pagination: { page: number; page_size: number; total: number } }>(
+    `/finance/settings/audit-logs${suffix ? `?${suffix}` : ""}`
+  );
+  return {
+    items: Array.isArray(data?.items) ? data.items : [],
+    pagination: data?.pagination ?? { page: 1, page_size: params.page_size ?? 50, total: 0 }
+  };
 }

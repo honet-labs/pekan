@@ -12,6 +12,7 @@ import (
 
 	"pekan/backend/internal/modules/finance/reminders/domain"
 	"pekan/backend/internal/platform/access"
+	"pekan/backend/internal/platform/audit"
 	"pekan/backend/internal/platform/storage"
 )
 
@@ -96,7 +97,11 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (domain.Reminder, 
 	if s.audit != nil {
 		go func(data domain.Reminder) {
 			defer func() { recover() }()
-			_ = s.audit.Write(context.Background(), "finance.reminder.create", "finance_reminder", data.ID, nil, data)
+			auditCtx := audit.WithContext(context.Background(), audit.AuditContext{
+				TenantID:    data.TenantID,
+				ActorUserID: data.CreatedBy,
+			})
+			_ = s.audit.Write(auditCtx, "finance.reminder.create", "finance_reminder", data.ID, nil, data)
 		}(out)
 	}
 	return out, nil
@@ -211,7 +216,11 @@ func (s *Service) Update(ctx context.Context, in UpdateInput) (domain.Reminder, 
 	if s.audit != nil {
 		go func(beforeData, afterData domain.Reminder) {
 			defer func() { recover() }()
-			_ = s.audit.Write(context.Background(), "finance.reminder.update", "finance_reminder", afterData.ID, beforeData, afterData)
+			auditCtx := audit.WithContext(context.Background(), audit.AuditContext{
+				TenantID:    afterData.TenantID,
+				ActorUserID: afterData.UpdatedBy,
+			})
+			_ = s.audit.Write(auditCtx, "finance.reminder.update", "finance_reminder", afterData.ID, beforeData, afterData)
 		}(snapshot, updated)
 	}
 	return updated, nil
@@ -236,10 +245,14 @@ func (s *Service) MarkStatus(ctx context.Context, tenantID, actorUserID, reminde
 		return domain.Reminder{}, err
 	}
 	if s.audit != nil {
-		go func(id, stat string) {
+		go func(id, stat, tID, aID string) {
 			defer func() { recover() }()
-			_ = s.audit.Write(context.Background(), "finance.reminder.mark", "finance_reminder", id, nil, map[string]any{"status": stat})
-		}(reminderID, updated.Status)
+			auditCtx := audit.WithContext(context.Background(), audit.AuditContext{
+				TenantID:    tID,
+				ActorUserID: aID,
+			})
+			_ = s.audit.Write(auditCtx, "finance.reminder.mark", "finance_reminder", id, nil, map[string]any{"status": stat})
+		}(reminderID, updated.Status, tenantID, actorUserID)
 	}
 	return updated, nil
 }
@@ -258,10 +271,14 @@ func (s *Service) Delete(ctx context.Context, tenantID, actorUserID, reminderID 
 		return err
 	}
 	if s.audit != nil {
-		go func(id string) {
+		go func(id, tID, aID string) {
 			defer func() { recover() }()
-			_ = s.audit.Write(context.Background(), "finance.reminder.delete", "finance_reminder", id, nil, map[string]any{"deleted": true})
-		}(reminderID)
+			auditCtx := audit.WithContext(context.Background(), audit.AuditContext{
+				TenantID:    tID,
+				ActorUserID: aID,
+			})
+			_ = s.audit.Write(auditCtx, "finance.reminder.delete", "finance_reminder", id, nil, map[string]any{"deleted": true})
+		}(reminderID, tenantID, actorUserID)
 	}
 	return nil
 }
@@ -422,7 +439,11 @@ func (s *Service) AddPayment(ctx context.Context, in AddPaymentInput) (domain.Re
 	if s.audit != nil {
 		go func(data domain.ReminderPayment) {
 			defer func() { recover() }()
-			_ = s.audit.Write(context.Background(), "finance.reminder.payment.add", "finance_reminder_payment", data.ID, nil, data)
+			auditCtx := audit.WithContext(context.Background(), audit.AuditContext{
+				TenantID:    data.TenantID,
+				ActorUserID: data.CreatedBy,
+			})
+			_ = s.audit.Write(auditCtx, "finance.reminder.payment.add", "finance_reminder_payment", data.ID, nil, data)
 		}(payment)
 	}
 	return payment, nil
@@ -562,7 +583,11 @@ func (s *Service) UpdatePayment(ctx context.Context, in UpdatePaymentInput) (dom
 	if s.audit != nil {
 		go func(data domain.ReminderPayment) {
 			defer func() { recover() }()
-			_ = s.audit.Write(context.Background(), "finance.reminder.payment.update", "finance_reminder_payment", data.ID, nil, data)
+			auditCtx := audit.WithContext(context.Background(), audit.AuditContext{
+				TenantID:    data.TenantID,
+				ActorUserID: data.UpdatedBy,
+			})
+			_ = s.audit.Write(auditCtx, "finance.reminder.payment.update", "finance_reminder_payment", data.ID, nil, data)
 		}(payment)
 	}
 	return payment, nil
@@ -584,10 +609,14 @@ func (s *Service) DeletePayment(ctx context.Context, tenantID, actorUserID, remi
 	}
 
 	if s.audit != nil {
-		go func(id string) {
+		go func(id, tID, aID string) {
 			defer func() { recover() }()
-			_ = s.audit.Write(context.Background(), "finance.reminder.payment.delete", "finance_reminder_payment", id, nil, map[string]any{"deleted": true})
-		}(paymentID)
+			auditCtx := audit.WithContext(context.Background(), audit.AuditContext{
+				TenantID:    tID,
+				ActorUserID: aID,
+			})
+			_ = s.audit.Write(auditCtx, "finance.reminder.payment.delete", "finance_reminder_payment", id, nil, map[string]any{"deleted": true})
+		}(paymentID, tenantID, actorUserID)
 	}
 	return nil
 }
