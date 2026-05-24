@@ -131,12 +131,13 @@ export function AppShell(): JSX.Element {
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
               <rect width="32" height="32" rx="8" fill="url(#logo_grad)" />
-              <path d="M9 8H17C20.3137 8 23 10.6863 23 14C23 17.3137 20.3137 20 17 20H13V24.5C13 24.7761 12.7761 25 12.5 25H9.5C9.22386 25 9 24.7761 9 24.5V8.5C9 8.22386 9.22386 8 9.5 8H9Z" fill="white" />
-              <circle cx="13" cy="11" r="1.5" fill="#d97706" />
-              <circle cx="17" cy="11" r="1.5" fill="#d97706" />
-              <circle cx="13" cy="14" r="1.5" fill="#d97706" />
-              <circle cx="17" cy="14" r="1.5" fill="#d97706" />
-              <path d="M12.5 17L15 14.5L17.5 17L21.5 13" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M12 6H21C22.1046 6 23 6.89543 23 8V19C23 19.5523 22.5523 20 22 20H12C11.4477 20 11 19.5523 11 19V7C11 6.44772 11.4477 6 12 6Z" fill="#F8FAFC" />
+              <line x1="14" y1="9" x2="20" y2="9" stroke="#0D9488" strokeWidth="1.5" strokeLinecap="round" />
+              <line x1="14" y1="12" x2="20" y2="12" stroke="#0D9488" strokeWidth="1.5" strokeLinecap="round" />
+              <line x1="14" y1="15" x2="18" y2="15" stroke="#D97706" strokeWidth="1.5" strokeLinecap="round" />
+              <path d="M8 12H20C21.1046 12 22 12.8954 22 14V23C22 24.1046 21.1046 25 20 25H8C6.89543 25 6 24.1046 6 23V14C6 12.8954 6.89543 12 8 12Z" fill="#0F766E" stroke="#0D9488" strokeWidth="1" />
+              <path d="M18 15.5H22V21.5H18C16.3431 21.5 15 20.1569 15 18.5C15 16.8431 16.3431 15.5 18 15.5Z" fill="#11395F" />
+              <circle cx="18" cy="18.5" r="1.75" fill="#D97706" />
               <defs>
                 <linearGradient id="logo_grad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
                   <stop stopColor="#0f766e" />
@@ -305,12 +306,13 @@ export function AppShell(): JSX.Element {
         <strong className="mobile-brand" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <svg width="24" height="24" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
             <rect width="32" height="32" rx="8" fill="url(#logo_grad_mobile)" />
-            <path d="M9 8H17C20.3137 8 23 10.6863 23 14C23 17.3137 20.3137 20 17 20H13V24.5C13 24.7761 12.7761 25 12.5 25H9.5C9.22386 25 9 24.7761 9 24.5V8.5C9 8.22386 9.22386 8 9.5 8H9Z" fill="white" />
-            <circle cx="13" cy="11" r="1.5" fill="#d97706" />
-            <circle cx="17" cy="11" r="1.5" fill="#d97706" />
-            <circle cx="13" cy="14" r="1.5" fill="#d97706" />
-            <circle cx="17" cy="14" r="1.5" fill="#d97706" />
-            <path d="M12.5 17L15 14.5L17.5 17L21.5 13" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M12 6H21C22.1046 6 23 6.89543 23 8V19C23 19.5523 22.5523 20 22 20H12C11.4477 20 11 19.5523 11 19V7C11 6.44772 11.4477 6 12 6Z" fill="#F8FAFC" />
+            <line x1="14" y1="9" x2="20" y2="9" stroke="#0D9488" strokeWidth="1.5" strokeLinecap="round" />
+            <line x1="14" y1="12" x2="20" y2="12" stroke="#0D9488" strokeWidth="1.5" strokeLinecap="round" />
+            <line x1="14" y1="15" x2="18" y2="15" stroke="#D97706" strokeWidth="1.5" strokeLinecap="round" />
+            <path d="M8 12H20C21.1046 12 22 12.8954 22 14V23C22 24.1046 21.1046 25 20 25H8C6.89543 25 6 24.1046 6 23V14C6 12.8954 6.89543 12 8 12Z" fill="#0F766E" stroke="#0D9488" strokeWidth="1" />
+            <path d="M18 15.5H22V21.5H18C16.3431 21.5 15 20.1569 15 18.5C15 16.8431 16.3431 15.5 18 15.5Z" fill="#11395F" />
+            <circle cx="18" cy="18.5" r="1.75" fill="#D97706" />
             <defs>
               <linearGradient id="logo_grad_mobile" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
                 <stop stopColor="#0f766e" />
