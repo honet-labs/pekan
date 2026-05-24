@@ -128,7 +128,7 @@ export function AppShell(): JSX.Element {
     <div className={`app-shell${sidebarOpen ? " sidebar-open" : ""}`}>
       <aside className="app-sidebar">
         <div className="sidebar-header">
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
               <rect width="32" height="32" rx="8" fill="url(#logo_grad)" />
               <path d="M12 6H21C22.1046 6 23 6.89543 23 8V19C23 19.5523 22.5523 20 22 20H12C11.4477 20 11 19.5523 11 19V7C11 6.44772 11.4477 6 12 6Z" fill="#F8FAFC" />
@@ -145,9 +145,9 @@ export function AppShell(): JSX.Element {
                 </linearGradient>
               </defs>
             </svg>
-            <div>
-              <h2 className="brand" style={{ margin: 0, fontSize: "1.35rem", fontWeight: 700, letterSpacing: "0.5px" }}>{t("app.brand")}</h2>
-              <p className="sidebar-caption" style={{ margin: 0, fontSize: "0.75rem", opacity: 0.8 }}>{t("app.subtitle")}</p>
+            <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+              <h2 className="brand" style={{ margin: 0, fontSize: "1.35rem", fontWeight: 700, letterSpacing: "0.5px", lineHeight: 1.2 }}>{t("app.brand")}</h2>
+              <p className="sidebar-caption" style={{ margin: 0, fontSize: "0.68rem", opacity: 0.8, lineHeight: 1.2, marginTop: "2px" }}>{t("app.subtitle")}</p>
             </div>
           </div>
           <button type="button" className="btn btn-ghost-inline sidebar-close-btn" onClick={() => setSidebarOpen(false)} aria-label={t("common.closeMenu")}>
