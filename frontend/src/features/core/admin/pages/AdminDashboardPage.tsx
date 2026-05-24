@@ -27,7 +27,7 @@ import { BackToTop } from "../../../../core/components/BackToTop";
 import { PasswordInput } from "../../../../core/components/PasswordInput";
 import { PageHeader } from "../../../../core/components/PageHeader";
 
-type Tab = "dashboard" | "tenants" | "add_tenant" | "stats" | "server" | "logs" | "notifications" | "ai" | "database" | "backups" | "storage" | "optimization" | "dbtool" | "whatsapp" | "updates";
+type Tab = "dashboard" | "tenants" | "add_tenant" | "stats" | "server" | "logs" | "notifications" | "ai" | "database" | "backups" | "storage" | "optimization" | "dbtool" | "whatsapp" | "updates" | "branding";
 
 const DEFAULT_WA_BOT_SYSTEM_PROMPT = `Anda adalah Asisten AI PEKAN, perencana keuangan pribadi yang profesional, ringkas, dan sangat membantu.
 Tugas Anda adalah membalas pesan pengguna WhatsApp secara interaktif. Pengguna sudah login/terverifikasi.
@@ -226,7 +226,7 @@ export function AdminDashboardPage(): JSX.Element {
     } catch (e) { return []; }
   });
   
-  const [savingConfig, setSavingConfig] = useState<"smtp" | "telegram" | "wa" | "wa_fonnte" | "wa_waha" | "wa_gowa" | "gemini" | "openai" | "claude" | "sumopod" | "active_ai" | "active_wa_bot_ai" | "wa_active_provider" | "wa_bot_system_prompt" | "wa_bot_phone_number" | "ai_queue_workers" | "database" | null>(null);
+  const [savingConfig, setSavingConfig] = useState<"smtp" | "telegram" | "wa" | "wa_fonnte" | "wa_waha" | "wa_gowa" | "gemini" | "openai" | "claude" | "sumopod" | "active_ai" | "active_wa_bot_ai" | "wa_active_provider" | "wa_bot_system_prompt" | "wa_bot_phone_number" | "ai_queue_workers" | "database" | "branding" | null>(null);
   const [testingConfig, setTestingConfig] = useState<string | null>(null);
 
   // WhatsApp bot concurrency state
