@@ -476,7 +476,7 @@ cp .env.example .env
 # Edit .env sesuai konfigurasi Anda (DATABASE_URL, JWT_SECRET, dll.)
 
 go mod tidy
-go run cmd/api/main.go               # API Server → http://localhost:8080
+go run cmd/api/main.go               # API Server → http://<IP_SERVER>:8080
 go run cmd/worker/main.go            # Background Worker (terminal terpisah)
 ```
 
@@ -486,18 +486,20 @@ go run cmd/worker/main.go            # Background Worker (terminal terpisah)
 cd frontend
 cp .env.example .env
 npm install
-npm run dev                           # Dev Server → http://localhost:5173
+npm run dev                           # Dev Server → http://<IP_SERVER>:5173
 ```
 
 ### Login Demo
 
 | Field | Value |
 | :--- | :--- |
-| URL | `http://localhost:5173` |
+| URL | `http://<IP_SERVER>:5173` (dev) atau `https://<DOMAIN>` (production) |
 | Tenant Code | `default` |
 | Email | `owner@pekan.local` |
 | Password | `password` |
 | Role | Owner (full access) |
+
+> **Catatan:** Ganti `<IP_SERVER>` dengan IP address server Anda (contoh: `192.168.1.100`).
 
 ---
 
@@ -515,6 +517,63 @@ PEKAN menyediakan skrip instalasi otomatis untuk server produksi yang mengkonfig
 | Restore DB | `deploy/restore.sh` |
 
 Panduan lengkap: [docs/SERVER-INSTALLER.md](docs/SERVER-INSTALLER.md)
+
+### Akses Aplikasi via IP Server
+
+Setelah deployment, aplikasi dapat diakses melalui IP address server Anda:
+
+| Mode | URL |
+| :--- | :--- |
+| Development | `http://<IP_SERVER>:5173` (frontend) / `http://<IP_SERVER>:8080` (API) |
+| Production (Nginx) | `http://<IP_SERVER>` (port 80) atau `https://<IP_SERVER>` (port 443 dengan SSL) |
+
+### Menggunakan Cloudflare Tunnel (Untuk Server Tanpa IP Publik)
+
+Jika server Anda hanya memiliki **IP private** (contoh: `192.168.x.x`, `10.x.x.x`) dan tidak memiliki IP publik, Anda dapat menggunakan **Cloudflare Tunnel (`cloudflared`)** untuk membungkus aplikasi dengan domain yang dapat diakses dari internet secara aman tanpa perlu membuka port atau konfigurasi port forwarding.
+
+**Langkah-langkah:**
+
+1. **Install `cloudflared`** di server Anda:
+   ```bash
+   # Debian/Ubuntu
+   curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+   sudo dpkg -i cloudflared.deb
+   ```
+
+2. **Login ke akun Cloudflare:**
+   ```bash
+   cloudflared tunnel login
+   ```
+
+3. **Buat tunnel baru:**
+   ```bash
+   cloudflared tunnel create pekan
+   ```
+
+4. **Konfigurasi tunnel** (`~/.cloudflared/config.yml`):
+   ```yaml
+   tunnel: <TUNNEL_ID>
+   credentials-file: /root/.cloudflared/<TUNNEL_ID>.json
+
+   ingress:
+     - hostname: pekan.yourdomain.com
+       service: http://localhost:80    # Arahkan ke Nginx
+     - service: http_status:404
+   ```
+
+5. **Tambahkan DNS record** di Cloudflare Dashboard:
+   ```bash
+   cloudflared tunnel route dns pekan pekan.yourdomain.com
+   ```
+
+6. **Jalankan tunnel sebagai service:**
+   ```bash
+   sudo cloudflared service install
+   sudo systemctl start cloudflared
+   sudo systemctl enable cloudflared
+   ```
+
+Setelah konfigurasi selesai, aplikasi PEKAN Anda dapat diakses melalui `https://pekan.yourdomain.com` dari mana saja — meskipun server hanya memiliki IP private. Cloudflare secara otomatis menyediakan sertifikat SSL gratis.
 
 ### Menjalankan Pengujian
 
