@@ -2361,10 +2361,18 @@ button.app-nav-link {
     gap: 1.25rem !important;
     width: 100%;
   }
+  .page-header:has(.btn-icon-danger) {
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+  }
   .header-actions {
     width: 100%;
     margin-left: 0;
     flex-shrink: 1;
+  }
+  .page-header:has(.btn-icon-danger) .header-actions {
+    width: auto !important;
   }
   .dashboard-range-controls {
     width: 100%;

@@ -54,8 +54,8 @@ INSERT INTO public.files (
 
 		const insertAttachmentQuery = `
 INSERT INTO finance_entity_attachments (
-  id, owner_type, owner_id, file_id, created_by, created_at
-) VALUES ($1,$2,$3,$4,$5,$6)`
+  id, tenant_id, owner_type, owner_id, file_id, created_by, created_at
+) VALUES ($1,$2,$3,$4,$5,$6,$7)`
 
 		const upsertScanJobQuery = `
 INSERT INTO public.file_scan_jobs (
@@ -92,6 +92,7 @@ DO UPDATE SET
 
 		_, err = tx.ExecContext(ctx, insertAttachmentQuery,
 			attachmentID,
+			in.TenantID,
 			string(in.OwnerType),
 			in.OwnerID,
 			in.FileID,

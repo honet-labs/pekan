@@ -95,7 +95,9 @@ export function ReminderDetailPage(): JSX.Element {
       const updated = await updateReminder(reminderID, payload);
       setItem(updated);
       success(t("common.updateSuccess"));
-      await loadReminder();
+      setTimeout(() => {
+        navigate(tenantCode ? `/app/${tenantCode}/finance/reminders` : "..");
+      }, 1000);
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : t("errors.loadRemindersFailed");
       setError(errMsg);
