@@ -68,7 +68,10 @@ SELECT b.id,
        b.end_date,
        b.alert_threshold_pct,
        b.notes,
-       b.status,
+       CASE
+           WHEN b.status = 'active' AND b.end_date IS NOT NULL AND b.end_date < CURRENT_DATE THEN 'ended'
+           ELSE b.status
+       END AS status,
        b.created_by,
        b.updated_by,
        b.created_at,
@@ -189,7 +192,10 @@ SELECT b.id,
        b.end_date,
        b.alert_threshold_pct,
        b.notes,
-       b.status,
+       CASE
+           WHEN b.status = 'active' AND b.end_date IS NOT NULL AND b.end_date < CURRENT_DATE THEN 'ended'
+           ELSE b.status
+       END AS status,
        b.created_by,
        b.updated_by,
        b.created_at,
@@ -463,7 +469,10 @@ SELECT b.id,
        b.end_date,
        b.alert_threshold_pct,
        b.notes,
-       b.status,
+       CASE
+           WHEN b.status = 'active' AND b.end_date IS NOT NULL AND b.end_date < CURRENT_DATE THEN 'ended'
+           ELSE b.status
+       END AS status,
        COALESCE(to_jsonb(b)->>'ida', '') AS ida
 FROM finance_budgets b
 LEFT JOIN LATERAL (
@@ -488,6 +497,7 @@ LEFT JOIN LATERAL (
 ) spent ON TRUE
 WHERE b.deleted_at IS NULL 
   AND b.status = 'active'
+  AND (b.end_date IS NULL OR b.end_date >= CURRENT_DATE)
   AND (b.category_id IS NULL OR b.category_id = $1 OR $1 IN (
       WITH RECURSIVE cat_tree AS (
           SELECT parent_id FROM finance_categories WHERE id = $1

@@ -185,7 +185,10 @@ SELECT
   b.start_date,
   b.end_date,
   b.alert_threshold_pct,
-  b.status,
+  CASE
+      WHEN b.status = 'active' AND b.end_date IS NOT NULL AND b.end_date < CURRENT_DATE THEN 'ended'
+      ELSE b.status
+  END AS status,
   b.updated_at
 FROM finance_budgets b
 LEFT JOIN finance_categories c ON c.id = b.category_id AND c.tenant_id = b.tenant_id

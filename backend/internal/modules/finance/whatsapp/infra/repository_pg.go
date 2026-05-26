@@ -468,7 +468,7 @@ func (r *RepositoryPG) GetFinancialContext(ctx context.Context, tenantID, userID
 					  )
 				  )
 			) spent ON TRUE
-			WHERE b.deleted_at IS NULL AND (b.status = 'active' OR b.status = 'approved')`
+			WHERE b.deleted_at IS NULL AND (b.status = 'active' OR b.status = 'approved') AND (b.end_date IS NULL OR b.end_date >= CURRENT_DATE)`
 		
 		brows, err := tx.QueryContext(tenantCtx, budgetQ)
 		if err != nil {
