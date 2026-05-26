@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useBudgets } from "../hooks/useBudgets";
 import { BudgetTable } from "../components/BudgetTable";
@@ -14,6 +14,7 @@ export function BudgetsListPage(): JSX.Element {
   const { t } = useI18n();
   const { items, loading, error, page, pageSize, total, setPage, remove } = useBudgets();
   const { toasts, success, error: showError, remove: removeToast } = useToast();
+  const [activeTab, setActiveTab] = useState<"active" | "history">("active");
 
   useEffect(() => {
     const flash = consumeFlashToast();
@@ -37,6 +38,10 @@ export function BudgetsListPage(): JSX.Element {
     }
   }
 
+  const activeItems = items.filter(item => item.status !== "ended");
+  const historyItems = items.filter(item => item.status === "ended");
+  const displayedItems = activeTab === "active" ? activeItems : historyItems;
+
   return (
     <section className="page-section">
       <PageHeader 
@@ -53,12 +58,66 @@ export function BudgetsListPage(): JSX.Element {
 
       {!error && (items.length > 0 || !loading) ? (
         <div className="surface card">
-          <h3 className="form-title">{t("budgets.table.title")}</h3>
-          <BudgetTable items={items} onDelete={handleDelete} />
+          <div style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "1rem",
+            marginBottom: "1rem"
+          }}>
+            <h3 className="form-title" style={{ margin: 0 }}>{t("budgets.table.title")}</h3>
+            
+            {/* Tabs */}
+            <div style={{
+              display: "flex",
+              background: "var(--surface-soft)",
+              padding: "4px",
+              borderRadius: "10px",
+              border: "1px solid var(--border)"
+            }}>
+              <button
+                type="button"
+                onClick={() => setActiveTab("active")}
+                style={{
+                  padding: "6px 16px",
+                  borderRadius: "8px",
+                  border: "none",
+                  background: activeTab === "active" ? "var(--primary)" : "transparent",
+                  color: activeTab === "active" ? "#fff" : "var(--text-muted)",
+                  fontWeight: 600,
+                  fontSize: "0.875rem",
+                  cursor: "pointer",
+                  transition: "all 0.2s"
+                }}
+              >
+                Aktif ({activeItems.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("history")}
+                style={{
+                  padding: "6px 16px",
+                  borderRadius: "8px",
+                  border: "none",
+                  background: activeTab === "history" ? "var(--primary)" : "transparent",
+                  color: activeTab === "history" ? "#fff" : "var(--text-muted)",
+                  fontWeight: 600,
+                  fontSize: "0.875rem",
+                  cursor: "pointer",
+                  transition: "all 0.2s"
+                }}
+              >
+                Riwayat ({historyItems.length})
+              </button>
+            </div>
+          </div>
+
+          <BudgetTable items={displayedItems} onDelete={handleDelete} />
           <Pagination
             currentPage={page}
             pageSize={pageSize}
-            totalItems={total}
+            totalItems={activeTab === "active" ? activeItems.length : historyItems.length}
             onPageChange={setPage}
             disabled={loading}
           />

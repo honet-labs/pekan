@@ -38,6 +38,7 @@ export function RemindersPage(): JSX.Element {
     updatePayment,
     removePayment
   } = useReminders();
+  const [activeTab, setActiveTab] = useState<"pending" | "paid">("pending");
   const [itemToDelete, setItemToDelete] = useState<Reminder | null>(null);
   const [deletingID, setDeletingID] = useState<string | null>(null);
   const [selectedItemForDetail, setSelectedItemForDetail] = useState<Reminder | null>(null);
@@ -47,6 +48,10 @@ export function RemindersPage(): JSX.Element {
   const [submittingPayment, setSubmittingPayment] = useState(false);
   const [editingPayment, setEditingPayment] = useState<ReminderPayment | null>(null);
   const [descToShow, setDescToShow] = useState<{ title: string; description: string } | null>(null);
+
+  const unpaidItems = useMemo(() => items.filter(item => item.status !== "paid"), [items]);
+  const paidItems = useMemo(() => items.filter(item => item.status === "paid"), [items]);
+  const displayedItems = useMemo(() => activeTab === "pending" ? unpaidItems : paidItems, [activeTab, unpaidItems, paidItems]);
 
   useEffect(() => {
     if (selectedItemForDetail) {
@@ -118,76 +123,130 @@ export function RemindersPage(): JSX.Element {
         </ul>
       </div>
 
-      <div className="card surface">
-        <h3 className="form-title">{t("reminders.all")}</h3>
-        <div className="data-table-wrap table-mobile-stack">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>{t("reminders.form.title")}</th>
-                <th>{t("reminders.form.dueDate")}</th>
-                <th>{t("transactions.table.total")}</th>
-                <th>{t("reminders.form.description")}</th>
-                <th>{t("reminders.form.status")}</th>
-                <th>{t("transactions.table.action")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => (
-                <tr key={item.id}>
-                  <td data-label={t("reminders.form.title")}>{item.title}</td>
-                  <td data-label={t("reminders.form.dueDate")}>{item.due_date}</td>
-                  <td data-label={t("transactions.table.total")}>Rp {numberFormatter.format(item.amount_minor ?? 0)}</td>
-                  <td data-label={t("reminders.form.description")}>
-                    {item.description ? (
-                      <button 
-                        className="btn btn-ghost-inline" 
-                        title={t("common.view")}
-                        onClick={() => setDescToShow({ title: item.title, description: item.description || "" })}
-                      >
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                          <circle cx="12" cy="12" r="3" />
-                        </svg>
-                      </button>
-                    ) : "-"}
-                  </td>
-                  <td data-label={t("reminders.form.status")}>{t(`reminders.status.${item.status}`)}</td>
-                  <td data-label={t("transactions.table.action")}>
-                    <div className="table-actions">
-                      <button className="btn btn-ghost-inline" type="button" onClick={() => setSelectedItemForDetail(item)}>
-                        {t("common.detail")}
-                      </button>
-                      <Link className="btn btn-ghost-inline" to={item.id}>
-                        {t("common.edit")}
-                      </Link>
-                      <button 
-                        className="btn btn-ghost-inline danger" 
-                        type="button" 
-                        onClick={() => setItemToDelete(item)}
-                      >
-                        {t("common.delete")}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {!items.length && !loading ? (
+        <div className="card surface">
+          <div style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "1rem",
+            marginBottom: "1rem"
+          }}>
+            <h3 className="form-title" style={{ margin: 0 }}>{t("reminders.all")}</h3>
+            
+            {/* Tabs */}
+            <div style={{
+              display: "flex",
+              background: "var(--surface-soft)",
+              padding: "4px",
+              borderRadius: "10px",
+              border: "1px solid var(--border)"
+            }}>
+              <button
+                type="button"
+                onClick={() => setActiveTab("pending")}
+                style={{
+                  padding: "6px 16px",
+                  borderRadius: "8px",
+                  border: "none",
+                  background: activeTab === "pending" ? "var(--primary)" : "transparent",
+                  color: activeTab === "pending" ? "#fff" : "var(--text-muted)",
+                  fontWeight: 600,
+                  fontSize: "0.875rem",
+                  cursor: "pointer",
+                  transition: "all 0.2s"
+                }}
+              >
+                Belum Lunas ({unpaidItems.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("paid")}
+                style={{
+                  padding: "6px 16px",
+                  borderRadius: "8px",
+                  border: "none",
+                  background: activeTab === "paid" ? "var(--primary)" : "transparent",
+                  color: activeTab === "paid" ? "#fff" : "var(--text-muted)",
+                  fontWeight: 600,
+                  fontSize: "0.875rem",
+                  cursor: "pointer",
+                  transition: "all 0.2s"
+                }}
+              >
+                Lunas ({paidItems.length})
+              </button>
+            </div>
+          </div>
+
+          <div className="data-table-wrap table-mobile-stack">
+            <table className="data-table">
+              <thead>
                 <tr>
-                  <td colSpan={6}>{t("common.noItems")}</td>
+                  <th>{t("reminders.form.title")}</th>
+                  <th>{t("reminders.form.dueDate")}</th>
+                  <th>{t("transactions.table.total")}</th>
+                  <th>{t("reminders.form.description")}</th>
+                  <th>{t("reminders.form.status")}</th>
+                  <th>{t("transactions.table.action")}</th>
                 </tr>
-              ) : null}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {displayedItems.map((item) => (
+                  <tr key={item.id}>
+                    <td data-label={t("reminders.form.title")}>{item.title}</td>
+                    <td data-label={t("reminders.form.dueDate")}>{item.due_date}</td>
+                    <td data-label={t("transactions.table.total")}>Rp {numberFormatter.format(item.amount_minor ?? 0)}</td>
+                    <td data-label={t("reminders.form.description")}>
+                      {item.description ? (
+                        <button 
+                          className="btn btn-ghost-inline" 
+                          title={t("common.view")}
+                          onClick={() => setDescToShow({ title: item.title, description: item.description || "" })}
+                        >
+                          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                            <circle cx="12" cy="12" r="3" />
+                          </svg>
+                        </button>
+                      ) : "-"}
+                    </td>
+                    <td data-label={t("reminders.form.status")}>{t(`reminders.status.${item.status}`)}</td>
+                    <td data-label={t("transactions.table.action")}>
+                      <div className="table-actions">
+                        <button className="btn btn-ghost-inline" type="button" onClick={() => setSelectedItemForDetail(item)}>
+                          {t("common.detail")}
+                        </button>
+                        <Link className="btn btn-ghost-inline" to={item.id}>
+                          {t("common.edit")}
+                        </Link>
+                        <button 
+                          className="btn btn-ghost-inline danger" 
+                          type="button" 
+                          onClick={() => setItemToDelete(item)}
+                        >
+                          {t("common.delete")}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {!displayedItems.length && !loading ? (
+                  <tr>
+                    <td colSpan={6}>{t("common.noItems")}</td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+          <Pagination
+            currentPage={page}
+            pageSize={pageSize}
+            totalItems={activeTab === "pending" ? unpaidItems.length : paidItems.length}
+            onPageChange={setPage}
+            disabled={loading}
+          />
         </div>
-        <Pagination
-          currentPage={page}
-          pageSize={pageSize}
-          totalItems={total}
-          onPageChange={setPage}
-          disabled={loading}
-        />
-      </div>
 
       <DeleteConfirmModal
         isOpen={!!itemToDelete}
