@@ -28,13 +28,13 @@ func (r *RepositoryPG) Create(ctx context.Context, in domain.Reminder) (domain.R
 		in.ID = uuid.NewString()
 		const q = `
 INSERT INTO finance_reminders (
-  id, tenant_id, title, description, amount_minor, currency, due_date, repeat_interval, status,
+  id, title, description, amount_minor, currency, due_date, repeat_interval, status,
   total_tenor, current_tenor,
   last_triggered_at, created_by, updated_by, created_at, updated_at
-) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`
 
 		_, err := tx.ExecContext(ctx, q,
-			in.ID, in.TenantID, in.Title, in.Description, in.AmountMinor, in.Currency, in.DueDate, in.RepeatInterval,
+			in.ID, in.Title, in.Description, in.AmountMinor, in.Currency, in.DueDate, in.RepeatInterval,
 			in.Status, in.TotalTenor, in.CurrentTenor, in.LastTriggeredAt, in.CreatedBy, in.UpdatedBy, in.CreatedAt, in.UpdatedAt,
 		)
 		if err != nil {
@@ -336,12 +336,12 @@ func (r *RepositoryPG) CreatePayment(ctx context.Context, in domain.ReminderPaym
 
 		const q = `
 INSERT INTO finance_reminder_payments (
-    id, tenant_id, reminder_id, paid_at, amount_minor, status, notes, proof_image_url,
+    id, reminder_id, paid_at, amount_minor, status, notes, proof_image_url,
     created_by, updated_by, created_at, updated_at
-) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`
 
 		_, err := tx.ExecContext(ctx, q,
-			in.ID, in.TenantID, in.ReminderID, in.PaidAt, in.AmountMinor, in.Status, in.Notes, in.ProofImageURL,
+			in.ID, in.ReminderID, in.PaidAt, in.AmountMinor, in.Status, in.Notes, in.ProofImageURL,
 			in.CreatedBy, in.UpdatedBy, in.CreatedAt, in.UpdatedAt,
 		)
 		if err != nil {
@@ -368,11 +368,11 @@ INSERT INTO public.files (
 
 			const insertAttachmentQuery = `
 INSERT INTO finance_entity_attachments (
-  id, tenant_id, owner_type, owner_id, file_id, created_by, created_at
-) VALUES ($1,$2,$3,$4,$5,$6,$7)`
+  id, owner_type, owner_id, file_id, created_by, created_at
+) VALUES ($1,$2,$3,$4,$5,$6)`
 
 			_, err = tx.ExecContext(ctx, insertAttachmentQuery,
-				attachmentID, in.TenantID, "reminders", in.ReminderID, fileID, in.CreatedBy, in.CreatedAt,
+				attachmentID, "reminders", in.ReminderID, fileID, in.CreatedBy, in.CreatedAt,
 			)
 			if err != nil {
 				return err
