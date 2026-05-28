@@ -107,6 +107,7 @@ async function parseResponse<T>(response: Response): Promise<T> {
     const fallback = getFallbackMessageByStatus(response.status);
     const raw = payload.rawText ? compactText(payload.rawText) : "";
     const message = payload.error?.message ?? (raw || fallback);
+    console.error(`[API Error] Request to ${response.url} failed with status ${response.status}:`, message);
     throw new Error(message);
   }
   if (typeof payload.data === "undefined") {

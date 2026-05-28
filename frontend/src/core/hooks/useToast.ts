@@ -23,6 +23,7 @@ export function useToast() {
   }, [show]);
 
   const error = useCallback((message: string) => {
+    console.error(`[App Error] ${message}`);
     return show(message, "error", 5000);
   }, [show]);
 
@@ -31,6 +32,7 @@ export function useToast() {
   }, [show]);
 
   const warning = useCallback((message: string) => {
+    console.warn(`[App Warning] ${message}`);
     return show(message, "warning", 4000);
   }, [show]);
 
