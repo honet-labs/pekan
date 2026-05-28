@@ -54,6 +54,7 @@ export function ReceiptScanPage(): JSX.Element {
         setProviderCode("gemini");
       }
     } catch (err) {
+      console.error("Failed to load receipt scan configs, providers or history:", err);
       showError(err instanceof Error ? err.message : t("errors.saveDataFailed"));
     } finally {
       setLoading(false);
@@ -78,6 +79,7 @@ export function ReceiptScanPage(): JSX.Element {
       const historyItems = await listReceiptScanHistory(10);
       setHistory(historyItems);
     } catch (err) {
+      console.error("Failed to scan receipt image:", err);
       showError(err instanceof Error ? err.message : t("receipt.scan.failed"));
     } finally {
       setScanning(false);
@@ -149,6 +151,7 @@ export function ReceiptScanPage(): JSX.Element {
       setHistory([]);
       success(t("common.deleteSuccess"));
     } catch (err) {
+      console.error("Failed to clear receipt scan history:", err);
       showError(err instanceof Error ? err.message : t("errors.saveDataFailed"));
     } finally {
       setClearingHistory(false);
@@ -163,6 +166,7 @@ export function ReceiptScanPage(): JSX.Element {
       setHistory((prev) => prev.filter((h) => h.id !== scanID));
       success(t("common.deleteSuccess"));
     } catch (err) {
+      console.error("Failed to delete receipt scan item:", err);
       showError(err instanceof Error ? err.message : t("errors.saveDataFailed"));
     } finally {
       setDeletingScanID(null);
@@ -175,6 +179,7 @@ export function ReceiptScanPage(): JSX.Element {
       const url = await fetchReceiptScanImageBlob(scanID);
       setViewingImageURL(url);
     } catch (err) {
+      console.error("Failed to view receipt scan image:", err);
       showError(err instanceof Error ? err.message : "Gagal memuat gambar");
     } finally {
       setLoadingImage(false);
