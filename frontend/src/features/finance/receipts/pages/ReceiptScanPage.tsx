@@ -103,17 +103,26 @@ export function ReceiptScanPage(): JSX.Element {
         items: Array.isArray(draft.items) ? draft.items : [],
         receipt_scan_id: result?.scan?.id
       };
-      window.sessionStorage.setItem("pekan_receipt_draft", JSON.stringify(draftData));
+      
+      try {
+        window.sessionStorage.setItem("pekan_receipt_draft", JSON.stringify(draftData));
+      } catch (e) {
+        console.error("Failed to store receipt draft in sessionStorage", e);
+      }
 
       if (fileDataURL && file) {
-        window.sessionStorage.setItem(
-          "pekan_receipt_attach_file",
-          JSON.stringify({
-            name: file.name,
-            type: file.type,
-            dataURL: fileDataURL
-          })
-        );
+        try {
+          window.sessionStorage.setItem(
+            "pekan_receipt_attach_file",
+            JSON.stringify({
+              name: file.name,
+              type: file.type,
+              dataURL: fileDataURL
+            })
+          );
+        } catch (e) {
+          console.warn("Failed to store receipt attachment in sessionStorage (exceeded quota)", e);
+        }
       }
       navigate(transactionCreatePath);
     };
