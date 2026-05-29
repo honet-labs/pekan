@@ -98,8 +98,12 @@ export function TransactionDetailPage(): JSX.Element {
           }
         }
       }
-      await loadAll();
-      success(t("common.updateSuccess") || "Data berhasil diperbarui");
+      setFlashToast({ message: t("common.updateSuccess") || "Data berhasil diperbarui", type: "success" });
+      if (tenantCode) {
+        navigate(`/app/${tenantCode}/finance/transactions`, { replace: true });
+        return;
+      }
+      navigate("..", { relative: "path" });
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : t("errors.saveTransactionFailed");
       showError(errMsg);
@@ -178,7 +182,7 @@ export function TransactionDetailPage(): JSX.Element {
               initialCategoryName={item.category_name ?? undefined}
               savingsOptions={savings}
               submitLabel={submitting ? t("common.loading") : t("transactions.form.update")}
-              onCancel={() => navigate("..")}
+              onCancel={() => navigate(tenantCode ? `/app/${tenantCode}/finance/transactions` : "..")}
               includeAttachmentUpload
               actorLabel={item.created_by_name || item.created_by || "-"}
             />

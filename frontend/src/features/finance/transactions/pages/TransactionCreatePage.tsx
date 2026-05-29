@@ -115,7 +115,7 @@ export function TransactionCreatePage(): JSX.Element {
         <div className="narrow-stack">
           <TransactionForm
             onSubmit={handleSubmit}
-            onCancel={() => navigate("..")}
+            onCancel={() => navigate(tenantCode ? `/app/${tenantCode}/finance/transactions` : "..")}
             accounts={accounts}
             categories={categories}
             savingsOptions={savings}
