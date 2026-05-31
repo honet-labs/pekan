@@ -135,6 +135,8 @@ export function BudgetsListPage(): JSX.Element {
         title={`${t("nav.budgets")}: ${transactionViewEntity?.name}`}
         type="budget"
         entityId={transactionViewEntity?.category_id || ""}
+        startDate={transactionViewEntity?.start_date}
+        endDate={transactionViewEntity?.end_date}
         onClose={() => setTransactionViewEntity(null)}
       />
       <ToastContainer toasts={toasts} onRemove={removeToast} />

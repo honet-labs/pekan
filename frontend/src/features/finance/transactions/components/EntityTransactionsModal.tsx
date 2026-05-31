@@ -8,6 +8,8 @@ export interface EntityTransactionsModalProps {
   title: string;
   type: "savings" | "budget";
   entityId: string;
+  startDate?: string;
+  endDate?: string;
   onClose: () => void;
 }
 
@@ -16,6 +18,8 @@ export function EntityTransactionsModal({
   title,
   type,
   entityId,
+  startDate,
+  endDate,
   onClose
 }: EntityTransactionsModalProps): JSX.Element | null {
   const { locale, t } = useI18n();
@@ -26,7 +30,7 @@ export function EntityTransactionsModal({
     if (isOpen && entityId) {
       loadTransactions();
     }
-  }, [isOpen, entityId, type]);
+  }, [isOpen, entityId, type, startDate, endDate]);
 
   async function loadTransactions() {
     setLoading(true);
@@ -35,8 +39,13 @@ export function EntityTransactionsModal({
       if (type === "savings") {
         data = await listTransactionsBySavings(entityId);
       } else {
-        // For budgets, we filter by category_id
-        const resp = await listTransactions({ category_id: entityId, page_size: 100 });
+        // For budgets, we filter by category_id and budget's start & end dates
+        const resp = await listTransactions({ 
+          category_id: entityId, 
+          page_size: 100,
+          from: startDate || undefined,
+          to: endDate || undefined
+        });
         data = resp.items;
       }
       setItems(data);
