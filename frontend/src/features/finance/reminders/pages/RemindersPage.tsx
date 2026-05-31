@@ -150,11 +150,19 @@ export function RemindersPage(): JSX.Element {
                 <button
                   className="btn btn-ghost-inline"
                   type="button"
-                  onClick={() =>
-                    markStatus(item.id, "paid")
-                      .then(() => success(t("common.updateSuccess")))
-                      .catch((err) => showError(err instanceof Error ? err.message : t("errors.loadRemindersFailed")))
-                  }
+                  onClick={() => {
+                    if (item.total_tenor && item.total_tenor > 1) {
+                      // Buka modal untuk mencatat tenor berikutnya
+                      setSelectedItemForDetail(item);
+                      setEditingPayment(null);
+                      setIsAddingPayment(true);
+                    } else {
+                      // Jika bukan tenor, langsung tandai lunas
+                      markStatus(item.id, "paid")
+                        .then(() => success(t("common.updateSuccess")))
+                        .catch((err) => showError(err instanceof Error ? err.message : t("errors.loadRemindersFailed")));
+                    }
+                  }}
                 >
                   {t("reminders.markPaid")}
                 </button>
@@ -350,26 +358,14 @@ export function RemindersPage(): JSX.Element {
                                       const installmentDueDate = getDueDateForInstallment(item.due_date, item.repeat_interval, slotIndex);
                                       
                                       return (
-                                        <div
-                                          key={slotIndex}
-                                          style={{
-                                            display: "flex",
-                                            justifyContent: "space-between",
-                                            alignItems: "center",
-                                            padding: "0.8rem 1.2rem",
-                                            background: "var(--surface)",
-                                            border: "1px solid var(--border)",
-                                            borderRadius: "8px",
-                                            boxShadow: "0 2px 4px rgba(0,0,0,0.02)"
-                                          }}
-                                        >
-                                          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                        <div key={slotIndex} className="installment-slot-row">
+                                          <div className="installment-slot-info">
+                                            <div className="installment-slot-badge-container">
                                               <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--text)" }}>
                                                 Cicilan Ke-{slotIndex} dari {item.total_tenor}
                                               </span>
-                                              <span className={`pill ${isPaid ? "income" : "transfer"}`} style={{ fontSize: "0.7rem", padding: "2px 8px" }}>
-                                                {isPaid ? "Lunas" : "Belum Bayar"}
+                                              <span className={`pill ${isPaid ? "income" : "transfer"}`} style={{ fontSize: "0.75rem", padding: "2px 8px", fontWeight: 600 }}>
+                                                {isPaid ? "LUNAS" : "BELUM BAYAR"}
                                               </span>
                                             </div>
                                             <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>
@@ -377,7 +373,7 @@ export function RemindersPage(): JSX.Element {
                                             </span>
                                           </div>
                                           
-                                          <div>
+                                          <div className="installment-slot-actions">
                                             {isPaid && payment ? (
                                               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                                                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
