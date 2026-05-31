@@ -379,6 +379,108 @@ INSERT INTO finance_entity_attachments (
 			}
 		}
 
+		// Fetch reminder details
+		var (
+			reminderTitle string
+			totalTenor    *int
+			currentTenor  *int
+			currency      string
+		)
+		const reminderQuery = `
+			SELECT title, total_tenor, current_tenor, currency 
+			FROM finance_reminders 
+			WHERE id = $1 AND deleted_at IS NULL`
+		err = tx.QueryRowContext(ctx, reminderQuery, in.ReminderID).Scan(&reminderTitle, &totalTenor, &currentTenor, &currency)
+		if err != nil {
+			return fmt.Errorf("failed to find reminder: %w", err)
+		}
+
+		// Find or create active account
+		var accountID string
+		const findAccountQ = `SELECT id FROM finance_accounts WHERE is_active = TRUE LIMIT 1`
+		err = tx.QueryRowContext(ctx, findAccountQ).Scan(&accountID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				// No active account exists. Let's create a default one!
+				accountID = uuid.NewString()
+				const insertAccountQ = `
+INSERT INTO finance_accounts (id, name, account_type, currency, opening_balance_minor, is_active, created_by, created_at, updated_at)
+VALUES ($1, 'Cash / Tunai', 'cash', 'IDR', 0, TRUE, $2, now(), now())`
+				_, err = tx.ExecContext(ctx, insertAccountQ, accountID, in.CreatedBy)
+				if err != nil {
+					return fmt.Errorf("failed to create default account: %w", err)
+				}
+			} else {
+				return fmt.Errorf("failed to find active account: %w", err)
+			}
+		}
+
+		// Find or create 'Cicilan' category
+		var categoryID string
+		const findCategoryQ = `
+			SELECT id FROM finance_categories
+			WHERE category_type = 'expense' AND LOWER(name) = 'cicilan' AND is_active = TRUE
+			LIMIT 1`
+		err = tx.QueryRowContext(ctx, findCategoryQ).Scan(&categoryID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				// Create new category
+				categoryID = uuid.NewString()
+				const insertCategoryQ = `
+					INSERT INTO finance_categories (id, name, category_type, parent_id, is_active, created_by, created_at, updated_at)
+					VALUES ($1, 'Cicilan', 'expense', NULL, TRUE, $2, now(), now())`
+				_, err = tx.ExecContext(ctx, insertCategoryQ, categoryID, in.CreatedBy)
+				if err != nil {
+					return fmt.Errorf("failed to create category: %w", err)
+				}
+			} else {
+				return fmt.Errorf("failed to find category: %w", err)
+			}
+		}
+
+		// Determine transaction description
+		// e.g. "pembayaran tenor 4 - cicilan kulkas" or "pembayaran - cicilan kulkas"
+		description := "pembayaran - " + reminderTitle
+		if totalTenor != nil && *totalTenor > 1 {
+			var paidCount int
+			const countPaymentsQ = `
+				SELECT COUNT(1) 
+				FROM finance_reminder_payments 
+				WHERE reminder_id = $1`
+			err = tx.QueryRowContext(ctx, countPaymentsQ, in.ReminderID).Scan(&paidCount)
+			if err != nil {
+				return fmt.Errorf("failed to count reminder payments: %w", err)
+			}
+			description = fmt.Sprintf("pembayaran tenor %d - %s", paidCount, reminderTitle)
+		} else if currentTenor != nil && totalTenor != nil {
+			// Fallback for tenor info if exists
+			description = fmt.Sprintf("pembayaran tenor %d - %s", *currentTenor, reminderTitle)
+		}
+
+		// Clean and validate currency
+		cleanCurrency := strings.ToUpper(strings.TrimSpace(currency))
+		if len(cleanCurrency) != 3 {
+			cleanCurrency = "IDR"
+		}
+
+		// Insert auto-generated transaction
+		transactionID := uuid.NewString()
+		const insertTxQ = `
+			INSERT INTO finance_transactions (
+				id, account_id, category_id, type, amount_minor, currency, input_date, transaction_date,
+				description, merchant_name, receipt_number, payment_method, subtotal_minor, tax_minor,
+				service_charge_minor, receipt_discount_minor, notes, created_by, updated_by, created_at, updated_at
+			) VALUES ($1, $2, $3, 'expense', $4, $5, $6, $7, $8, NULL, NULL, NULL, $9, 0, 0, 0, $10, $11, $11, $6, $6)`
+
+		now := time.Now().UTC()
+		_, err = tx.ExecContext(ctx, insertTxQ,
+			transactionID, accountID, categoryID, in.AmountMinor, cleanCurrency, now, in.PaidAt,
+			description, in.AmountMinor, in.Notes, in.CreatedBy,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to auto-log transaction: %w", err)
+		}
+
 		out = in
 		return nil
 	})
@@ -419,6 +521,65 @@ WHERE reminder_id = $8 AND id = $9`
 
 func (r *RepositoryPG) DeletePayment(ctx context.Context, tenantID, reminderID, paymentID, actorUserID string) error {
 	return db.WithTenantTx(ctx, r.conn, func(tx *sql.Tx) error {
+		// Fetch payment details before deleting
+		var (
+			amountMinor int64
+			paidAt      time.Time
+		)
+		const paymentQuery = `
+			SELECT amount_minor, paid_at 
+			FROM finance_reminder_payments 
+			WHERE reminder_id = $1 AND id = $2`
+		err := tx.QueryRowContext(ctx, paymentQuery, reminderID, paymentID).Scan(&amountMinor, &paidAt)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return errors.New("payment not found")
+			}
+			return err
+		}
+
+		// Fetch reminder details
+		var (
+			reminderTitle string
+			totalTenor    *int
+		)
+		const reminderQuery = `
+			SELECT title, total_tenor 
+			FROM finance_reminders 
+			WHERE id = $1 AND deleted_at IS NULL`
+		err = tx.QueryRowContext(ctx, reminderQuery, reminderID).Scan(&reminderTitle, &totalTenor)
+		if err != nil {
+			return err
+		}
+
+		// Determine the description of the transaction to delete
+		description := "pembayaran - " + reminderTitle
+		if totalTenor != nil && *totalTenor > 1 {
+			// Find the sequence number of this payment being deleted
+			// It is the count of payments that were created on or before this payment's creation date/time
+			var sequence int
+			const countPrevQuery = `
+				SELECT COUNT(1) 
+				FROM finance_reminder_payments 
+				WHERE reminder_id = $1 
+				  AND created_at <= (SELECT created_at FROM finance_reminder_payments WHERE id = $2)`
+			err = tx.QueryRowContext(ctx, countPrevQuery, reminderID, paymentID).Scan(&sequence)
+			if err == nil && sequence > 0 {
+				description = fmt.Sprintf("pembayaran tenor %d - %s", sequence, reminderTitle)
+			}
+		}
+
+		// Perform soft delete on the transaction matching this description, date, and amount
+		const deleteTxQuery = `
+			UPDATE finance_transactions 
+			SET deleted_at = now(), updated_by = $1, updated_at = now() 
+			WHERE type = 'expense' 
+			  AND amount_minor = $2 
+			  AND transaction_date = $3 
+			  AND description = $4 
+			  AND deleted_at IS NULL`
+		_, _ = tx.ExecContext(ctx, deleteTxQuery, actorUserID, amountMinor, paidAt, description)
+
 		const q = `DELETE FROM finance_reminder_payments WHERE reminder_id = $1 AND id = $2`
 		res, err := tx.ExecContext(ctx, q, reminderID, paymentID)
 		if err != nil {
