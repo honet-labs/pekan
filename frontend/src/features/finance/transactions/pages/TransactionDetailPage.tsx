@@ -99,11 +99,7 @@ export function TransactionDetailPage(): JSX.Element {
         }
       }
       setFlashToast({ message: t("common.updateSuccess") || "Data berhasil diperbarui", type: "success" });
-      if (tenantCode) {
-        navigate(`/app/${tenantCode}/finance/transactions`, { replace: true });
-        return;
-      }
-      navigate("..", { relative: "path" });
+      navigate(tenantCode ? `/app/${tenantCode}/finance/transactions` : "..");
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : t("errors.saveTransactionFailed");
       showError(errMsg);
@@ -121,11 +117,7 @@ export function TransactionDetailPage(): JSX.Element {
     try {
       await deleteTransaction(transactionID);
       setFlashToast({ message: t("common.deleteSuccess"), type: "success" });
-      if (tenantCode) {
-        navigate(`/app/${tenantCode}/finance/transactions`, { replace: true });
-        return;
-      }
-      navigate("..");
+      navigate(tenantCode ? `/app/${tenantCode}/finance/transactions` : "..");
     } catch (err) {
       showError(err instanceof Error ? err.message : t("errors.saveTransactionFailed"));
     } finally {
