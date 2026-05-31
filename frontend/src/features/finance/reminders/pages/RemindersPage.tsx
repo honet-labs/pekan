@@ -57,7 +57,8 @@ export function RemindersPage(): JSX.Element {
     fetchPayments, 
     addPayment,
     updatePayment,
-    removePayment
+    removePayment,
+    update
   } = useReminders();
   const [activeTab, setActiveTab] = useState<"pending" | "paid">("pending");
   const [itemToDelete, setItemToDelete] = useState<Reminder | null>(null);
@@ -430,6 +431,26 @@ export function RemindersPage(): JSX.Element {
                                                             success("Pembayaran dihapus");
                                                             const updated = await fetchPayments(item.id);
                                                             setReminderPaymentsMap(prev => ({ ...prev, [item.id]: updated }));
+                                                            
+                                                            // Rollback status/tenor
+                                                            if (item.total_tenor && item.total_tenor > 1) {
+                                                              const totalTenor = item.total_tenor;
+                                                              const paidCount = updated.length;
+                                                              const isFullyPaid = paidCount >= totalTenor;
+                                                              await update(item.id, {
+                                                                title: item.title,
+                                                                description: item.description,
+                                                                amount_minor: item.amount_minor,
+                                                                currency: item.currency,
+                                                                due_date: item.due_date,
+                                                                repeat_interval: item.repeat_interval,
+                                                                status: isFullyPaid ? "paid" : "pending",
+                                                                total_tenor: totalTenor,
+                                                                current_tenor: Math.min(paidCount, totalTenor)
+                                                              });
+                                                            } else {
+                                                              await markStatus(item.id, "pending");
+                                                            }
                                                           })
                                                           .catch((err: unknown) => showError(err instanceof Error ? err.message : "Gagal menghapus pembayaran"));
                                                       }
@@ -474,6 +495,26 @@ export function RemindersPage(): JSX.Element {
                                               success("Pembayaran dihapus");
                                               const updated = await fetchPayments(item.id);
                                               setReminderPaymentsMap(prev => ({ ...prev, [item.id]: updated }));
+                                              
+                                              // Rollback status/tenor
+                                              if (item.total_tenor && item.total_tenor > 1) {
+                                                const totalTenor = item.total_tenor;
+                                                const paidCount = updated.length;
+                                                const isFullyPaid = paidCount >= totalTenor;
+                                                await update(item.id, {
+                                                  title: item.title,
+                                                  description: item.description,
+                                                  amount_minor: item.amount_minor,
+                                                  currency: item.currency,
+                                                  due_date: item.due_date,
+                                                  repeat_interval: item.repeat_interval,
+                                                  status: isFullyPaid ? "paid" : "pending",
+                                                  total_tenor: totalTenor,
+                                                  current_tenor: Math.min(paidCount, totalTenor)
+                                                });
+                                              } else {
+                                                await markStatus(item.id, "pending");
+                                              }
                                             })
                                             .catch((err: unknown) => showError(err instanceof Error ? err.message : "Gagal menghapus pembayaran"));
                                         }
@@ -570,11 +611,32 @@ export function RemindersPage(): JSX.Element {
                   onDelete={(pid) => {
                     if (confirm("Hapus riwayat pembayaran ini?")) {
                       removePayment(selectedItemForDetail.id, pid)
-                        .then(() => {
+                        .then(async () => {
                           success("Pembayaran dihapus");
-                          return fetchPayments(selectedItemForDetail.id);
+                          const updated = await fetchPayments(selectedItemForDetail.id);
+                          setPaymentsHistory(updated);
+                          setReminderPaymentsMap(prev => ({ ...prev, [selectedItemForDetail.id]: updated }));
+                          
+                          // Rollback status/tenor
+                          if (selectedItemForDetail.total_tenor && selectedItemForDetail.total_tenor > 1) {
+                            const totalTenor = selectedItemForDetail.total_tenor;
+                            const paidCount = updated.length;
+                            const isFullyPaid = paidCount >= totalTenor;
+                            await update(selectedItemForDetail.id, {
+                              title: selectedItemForDetail.title,
+                              description: selectedItemForDetail.description,
+                              amount_minor: selectedItemForDetail.amount_minor,
+                              currency: selectedItemForDetail.currency,
+                              due_date: selectedItemForDetail.due_date,
+                              repeat_interval: selectedItemForDetail.repeat_interval,
+                              status: isFullyPaid ? "paid" : "pending",
+                              total_tenor: totalTenor,
+                              current_tenor: Math.min(paidCount, totalTenor)
+                            });
+                          } else {
+                            await markStatus(selectedItemForDetail.id, "pending");
+                          }
                         })
-                        .then(setPaymentsHistory)
                         .catch((err: unknown) => showError(err instanceof Error ? err.message : "Gagal menghapus pembayaran"));
                     }
                   }}
@@ -634,10 +696,34 @@ export function RemindersPage(): JSX.Element {
             }
             setIsAddingPayment(false);
             setEditingPayment(null);
-            // Refresh history
+            
+            // Refresh history and map
             const updated = await fetchPayments(selectedItemForDetail.id);
             setPaymentsHistory(updated);
             setReminderPaymentsMap(prev => ({ ...prev, [selectedItemForDetail.id]: updated }));
+
+            // Automatically transition/advance tenor and status
+            if (selectedItemForDetail.total_tenor && selectedItemForDetail.total_tenor > 1) {
+              const totalTenor = selectedItemForDetail.total_tenor;
+              const paidCount = updated.length;
+              const isFullyPaid = paidCount >= totalTenor;
+              
+              await update(selectedItemForDetail.id, {
+                title: selectedItemForDetail.title,
+                description: selectedItemForDetail.description,
+                amount_minor: selectedItemForDetail.amount_minor,
+                currency: selectedItemForDetail.currency,
+                due_date: selectedItemForDetail.due_date,
+                repeat_interval: selectedItemForDetail.repeat_interval,
+                status: isFullyPaid ? "paid" : "pending",
+                total_tenor: totalTenor,
+                current_tenor: Math.min(paidCount, totalTenor)
+              });
+            } else {
+              if (data.status === "paid") {
+                await markStatus(selectedItemForDetail.id, "paid");
+              }
+            }
           } catch (err) {
             showError(err instanceof Error ? err.message : "Gagal menyimpan pembayaran");
           } finally {
