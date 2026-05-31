@@ -8,9 +8,10 @@ import { InfoModal } from "../../../../core/components/InfoModal";
 type Props = {
   items: Budget[];
   onDelete: (id: string) => Promise<void>;
+  onViewTransactions?: (item: Budget) => void;
 };
 
-export function BudgetTable({ items, onDelete }: Props): JSX.Element {
+export function BudgetTable({ items, onDelete, onViewTransactions }: Props): JSX.Element {
   const { tenantCode } = useParams();
   const { locale, t } = useI18n();
   const [itemToDelete, setItemToDelete] = useState<Budget | null>(null);
@@ -84,6 +85,27 @@ export function BudgetTable({ items, onDelete }: Props): JSX.Element {
               <td data-label={t("budgets.table.status")}>{t(`budgets.status.${item.status}`)}</td>
               <td data-label={t("budgets.table.action")}>
                 <div className="table-actions">
+                  {onViewTransactions && (
+                    <button
+                      className="btn btn-ghost-inline"
+                      type="button"
+                      title={t("savings.viewTransactions")}
+                      onClick={() => onViewTransactions(item)}
+                      style={{
+                        color: "var(--primary-color)",
+                        fontWeight: 600,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px"
+                      }}
+                    >
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
+                        <line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
+                      </svg>
+                      {t("savings.viewTransactions")}
+                    </button>
+                  )}
                   <Link className="btn btn-ghost-inline" to={`/app/${tenantCode ?? "default"}/finance/budgets/${item.id}`}>
                     {t("common.edit")}
                   </Link>

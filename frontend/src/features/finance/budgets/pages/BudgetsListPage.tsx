@@ -6,6 +6,8 @@ import { useI18n } from "../../../../core/i18n/i18n";
 import { ToastContainer } from "../../../../core/components/Toast";
 import { useToast } from "../../../../core/hooks/useToast";
 import { consumeFlashToast } from "../../../../core/toast/flashToast";
+import { EntityTransactionsModal } from "../../transactions/components/EntityTransactionsModal";
+import { Budget } from "../api/budgets.types";
 
 import { Pagination } from "../../../../core/components/Pagination";
 import { PageHeader } from "../../../../core/components/PageHeader";
@@ -15,6 +17,7 @@ export function BudgetsListPage(): JSX.Element {
   const { items, loading, error, page, pageSize, total, setPage, remove } = useBudgets();
   const { toasts, success, error: showError, remove: removeToast } = useToast();
   const [activeTab, setActiveTab] = useState<"active" | "history">("active");
+  const [transactionViewEntity, setTransactionViewEntity] = useState<Budget | null>(null);
 
   useEffect(() => {
     const flash = consumeFlashToast();
@@ -113,7 +116,11 @@ export function BudgetsListPage(): JSX.Element {
             </div>
           </div>
 
-          <BudgetTable items={displayedItems} onDelete={handleDelete} />
+          <BudgetTable 
+            items={displayedItems} 
+            onDelete={handleDelete} 
+            onViewTransactions={(item) => setTransactionViewEntity(item)} 
+          />
           <Pagination
             currentPage={page}
             pageSize={pageSize}
@@ -123,6 +130,13 @@ export function BudgetsListPage(): JSX.Element {
           />
         </div>
       ) : null}
+      <EntityTransactionsModal
+        isOpen={!!transactionViewEntity}
+        title={`${t("nav.budgets")}: ${transactionViewEntity?.name}`}
+        type="budget"
+        entityId={transactionViewEntity?.category_id || ""}
+        onClose={() => setTransactionViewEntity(null)}
+      />
       <ToastContainer toasts={toasts} onRemove={removeToast} />
     </section>
   );
