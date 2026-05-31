@@ -8,8 +8,8 @@ export interface EntityTransactionsModalProps {
   title: string;
   type: "savings" | "budget";
   entityId: string;
-  startDate?: string;
-  endDate?: string;
+  startDate?: string | null;
+  endDate?: string | null;
   onClose: () => void;
 }
 
