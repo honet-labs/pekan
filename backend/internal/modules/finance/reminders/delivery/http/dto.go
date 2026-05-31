@@ -8,6 +8,8 @@ type ReminderRequest struct {
 	DueDate        string  `json:"due_date"`
 	RepeatInterval string  `json:"repeat_interval"`
 	Status         string  `json:"status"`
+	TotalTenor     *int    `json:"total_tenor"`
+	CurrentTenor   *int    `json:"current_tenor"`
 }
 
 type ReminderStatusRequest struct {
@@ -23,6 +25,8 @@ type ReminderResponse struct {
 	DueDate        string  `json:"due_date"`
 	RepeatInterval string  `json:"repeat_interval"`
 	Status         string  `json:"status"`
+	TotalTenor     *int    `json:"total_tenor"`
+	CurrentTenor   *int    `json:"current_tenor"`
 	CreatedAt      string  `json:"created_at"`
 	UpdatedAt      string  `json:"updated_at"`
 }

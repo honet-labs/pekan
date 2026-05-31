@@ -73,6 +73,8 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		DueDate:        dueDate,
 		RepeatInterval: req.RepeatInterval,
 		Status:         req.Status,
+		TotalTenor:     req.TotalTenor,
+		CurrentTenor:   req.CurrentTenor,
 	})
 	if err != nil {
 		writeUsecaseError(w, r, err)
@@ -204,6 +206,8 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		DueDate:        dueDate,
 		RepeatInterval: req.RepeatInterval,
 		Status:         req.Status,
+		TotalTenor:     req.TotalTenor,
+		CurrentTenor:   req.CurrentTenor,
 	})
 	if err != nil {
 		writeUsecaseError(w, r, err)
@@ -474,6 +478,8 @@ func toResponse(item domain.Reminder) ReminderResponse {
 		DueDate:        item.DueDate.UTC().Format("2006-01-02"),
 		RepeatInterval: item.RepeatInterval,
 		Status:         item.Status,
+		TotalTenor:     item.TotalTenor,
+		CurrentTenor:   item.CurrentTenor,
 		CreatedAt:      item.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:      item.UpdatedAt.UTC().Format(time.RFC3339),
 	}

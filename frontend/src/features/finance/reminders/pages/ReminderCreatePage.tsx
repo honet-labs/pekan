@@ -13,7 +13,9 @@ const initialForm = {
   currency: "IDR",
   due_date: "",
   repeat_interval: "none",
-  status: "pending"
+  status: "pending",
+  total_tenor: 0,
+  current_tenor: 0
 };
 
 export function ReminderCreatePage(): JSX.Element {
@@ -40,7 +42,9 @@ export function ReminderCreatePage(): JSX.Element {
         currency: form.currency || undefined,
         due_date: form.due_date,
         repeat_interval: form.repeat_interval,
-        status: form.status
+        status: form.status,
+        total_tenor: form.total_tenor || undefined,
+        current_tenor: form.current_tenor || undefined
       });
       success(t("common.saveSuccess"));
       setTimeout(() => {
@@ -141,6 +145,30 @@ export function ReminderCreatePage(): JSX.Element {
                 <option value="paid">{t("reminders.status.paid")}</option>
                 <option value="cancelled">{t("reminders.status.cancelled")}</option>
               </select>
+            </label>
+          </div>
+          <div className="form-grid two-col" style={{ marginTop: "1rem" }}>
+            <label className="form-field">
+              {t("reminders.form.totalTenor")}
+              <input 
+                className="input-control" 
+                type="number" 
+                min="0"
+                value={form.total_tenor} 
+                onChange={(event) => setForm({ ...form, total_tenor: Number(event.target.value) })} 
+                disabled={saving}
+              />
+            </label>
+            <label className="form-field">
+              {t("reminders.form.currentTenor")}
+              <input 
+                className="input-control" 
+                type="number" 
+                min="0"
+                value={form.current_tenor} 
+                onChange={(event) => setForm({ ...form, current_tenor: Number(event.target.value) })} 
+                disabled={saving}
+              />
             </label>
           </div>
           <div className="form-actions" style={{ marginTop: "1rem" }}>
