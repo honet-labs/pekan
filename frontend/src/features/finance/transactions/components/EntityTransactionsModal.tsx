@@ -86,7 +86,7 @@ export function EntityTransactionsModal({
                <p className="text-muted" style={{ fontSize: '1.1rem' }}>{t("common.noItems") || "Tidak ada data transaksi"}</p>
             </div>
           ) : (
-            <div className="data-table-wrap" style={{ border: 'none', borderRadius: '0' }}>
+            <div className="data-table-wrap table-mobile-stack" style={{ border: 'none', borderRadius: '0' }}>
               <table className="data-table">
                 <thead>
                   <tr>
@@ -100,17 +100,17 @@ export function EntityTransactionsModal({
                 <tbody>
                   {items.map((item) => (
                     <tr key={item.id}>
-                      <td style={{ paddingLeft: '1.5rem' }}>
+                      <td data-label="TID" style={{ paddingLeft: '1.5rem' }}>
                         <span style={{ fontWeight: 600, color: 'var(--primary-color)', fontSize: '0.85rem' }}>{item.tid}</span>
                       </td>
-                      <td style={{ whiteSpace: 'nowrap' }}>{item.transaction_date}</td>
-                      <td>
+                      <td data-label={t("transactions.table.date")} style={{ whiteSpace: 'nowrap' }}>{item.transaction_date}</td>
+                      <td data-label={t("transactions.table.type")}>
                         <span className={`type-pill ${item.type}`} style={{ fontSize: '10px', padding: '2px 8px' }}>
                           {t(`transactions.type.${item.type}`)}
                         </span>
                       </td>
-                      <td style={{ fontWeight: 600 }}>{formatAmount(item.amount_minor, item.currency)}</td>
-                      <td style={{ paddingRight: '1.5rem', fontSize: '0.9rem' }}>
+                      <td data-label={t("transactions.table.total")} style={{ fontWeight: 600 }}>{formatAmount(item.amount_minor, item.currency)}</td>
+                      <td data-label={t("transactions.table.description")} style={{ paddingRight: '1.5rem', fontSize: '0.9rem' }}>
                         {item.description || item.merchant_name || "-"}
                       </td>
                     </tr>

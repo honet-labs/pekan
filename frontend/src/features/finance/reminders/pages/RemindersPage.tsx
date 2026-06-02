@@ -142,7 +142,15 @@ export function RemindersPage(): JSX.Element {
               <div style={{ flex: 1 }}>
                 <strong>{item.title}</strong>
                 <p className="page-subtitle" style={{ margin: "0.25rem 0" }}>
-                  {t("reminders.form.dueDate")} {item.due_date}
+                  {t("reminders.form.dueDate")} {" "}
+                  {item.total_tenor && item.total_tenor > 1
+                    ? getDueDateForInstallment(item.due_date, item.repeat_interval, (item.current_tenor || 0) + 1)
+                    : item.due_date}
+                  {item.total_tenor && item.total_tenor > 1 ? (
+                    <span style={{ fontSize: "0.75rem", color: "var(--muted)", marginLeft: "8px" }}>
+                      (Tenor: {(item.current_tenor || 0) + 1} / {item.total_tenor})
+                    </span>
+                  ) : null}
                 </p>
               </div>
               <div className="inline-metrics" style={{ flexShrink: 0 }}>
@@ -249,7 +257,7 @@ export function RemindersPage(): JSX.Element {
                   
                   return (
                     <Fragment key={item.id}>
-                      <tr style={{ background: isExpanded ? "rgba(var(--primary-color-rgb), 0.02)" : "transparent" }}>
+                      <tr className={isExpanded ? "reminder-row-expanded" : ""} style={{ background: isExpanded ? "rgba(var(--primary-color-rgb), 0.02)" : "transparent" }}>
                         <td data-label={t("reminders.form.title")}>
                           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                             <button
@@ -321,8 +329,8 @@ export function RemindersPage(): JSX.Element {
                         </td>
                       </tr>
                       {isExpanded && (
-                        <tr>
-                          <td colSpan={6} style={{ background: "var(--surface-soft)", padding: "1.5rem", borderBottom: "1px solid var(--border)" }}>
+                        <tr className="reminder-expand-row">
+                          <td colSpan={6} className="reminder-expand-cell" style={{ background: "var(--surface-soft)", padding: "1.5rem", borderBottom: "1px solid var(--border)" }}>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
                               <h4 style={{ margin: 0, color: "var(--text)", fontSize: "1.05rem", display: "flex", alignItems: "center", gap: "8px", fontWeight: 700 }}>
                                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--primary)" }}>
@@ -375,8 +383,8 @@ export function RemindersPage(): JSX.Element {
                                           
                                           <div className="installment-slot-actions">
                                             {isPaid && payment ? (
-                                              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                                                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
+                                              <div className="installment-payment-actions-wrapper">
+                                                <div className="installment-payment-info">
                                                   <span style={{ fontWeight: 600, fontSize: "0.9rem", color: "var(--primary)" }}>
                                                     Rp {numberFormatter.format(payment.amount_minor)}
                                                   </span>
@@ -390,7 +398,7 @@ export function RemindersPage(): JSX.Element {
                                                   )}
                                                 </div>
                                                 
-                                                <div style={{ display: "flex", gap: "8px" }}>
+                                                <div className="installment-payment-buttons">
                                                   {payment.proof_image_url && (
                                                     <button
                                                       type="button"

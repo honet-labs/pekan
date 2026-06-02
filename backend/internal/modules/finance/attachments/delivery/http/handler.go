@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"strconv"
@@ -244,6 +245,7 @@ func writeUsecaseError(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, access.ErrPermissionDenied):
 		httpx.WriteError(w, http.StatusForbidden, "FORBIDDEN_PERMISSION", err.Error(), requestID)
 	default:
+		log.Printf("[ERROR] internal server error [request_id=%s]: %v", requestID, err)
 		httpx.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", requestID)
 	}
 }

@@ -158,7 +158,18 @@ SELECT id, title, description, amount_minor, currency, due_date, repeat_interval
        total_tenor, current_tenor,
        last_triggered_at, created_by, updated_by, created_at, updated_at, deleted_at
 FROM finance_reminders
-WHERE status = 'pending' AND deleted_at IS NULL AND due_date <= CURRENT_DATE
+WHERE status = 'pending' AND deleted_at IS NULL AND (
+    CASE 
+      WHEN total_tenor IS NOT NULL AND total_tenor > 1 THEN
+        CASE 
+          WHEN repeat_interval = 'daily' THEN due_date + (COALESCE(current_tenor, 0) * INTERVAL '1 day')
+          WHEN repeat_interval = 'weekly' THEN due_date + (COALESCE(current_tenor, 0) * INTERVAL '1 week')
+          WHEN repeat_interval = 'monthly' THEN due_date + (COALESCE(current_tenor, 0) * INTERVAL '1 month')
+          ELSE due_date
+        END
+      ELSE due_date
+    END
+  ) <= CURRENT_DATE
 ORDER BY due_date ASC`
 
 		rows, err := tx.QueryContext(ctx, q)
@@ -196,8 +207,33 @@ SELECT id, tenant_id, title, description, amount_minor, currency, due_date, repe
 FROM finance_reminders
 WHERE status = 'pending'
   AND deleted_at IS NULL
-  AND due_date <= CURRENT_DATE
-  AND (last_triggered_at IS NULL OR last_triggered_at::date < due_date)
+  AND (
+    CASE 
+      WHEN total_tenor IS NOT NULL AND total_tenor > 1 THEN
+        CASE 
+          WHEN repeat_interval = 'daily' THEN due_date + (COALESCE(current_tenor, 0) * INTERVAL '1 day')
+          WHEN repeat_interval = 'weekly' THEN due_date + (COALESCE(current_tenor, 0) * INTERVAL '1 week')
+          WHEN repeat_interval = 'monthly' THEN due_date + (COALESCE(current_tenor, 0) * INTERVAL '1 month')
+          ELSE due_date
+        END
+      ELSE due_date
+    END
+  ) <= CURRENT_DATE
+  AND (
+    last_triggered_at IS NULL 
+    OR last_triggered_at::date < (
+      CASE 
+        WHEN total_tenor IS NOT NULL AND total_tenor > 1 THEN
+          CASE 
+            WHEN repeat_interval = 'daily' THEN due_date + (COALESCE(current_tenor, 0) * INTERVAL '1 day')
+            WHEN repeat_interval = 'weekly' THEN due_date + (COALESCE(current_tenor, 0) * INTERVAL '1 week')
+            WHEN repeat_interval = 'monthly' THEN due_date + (COALESCE(current_tenor, 0) * INTERVAL '1 month')
+            ELSE due_date
+          END
+        ELSE due_date
+      END
+    )::date
+  )
 ORDER BY due_date ASC
 LIMIT $1`
 

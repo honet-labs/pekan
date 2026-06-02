@@ -389,10 +389,68 @@ code {
     border-top: 1px dashed var(--border);
     padding-top: 0.75rem;
   }
+}
+
+/* Installment payment responsive wrappers */
+.installment-payment-actions-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  justify-content: flex-end;
+}
+
+.installment-payment-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.installment-payment-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Connects expanded detail cards to the parent row on mobile */
+@media (max-width: 992px) {
+  .table-mobile-stack .data-table tr.reminder-row-expanded {
+    margin-bottom: 0 !important;
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    border-bottom: 1px dashed var(--border) !important;
+  }
+
+  .table-mobile-stack .data-table tr.reminder-expand-row {
+    margin-top: -1rem !important;
+    border-top: none !important;
+    border-top-left-radius: 0 !important;
+    border-top-right-radius: 0 !important;
+    box-shadow: none !important;
+    background: var(--surface-soft) !important;
+  }
+
+  .table-mobile-stack .data-table td.reminder-expand-cell {
+    border-bottom: none !important;
+    padding: 0.75rem !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .installment-payment-actions-wrapper {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .installment-payment-info {
+    align-items: flex-start;
+  }
   
-  .installment-slot-actions > div {
-    width: 100%;
-    justify-content: space-between !important;
+  .installment-payment-buttons {
+    justify-content: flex-start;
+    margin-top: 4px;
   }
 }
 
