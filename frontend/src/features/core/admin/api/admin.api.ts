@@ -415,3 +415,7 @@ export async function getUpdateStatus(): Promise<UpdateProgress> {
   return adminFetch<UpdateProgress>("/admin/updates/status");
 }
 
+export async function getSystemLogs(service: string = "pekan-api", lines: number = 200): Promise<{ logs: string }> {
+  return adminFetch<{ logs: string }>(`/admin/system-logs?service=${service}&lines=${lines}`);
+}
+

@@ -1064,3 +1064,31 @@ func (s *Service) GetUpdateStatus(ctx context.Context) (map[string]any, error) {
 	}, nil
 }
 
+// GetSystemLogs retrieves system service logs (usually journalctl for pekan-api).
+func (s *Service) GetSystemLogs(ctx context.Context, serviceName string, lines int) (string, error) {
+	if serviceName == "" {
+		serviceName = "pekan-api"
+	}
+	allowedServices := map[string]bool{
+		"pekan-api":    true,
+		"pekan-worker": true,
+		"pekan-ai":     true,
+	}
+	if !allowedServices[serviceName] {
+		return "", errors.New("invalid service name")
+	}
+
+	cmd := exec.CommandContext(ctx, "journalctl", "-u", serviceName, "-n", fmt.Sprintf("%d", lines), "--no-pager")
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		return string(out), nil
+	}
+
+	// Fallback: Show update.log if journalctl fails
+	if data, errReadFile := os.ReadFile("logs/update.log"); errReadFile == nil {
+		return fmt.Sprintf("[journalctl failed: %v]\n\nShowing update.log fallback:\n%s", err, string(data)), nil
+	}
+
+	return "", fmt.Errorf("journalctl failed: %w (output: %s)", err, string(out))
+}
+

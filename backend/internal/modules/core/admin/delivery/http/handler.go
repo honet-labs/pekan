@@ -41,6 +41,7 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 			r.Post("/bootstrap-tenant", h.BootstrapTenant)
 			r.Get("/tenants", h.ListTenants)
 			r.Get("/logs", h.ListLogs)
+			r.Get("/system-logs", h.GetSystemLogs)
 			r.Get("/stats/growth", h.GetGrowth)
 			r.Get("/server/status", h.GetServerStatus)
 			
@@ -700,4 +701,23 @@ func (h *Handler) GetPublicBranding(w http.ResponseWriter, r *http.Request) {
 		"favicon":    favicon,
 		"public_url": publicURL,
 	}, middleware.GetRequestID(r.Context()))
+}
+
+func (h *Handler) GetSystemLogs(w http.ResponseWriter, r *http.Request) {
+	serviceName := r.URL.Query().Get("service")
+	linesStr := r.URL.Query().Get("lines")
+	lines := 200
+	if linesStr != "" {
+		if val, err := strconv.Atoi(linesStr); err == nil && val > 0 {
+			lines = val
+		}
+	}
+
+	out, err := h.service.GetSystemLogs(r.Context(), serviceName, lines)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), middleware.GetRequestID(r.Context()))
+		return
+	}
+
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"logs": out}, middleware.GetRequestID(r.Context()))
 }

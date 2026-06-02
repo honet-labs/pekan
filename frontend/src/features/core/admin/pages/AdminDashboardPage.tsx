@@ -11,7 +11,7 @@ import {
   adminResetUserPassword, adminUpdateUserEmail, adminUpdateUserPhone,
   listTenantBackups, createTenantBackup, restoreTenantBackup, downloadTenantBackupBlob,
   getWhatsAppQueueStats, getWhatsAppQueueHistory, retryWhatsAppQueueMessage,
-  checkUpdate, applyUpdate, getUpdateStatus,
+  checkUpdate, applyUpdate, getUpdateStatus, getSystemLogs,
   TenantListItem, AuditLog, GrowthStats, TenantModule, ServerStatus, BackupFile, DatabaseTable, DatabaseGrowthPoint, QueryResult, TenantUser,
   WhatsAppQueueStats, WhatsAppQueueItem, UpdateStatusInfo, UpdateProgress
 } from "../api/admin.api";
@@ -27,7 +27,7 @@ import { BackToTop } from "../../../../core/components/BackToTop";
 import { PasswordInput } from "../../../../core/components/PasswordInput";
 import { PageHeader } from "../../../../core/components/PageHeader";
 
-type Tab = "dashboard" | "tenants" | "add_tenant" | "stats" | "server" | "logs" | "notifications" | "ai" | "database" | "backups" | "storage" | "optimization" | "dbtool" | "whatsapp" | "updates" | "branding";
+type Tab = "dashboard" | "tenants" | "add_tenant" | "stats" | "server" | "logs" | "system_logs" | "notifications" | "ai" | "database" | "backups" | "storage" | "optimization" | "dbtool" | "whatsapp" | "updates" | "branding";
 
 const DEFAULT_WA_BOT_SYSTEM_PROMPT = `Anda adalah Asisten AI PEKAN, perencana keuangan pribadi yang profesional, ringkas, dan sangat membantu.
 Tugas Anda adalah membalas pesan pengguna WhatsApp secara interaktif. Pengguna sudah login/terverifikasi.
@@ -66,6 +66,11 @@ export function AdminDashboardPage(): JSX.Element {
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [fileToRestore, setFileToRestore] = useState<string | null>(null);
   const [isRestoring, setIsRestoring] = useState(false);
+
+  const [systemLogs, setSystemLogs] = useState("");
+  const [loadingSystemLogs, setLoadingSystemLogs] = useState(false);
+  const [systemLogLines, setSystemLogLines] = useState(200);
+  const [systemLogService, setSystemLogService] = useState("pekan-api");
 
   const [searchTerm, setSearchTerm] = useState("");
   const debouncedSearch = useDebounce(searchTerm, 500);
@@ -387,6 +392,7 @@ export function AdminDashboardPage(): JSX.Element {
       
       if (activeTab === "tenants") loadTenants();
       if (activeTab === "logs") loadLogs();
+      if (activeTab === "system_logs") loadSystemLogs();
       if (activeTab === "stats") loadStats();
       if (activeTab === "backups") loadBackups();
       if (activeTab === "server") {
@@ -1011,6 +1017,18 @@ export function AdminDashboardPage(): JSX.Element {
       error(`Gagal memuat log: ${err instanceof Error ? err.message : "Database Error"}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadSystemLogs = async (service = systemLogService, lines = systemLogLines) => {
+    setLoadingSystemLogs(true);
+    try {
+      const data = await getSystemLogs(service, lines);
+      setSystemLogs(data.logs);
+    } catch (err) {
+      error(`Gagal memuat log sistem: ${err instanceof Error ? err.message : "Network Error"}`);
+    } finally {
+      setLoadingSystemLogs(false);
     }
   };
 
@@ -1832,7 +1850,7 @@ export function AdminDashboardPage(): JSX.Element {
           {/* System Group */}
           <button 
             type="button" 
-            className={`app-nav-link sidebar-expand-btn ${(activeTab === "server" || activeTab === "logs") ? "is-expanded" : ""}`}
+            className={`app-nav-link sidebar-expand-btn ${(activeTab === "server" || activeTab === "logs" || activeTab === "system_logs") ? "is-expanded" : ""}`}
             onClick={() => setSystemExpanded(!systemExpanded)}
             style={{ width: "100%", textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between" }}
           >
@@ -1846,6 +1864,7 @@ export function AdminDashboardPage(): JSX.Element {
             <div className="sidebar-sub-nav">
               <button className={`app-nav-link sub-link ${activeTab === "server" ? "is-active" : ""}`} onClick={() => { setActiveTab("server"); setSidebarOpen(false); }}>{t("admin.nav_server")}</button>
               <button className={`app-nav-link sub-link ${activeTab === "logs" ? "is-active" : ""}`} onClick={() => { setActiveTab("logs"); setSidebarOpen(false); }}>{t("admin.nav_logs")}</button>
+              <button className={`app-nav-link sub-link ${activeTab === "system_logs" ? "is-active" : ""}`} onClick={() => { setActiveTab("system_logs"); setSidebarOpen(false); }}>{t("admin.nav_system_logs")}</button>
               <button className={`app-nav-link sub-link ${activeTab === "backups" ? "is-active" : ""}`} onClick={() => { setActiveTab("backups"); setSidebarOpen(false); }}>Backup & Restore</button>
               <button className={`app-nav-link sub-link ${activeTab === "updates" ? "is-active" : ""}`} onClick={() => { setActiveTab("updates"); setSidebarOpen(false); }}>System Update</button>
               <button className={`app-nav-link sub-link ${activeTab === "ai" ? "is-active" : ""}`} onClick={() => { setActiveTab("ai"); setSidebarOpen(false); }}>AI Settings</button>
@@ -1914,6 +1933,7 @@ export function AdminDashboardPage(): JSX.Element {
               activeTab === "tenants" ? t("admin.tenants.title") : 
               activeTab === "add_tenant" ? t("admin.tenants.add") : 
               activeTab === "logs" ? t("admin.logs.title") : 
+              activeTab === "system_logs" ? t("admin.system_logs.title") : 
               activeTab === "stats" ? "Growth Workspace and User" : 
               activeTab === "server" ? t("admin.nav_server") : 
               activeTab === "notifications" ? t("admin.notifications.title") :
@@ -1930,6 +1950,7 @@ export function AdminDashboardPage(): JSX.Element {
               activeTab === "tenants" ? t("admin.tenants.subtitle") :
               activeTab === "add_tenant" ? "Tambahkan workspace baru dengan kuota yang disesuaikan." :
               activeTab === "logs" ? "Pantau log aktivitas audit di seluruh platform." :
+              activeTab === "system_logs" ? "Pantau log konsol real-time dari layanan backend untuk debugging dan troubleshooting." :
               activeTab === "stats" ? "Analisis pertumbuhan workspace dan penggunaan sistem." :
               activeTab === "server" ? "Informasi status dan kesehatan server infrastruktur." :
               activeTab === "notifications" ? t("admin.notifications.subtitle") :
@@ -2485,6 +2506,150 @@ export function AdminDashboardPage(): JSX.Element {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "system_logs" && (
+            <div className="surface card shadow-soft">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+                <div>
+                  <h3 className="form-title" style={{ margin: 0 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+                      </svg>
+                      {t("admin.system_logs.title")}
+                    </span>
+                  </h3>
+                  <p className="form-section-desc" style={{ margin: '4px 0 0 0', opacity: 0.7 }}>Output journalctl real-time dari service backend. Cocok untuk debugging error 500, restart loop, dan validasi deployment.</p>
+                </div>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.6, fontWeight: 600 }}>Service</label>
+                    <select
+                      value={systemLogService}
+                      onChange={(e) => {
+                        setSystemLogService(e.target.value);
+                        loadSystemLogs(e.target.value, systemLogLines);
+                      }}
+                      style={{ padding: '7px 12px', height: '38px', minWidth: '160px', background: 'var(--background)', color: 'var(--foreground)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.85rem' }}
+                    >
+                      <option value="pekan-api">pekan-api (API Server)</option>
+                      <option value="pekan-worker">pekan-worker (Worker)</option>
+                      <option value="pekan-ai">pekan-ai (AI Service)</option>
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.6, fontWeight: 600 }}>Baris</label>
+                    <select
+                      value={systemLogLines}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setSystemLogLines(val);
+                        loadSystemLogs(systemLogService, val);
+                      }}
+                      style={{ padding: '7px 12px', height: '38px', minWidth: '90px', background: 'var(--background)', color: 'var(--foreground)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.85rem' }}
+                    >
+                      <option value={100}>100</option>
+                      <option value={200}>200</option>
+                      <option value={500}>500</option>
+                      <option value={1000}>1000</option>
+                      <option value={2000}>2000</option>
+                    </select>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => loadSystemLogs(systemLogService, systemLogLines)}
+                    disabled={loadingSystemLogs}
+                    className="btn btn-primary"
+                    style={{ height: '38px', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}
+                  >
+                    {loadingSystemLogs ? (
+                      <><span style={{ display: 'inline-block', border: '2px solid transparent', borderTopColor: 'white', borderRadius: '50%', width: '14px', height: '14px', animation: 'spin 1s linear infinite' }} /> Memuat...</>
+                    ) : (
+                      <><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Refresh</>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ position: 'relative', marginTop: '0.5rem' }}>
+                <div style={{
+                  position: 'absolute',
+                  top: '12px',
+                  right: '16px',
+                  display: 'flex',
+                  gap: '6px',
+                  zIndex: 5
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(systemLogs);
+                      success("Log berhasil disalin ke clipboard!");
+                    }}
+                    style={{ background: 'rgba(255,255,255,0.08)', color: '#94a3b8', padding: '4px 10px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)', fontSize: '0.75rem', cursor: 'pointer', transition: 'all 0.15s' }}
+                    onMouseEnter={e => { (e.target as HTMLElement).style.color = '#f8fafc'; (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.15)'; }}
+                    onMouseLeave={e => { (e.target as HTMLElement).style.color = '#94a3b8'; (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; }}
+                  >
+                    📋 Copy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const blob = new Blob([systemLogs], { type: 'text/plain' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `${systemLogService}_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.log`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                    }}
+                    style={{ background: 'rgba(255,255,255,0.08)', color: '#94a3b8', padding: '4px 10px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)', fontSize: '0.75rem', cursor: 'pointer', transition: 'all 0.15s' }}
+                    onMouseEnter={e => { (e.target as HTMLElement).style.color = '#f8fafc'; (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.15)'; }}
+                    onMouseLeave={e => { (e.target as HTMLElement).style.color = '#94a3b8'; (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; }}
+                  >
+                    💾 Download
+                  </button>
+                </div>
+
+                <div
+                  style={{
+                    background: '#0f172a',
+                    color: '#e2e8f0',
+                    padding: '48px 20px 20px 20px',
+                    borderRadius: '8px',
+                    fontFamily: 'JetBrains Mono, Fira Code, Consolas, monospace',
+                    fontSize: '0.82rem',
+                    lineHeight: '1.6',
+                    maxHeight: '650px',
+                    overflowY: 'auto',
+                    boxShadow: 'inset 0 2px 12px rgba(0,0,0,0.6)',
+                    border: '1px solid #1e293b',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-all',
+                    tabSize: 4
+                  }}
+                >
+                  {loadingSystemLogs && !systemLogs ? (
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '250px', gap: '12px' }}>
+                      <span style={{ display: 'inline-block', border: '3px solid rgba(255,255,255,0.08)', borderTopColor: '#0d9488', borderRadius: '50%', width: '28px', height: '28px', animation: 'spin 1s linear infinite' }} />
+                      <span style={{ color: '#94a3b8' }}>Mengambil log dari server...</span>
+                    </div>
+                  ) : systemLogs ? (
+                    systemLogs
+                  ) : (
+                    <div style={{ color: '#475569', textAlign: 'center', padding: '60px 0' }}>
+                      <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.3, marginBottom: '12px' }}>
+                        <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+                      </svg>
+                      <div>Tidak ada log ditemukan. Service mungkin tidak aktif atau journalctl belum tersedia.</div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
