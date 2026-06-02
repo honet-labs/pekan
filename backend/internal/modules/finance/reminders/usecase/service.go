@@ -568,6 +568,8 @@ func (s *Service) UpdatePayment(ctx context.Context, in UpdatePaymentInput) (dom
 		Status:        normalizeStatus(in.Status),
 		Notes:         in.Notes,
 		UpdatedBy:     in.ActorUserID,
+		TransientProofName: in.ProofImageName,
+		TransientProofMime: in.ProofImageMime,
 	}
 
 	// Only update the proof URL if a new image was actually uploaded

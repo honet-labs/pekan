@@ -547,6 +547,38 @@ WHERE reminder_id = $8 AND id = $9`
 		if affected == 0 {
 			return errors.New("payment not found")
 		}
+
+		if in.ProofImageURL != nil && *in.ProofImageURL != "" && in.TransientProofName != "" {
+			fileID := uuid.NewString()
+			attachmentID := uuid.NewString()
+			
+			const insertFileQuery = `
+INSERT INTO public.files (
+  id, tenant_id, module_code, owner_type, owner_id, provider, object_key,
+  original_filename, stored_filename, mime_type, scan_status, size_bytes, uploaded_by, created_at, deleted_at
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NULL)`
+			
+			_, err = tx.ExecContext(ctx, insertFileQuery,
+				fileID, in.TenantID, "finance.reminders", "reminders", in.ReminderID, "local", *in.ProofImageURL,
+				in.TransientProofName, in.TransientProofName, in.TransientProofMime, "clean", 0, in.UpdatedBy, in.UpdatedAt,
+			)
+			if err != nil {
+				return err
+			}
+
+			const insertAttachmentQuery = `
+INSERT INTO finance_entity_attachments (
+  id, owner_type, owner_id, file_id, created_by, created_at
+) VALUES ($1,$2,$3,$4,$5,$6)`
+
+			_, err = tx.ExecContext(ctx, insertAttachmentQuery,
+				attachmentID, "reminders", in.ReminderID, fileID, in.UpdatedBy, in.UpdatedAt,
+			)
+			if err != nil {
+				return err
+			}
+		}
+
 		return nil
 	})
 	if err != nil {

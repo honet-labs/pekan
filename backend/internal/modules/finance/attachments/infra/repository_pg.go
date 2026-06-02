@@ -59,8 +59,8 @@ INSERT INTO finance_entity_attachments (
 
 		const upsertScanJobQuery = `
 INSERT INTO public.file_scan_jobs (
-  id, file_id, status, attempts, scheduled_at, created_at, updated_at
-) VALUES ($1,$2,'queued',0,now(),now(),now())
+  id, tenant_id, file_id, status, attempts, scheduled_at, created_at, updated_at
+) VALUES ($1,$2,$3,'queued',0,now(),now(),now())
 ON CONFLICT (file_id)
 DO UPDATE SET
   status = 'queued',
@@ -103,7 +103,7 @@ DO UPDATE SET
 			return err
 		}
 
-		_, err = tx.ExecContext(ctx, upsertScanJobQuery, uuid.NewString(), in.FileID)
+		_, err = tx.ExecContext(ctx, upsertScanJobQuery, uuid.NewString(), in.TenantID, in.FileID)
 		if err != nil {
 			return err
 		}
