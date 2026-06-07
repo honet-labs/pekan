@@ -934,10 +934,14 @@ func (s *Service) generateInteractiveResponseWithLLM(ctx context.Context, messag
 	if providerCode == "gemini" {
 		url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", modelName, apiKey)
 		payload := map[string]any{
+			"systemInstruction": map[string]any{
+				"parts": []any{
+					map[string]any{"text": systemPrompt},
+				},
+			},
 			"contents": []any{
 				map[string]any{"role": "user", "parts": []any{
-					map[string]any{"text": systemPrompt},
-					map[string]any{"text": fmt.Sprintf("User Message: %q", message)},
+					map[string]any{"text": message},
 				}},
 			},
 			"generationConfig": map[string]any{"temperature": 0.7},

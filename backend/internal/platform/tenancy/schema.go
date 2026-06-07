@@ -6,7 +6,7 @@ import (
 )
 
 func GetSchemaName(tenantCode string) string {
-	if tenantCode == "" || tenantCode == "public" || tenantCode == "default" {
+	if tenantCode == "" || tenantCode == "public" {
 		return "public"
 	}
 	code := strings.ToLower(tenantCode)
