@@ -54,17 +54,18 @@ export function LoginPage(): JSX.Element {
   const [otpError, setOtpError] = useState<string | null>(null);
   const [otpLoading, setOtpLoading] = useState(false);
   const [countdown, setCountdown] = useState(600); // 10 minutes
+  const [resendCountdown, setResendCountdown] = useState(180); // 3 minutes cooldown
+  const [resendLoading, setResendLoading] = useState(false);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // Countdown timer for OTP
+  // Countdown timer for OTP & Resend Cooldown
   useEffect(() => {
     if (mode !== "register-otp") return;
     setCountdown(600);
+    setResendCountdown(180);
     const timer = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) { clearInterval(timer); return 0; }
-        return prev - 1;
-      });
+      setCountdown(prev => (prev > 0 ? prev - 1 : 0));
+      setResendCountdown(prev => (prev > 0 ? prev - 1 : 0));
     }, 1000);
     return () => clearInterval(timer);
   }, [mode, sessionToken]);
@@ -136,6 +137,32 @@ export function LoginPage(): JSX.Element {
       setRegError(err instanceof Error ? err.message : "Gagal memulai registrasi");
     } finally {
       setRegLoading(false);
+    }
+  }
+
+  // --- Resend OTP ---
+  async function handleResendOTP() {
+    setOtpError(null);
+    setResendLoading(true);
+    try {
+      const result = await registerInit({
+        tenant_code: regTenantCode.toUpperCase().trim(),
+        tenant_name: regTenantName.trim(),
+        admin_email: regEmail.trim(),
+        admin_name: regAdminName.trim(),
+        password: regPassword,
+        phone: regOTPMethod === "whatsapp" ? regPhone.trim() : undefined,
+        otp_method: regOTPMethod,
+      });
+      setSessionToken(result.session_token);
+      setOtpDigits(["", "", "", "", "", ""]);
+      setResendCountdown(180);
+      setCountdown(600);
+      setTimeout(() => otpRefs.current[0]?.focus(), 100);
+    } catch (err) {
+      setOtpError(err instanceof Error ? err.message : "Gagal mengirim ulang OTP");
+    } finally {
+      setResendLoading(false);
     }
   }
 
@@ -419,13 +446,30 @@ export function LoginPage(): JSX.Element {
           </button>
 
           {countdown === 0 && (
-            <div style={{ marginTop: "1.5rem", fontSize: "0.875rem", color: "var(--danger)" }}>
-              {t("auth.otpExpired")}{" "}
-              <button type="button" className="btn-link" style={{ fontWeight: 700 }} onClick={() => setMode("register-form")}>
-                {t("auth.otpRetry")}
-              </button>
+            <div className="auth-alert auth-alert-error" style={{ marginBottom: "1.5rem" }}>
+              <span>⚠️</span>
+              <span>{t("auth.otpExpired")}</span>
             </div>
           )}
+
+          <div style={{ marginTop: "1.5rem", fontSize: "0.875rem" }}>
+            {resendCountdown > 0 ? (
+              <span style={{ color: "var(--text-muted)" }}>
+                {t("auth.otpResendCooldown")}{" "}
+                <strong>{formatCountdown(resendCountdown)}</strong>
+              </span>
+            ) : (
+              <button
+                type="button"
+                className="btn-link"
+                style={{ fontWeight: 700, color: "var(--primary)" }}
+                disabled={resendLoading}
+                onClick={handleResendOTP}
+              >
+                {resendLoading ? t("auth.otpResending") : t("auth.otpResend")}
+              </button>
+            )}
+          </div>
 
           <button
             type="button"
