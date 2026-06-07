@@ -517,7 +517,7 @@ LEFT JOIN LATERAL (
 WHERE b.deleted_at IS NULL 
   AND b.status = 'active'
   AND (b.end_date IS NULL OR b.end_date >= CURRENT_DATE)
-  AND (b.category_id IS NULL OR b.category_id = '' OR $1 = ANY(string_to_array(b.category_id, ',')) OR EXISTS (
+  AND (b.category_id IS NULL OR b.category_id = '' OR $1::text = ANY(string_to_array(b.category_id, ',')) OR EXISTS (
       WITH RECURSIVE cat_tree AS (
           SELECT parent_id FROM finance_categories WHERE id = $1
           UNION ALL
