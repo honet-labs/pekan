@@ -190,54 +190,59 @@ func (s *Service) resolveJIDViaWAHA(ctx context.Context, phone string) (string, 
 		cleanPhone = "62" + strings.TrimPrefix(cleanPhone, "0")
 	}
 
-	// Construct WAHA check endpoint:
-	// If ApiUrl is "http://localhost:3000/api/sendText", we get base as "http://localhost:3000"
 	baseApiUrl := cfg.ApiUrl
 	if idx := strings.Index(baseApiUrl, "/api/"); idx != -1 {
 		baseApiUrl = baseApiUrl[:idx]
 	}
-	checkUrl := strings.TrimSuffix(baseApiUrl, "/") + "/api/contacts/check"
+	baseApiUrl = strings.TrimSuffix(baseApiUrl, "/")
 
-	payload, _ := json.Marshal(map[string]any{
-		"check":   []string{cleanPhone},
-		"session": session,
-	})
-
-	req, err := http.NewRequestWithContext(ctx, "POST", checkUrl, strings.NewReader(string(payload)))
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	if cfg.ApiKey != "" {
-		req.Header.Set("Authorization", "Bearer "+cfg.ApiKey)
-		req.Header.Set("X-Api-Key", cfg.ApiKey)
-	}
-
-	resp, err := (&http.Client{Timeout: 5 * time.Second}).Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 300 {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("WAHA API check error (status %d): %s", resp.StatusCode, string(bodyBytes))
+	// Attempt 1: GET /api/contacts/check-exists?phone={phone}&session={session}
+	checkUrl := fmt.Sprintf("%s/api/contacts/check-exists?phone=%s&session=%s", baseApiUrl, cleanPhone, session)
+	req, err := http.NewRequestWithContext(ctx, "GET", checkUrl, nil)
+	if err == nil {
+		if cfg.ApiKey != "" {
+			req.Header.Set("Authorization", "Bearer "+cfg.ApiKey)
+			req.Header.Set("X-Api-Key", cfg.ApiKey)
+		}
+		resp, err := (&http.Client{Timeout: 3 * time.Second}).Do(req)
+		if err == nil {
+			defer resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				var respPayload struct {
+					NumberExists bool   `json:"numberExists"`
+					ChatID       string `json:"chatId"`
+				}
+				if json.NewDecoder(resp.Body).Decode(&respPayload) == nil && respPayload.NumberExists && respPayload.ChatID != "" {
+					return respPayload.ChatID, nil
+				}
+			}
+		}
 	}
 
-	var respPayload []struct {
-		Phone  string `json:"phone"`
-		Exists bool   `json:"exists"`
-		JID    string `json:"jid"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&respPayload); err != nil {
-		return "", err
+	// Attempt 2 Fallback: GET /api/{session}/lids/pn/{phoneNumber}
+	lidUrl := fmt.Sprintf("%s/api/%s/lids/pn/%s", baseApiUrl, session, cleanPhone)
+	reqLid, err := http.NewRequestWithContext(ctx, "GET", lidUrl, nil)
+	if err == nil {
+		if cfg.ApiKey != "" {
+			reqLid.Header.Set("Authorization", "Bearer "+cfg.ApiKey)
+			reqLid.Header.Set("X-Api-Key", cfg.ApiKey)
+		}
+		respLid, err := (&http.Client{Timeout: 3 * time.Second}).Do(reqLid)
+		if err == nil {
+			defer respLid.Body.Close()
+			if respLid.StatusCode == http.StatusOK {
+				var respPayload struct {
+					LID string `json:"lid"`
+					PN  string `json:"pn"`
+				}
+				if json.NewDecoder(respLid.Body).Decode(&respPayload) == nil && respPayload.LID != "" {
+					return respPayload.LID, nil
+				}
+			}
+		}
 	}
 
-	if len(respPayload) > 0 && respPayload[0].Exists && respPayload[0].JID != "" {
-		return respPayload[0].JID, nil
-	}
-
-	return "", fmt.Errorf("contact not found or doesn't exist on WhatsApp")
+	return "", fmt.Errorf("gagal me-resolve JID dari WAHA menggunakan kedua endpoint")
 }
 
 func (s *Service) ProcessLogin(ctx context.Context, phoneNumber, code string) error {
