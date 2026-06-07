@@ -140,7 +140,7 @@ func (r *RepositoryPG) List(ctx context.Context, filter domain.ListFilter) ([]do
 			idx++
 		}
 		if filter.CategoryID != nil && *filter.CategoryID != "" {
-			clauses = append(clauses, fmt.Sprintf("t.category_id = $%d", idx))
+			clauses = append(clauses, fmt.Sprintf("t.category_id::text = ANY(string_to_array($%d, ','))", idx))
 			args = append(args, *filter.CategoryID)
 			idx++
 		}

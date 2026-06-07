@@ -437,14 +437,20 @@ func (s *Service) logJSON(level, event string, fields map[string]any) {
 
 // ProcessAIChat acts as the natural language parser bridge. 
 // It parses the transaction using the active AI provider, creates it in the database, and returns a reply.
-func (s *Service) ProcessAIChat(ctx context.Context, phoneNumber, message string) (string, error) {
+func (s *Service) ProcessAIChat(ctx context.Context, phoneNumber, message string, tenantID, userID string) (string, error) {
 	// Clean JID suffixes (e.g. "@lid", "@c.us") to lookup the session properly
 	cleanPhone := phoneNumber
 	if strings.Contains(phoneNumber, "@") {
 		cleanPhone = strings.Split(phoneNumber, "@")[0]
 	}
 
-	session, err := s.repo.GetSessionByPhone(ctx, cleanPhone)
+	var session domain.Session
+	var err error
+	if tenantID != "" && userID != "" {
+		session, err = s.repo.GetSessionByUser(ctx, tenantID, userID)
+	} else {
+		session, err = s.repo.GetSessionByPhone(ctx, cleanPhone)
+	}
 	if err != nil {
 		return "⚠️ *Nomor Anda Belum Terdaftar*\n\n" +
 			"Nomor WhatsApp Anda belum terhubung dengan akun PEKAN.\n\n" +
@@ -452,6 +458,9 @@ func (s *Service) ProcessAIChat(ctx context.Context, phoneNumber, message string
 			"lalu kirimkan kode tersebut di sini dengan format:\n" +
 			"`!login <KODE_OTP>`", nil
 	}
+
+	// Override cleanPhone with the actual session phone number so that user-level pending scans work correctly
+	cleanPhone = session.PhoneNumber
 
 	// Ping the session to keep it fresh
 	_ = s.repo.UpdateLastActive(ctx, cleanPhone)
@@ -1000,7 +1009,14 @@ func (s *Service) processNextQueueItem(ctx context.Context) {
 	chatCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
-	replyMsg, err = s.ProcessAIChat(chatCtx, item.PhoneNumber, item.Message)
+	var tID, uID string
+	if item.TenantID != nil {
+		tID = *item.TenantID
+	}
+	if item.UserID != nil {
+		uID = *item.UserID
+	}
+	replyMsg, err = s.ProcessAIChat(chatCtx, item.PhoneNumber, item.Message, tID, uID)
 	latency := int(time.Since(startTime).Milliseconds())
 
 	if err != nil {

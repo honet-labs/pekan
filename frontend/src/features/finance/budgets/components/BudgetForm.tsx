@@ -35,7 +35,12 @@ export function BudgetForm({ categories, initialValue, initialCategoryName, subm
     ...defaultForm,
     ...initialValue
   });
-  const [selectedCategoryID, setSelectedCategoryID] = useState<string>(initialValue?.category_id ?? "");
+  const [selectedCategoryIDs, setSelectedCategoryIDs] = useState<string[]>(() => {
+    if (initialValue?.category_id) {
+      return initialValue.category_id.split(",").map((s) => s.trim()).filter(Boolean);
+    }
+    return [];
+  });
   const [customCategoryName, setCustomCategoryName] = useState(() => {
     if (initialValue?.category_id) {
       return "";
@@ -55,14 +60,17 @@ export function BudgetForm({ categories, initialValue, initialCategoryName, subm
     if (isSubmitting) return;
     setIsSubmitting(true);
     setError(null);
-    const matchedCategory = categoryOptions.find((category) => category.id === selectedCategoryID);
+
+    const selectedCategories = categoryOptions.filter((category) => selectedCategoryIDs.includes(category.id));
+    const matchedCategoryIDs = selectedCategories.map((c) => c.id).join(",");
+    const matchedCategoryNames = selectedCategories.map((c) => c.name).join(", ");
     const normalizedCategoryName = customCategoryName.trim();
 
     try {
       await onSubmit({
         ...form,
-        category_id: matchedCategory?.id,
-        category_name: matchedCategory ? matchedCategory.name : normalizedCategoryName || undefined,
+        category_id: matchedCategoryIDs || undefined,
+        category_name: matchedCategoryIDs ? matchedCategoryNames : normalizedCategoryName || undefined,
         end_date: form.end_date || undefined,
         alert_threshold_pct: form.alert_threshold_pct || undefined,
         notes: form.notes || undefined
@@ -90,14 +98,18 @@ export function BudgetForm({ categories, initialValue, initialCategoryName, subm
           <span>{t("budgets.form.category")}</span>
           <div className="checkbox-grid budget-category-grid">
             {categoryOptions.map((category) => {
-              const checked = selectedCategoryID === category.id;
+              const checked = selectedCategoryIDs.includes(category.id);
               return (
                 <label key={category.id} className={`check-card${checked ? " is-checked" : ""}`}>
                   <input
                     type="checkbox"
                     checked={checked}
                     onChange={() => {
-                      setSelectedCategoryID((prev) => (prev === category.id ? "" : category.id));
+                      setSelectedCategoryIDs((prev) => 
+                        prev.includes(category.id)
+                          ? prev.filter((id) => id !== category.id)
+                          : [...prev, category.id]
+                      );
                       setCustomCategoryName("");
                     }}
                   />
@@ -112,7 +124,7 @@ export function BudgetForm({ categories, initialValue, initialCategoryName, subm
             onChange={(event) => {
               setCustomCategoryName(event.target.value);
               if (event.target.value.trim()) {
-                setSelectedCategoryID("");
+                setSelectedCategoryIDs([]);
               }
             }}
             placeholder={t("budgets.form.categoryCustom")}

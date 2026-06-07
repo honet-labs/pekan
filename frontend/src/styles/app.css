@@ -2660,5 +2660,14 @@ button.app-nav-link {
   }
 }
 
-
-
+/* Entity Transactions Modal Table Styling */
+@media (min-width: 993px) {
+  .entity-transactions-table-wrap .data-table th:first-child,
+  .entity-transactions-table-wrap .data-table td:first-child {
+    padding-left: 1.5rem !important;
+  }
+  .entity-transactions-table-wrap .data-table th:last-child,
+  .entity-transactions-table-wrap .data-table td:last-child {
+    padding-right: 1.5rem !important;
+  }
+}

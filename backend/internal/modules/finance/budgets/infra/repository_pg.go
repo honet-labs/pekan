@@ -55,7 +55,7 @@ func (r *RepositoryPG) GetByID(ctx context.Context, tenantID, budgetID string) (
 SELECT b.id,
        b.name,
        b.category_id,
-       c.name AS category_name,
+       (SELECT string_agg(c.name, ', ') FROM finance_categories c WHERE c.id::text = ANY(string_to_array(b.category_id, ','))) AS category_name,
        b.amount_limit_minor,
        COALESCE(spent.spent_amount_minor, 0) AS spent_amount_minor,
        CASE
@@ -79,7 +79,6 @@ SELECT b.id,
        b.deleted_at,
        COALESCE(to_jsonb(b)->>'ida', '') AS ida
 FROM finance_budgets b
-LEFT JOIN finance_categories c ON c.id = b.category_id
 LEFT JOIN LATERAL (
     SELECT COALESCE(SUM(t.amount_minor), 0) AS spent_amount_minor
     FROM finance_transactions t
@@ -88,11 +87,11 @@ LEFT JOIN LATERAL (
       AND t.transaction_date >= b.start_date
       AND (b.end_date IS NULL OR t.transaction_date <= b.end_date)
       AND (
-          b.category_id IS NULL 
-          OR t.category_id = b.category_id
+          b.category_id IS NULL OR b.category_id = ''
+          OR t.category_id::text = ANY(string_to_array(b.category_id, ','))
           OR t.category_id IN (
               WITH RECURSIVE cat_tree AS (
-                  SELECT id FROM finance_categories WHERE parent_id = b.category_id
+                  SELECT id FROM finance_categories WHERE parent_id::text = ANY(string_to_array(b.category_id, ','))
                   UNION ALL
                   SELECT c.id FROM finance_categories c JOIN cat_tree ct ON c.parent_id = ct.id
               )
@@ -179,7 +178,7 @@ func (r *RepositoryPG) List(ctx context.Context, filter domain.ListFilter) ([]do
 SELECT b.id,
        b.name,
        b.category_id,
-       c.name AS category_name,
+       (SELECT string_agg(c.name, ', ') FROM finance_categories c WHERE c.id::text = ANY(string_to_array(b.category_id, ','))) AS category_name,
        b.amount_limit_minor,
        COALESCE(spent.spent_amount_minor, 0) AS spent_amount_minor,
        CASE
@@ -203,7 +202,6 @@ SELECT b.id,
        b.deleted_at,
        COALESCE(to_jsonb(b)->>'ida', '') AS ida
 FROM finance_budgets b
-LEFT JOIN finance_categories c ON c.id = b.category_id
 LEFT JOIN LATERAL (
     SELECT COALESCE(SUM(t.amount_minor), 0) AS spent_amount_minor
     FROM finance_transactions t
@@ -212,11 +210,11 @@ LEFT JOIN LATERAL (
       AND t.transaction_date >= b.start_date
       AND (b.end_date IS NULL OR t.transaction_date <= b.end_date)
       AND (
-          b.category_id IS NULL 
-          OR t.category_id = b.category_id
+          b.category_id IS NULL OR b.category_id = ''
+          OR t.category_id::text = ANY(string_to_array(b.category_id, ','))
           OR t.category_id IN (
               WITH RECURSIVE cat_tree AS (
-                  SELECT id FROM finance_categories WHERE parent_id = b.category_id
+                  SELECT id FROM finance_categories WHERE parent_id::text = ANY(string_to_array(b.category_id, ','))
                   UNION ALL
                   SELECT c.id FROM finance_categories c JOIN cat_tree ct ON c.parent_id = ct.id
               )
@@ -351,15 +349,25 @@ func (r *RepositoryPG) ResolveCategoryID(ctx context.Context, tenantID, actorUse
 	err := db.WithTenantTx(ctx, r.conn, func(tx *sql.Tx) error {
 		if categoryID != nil && strings.TrimSpace(*categoryID) != "" {
 			cleanID := strings.TrimSpace(*categoryID)
-			const q = `SELECT 1 FROM finance_categories WHERE id = $1 AND category_type = 'expense' AND is_active = TRUE`
-			var exists int
-			if err := tx.QueryRowContext(ctx, q, cleanID).Scan(&exists); err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					return domain.ErrCategoryNotFound
+			ids := strings.Split(cleanID, ",")
+			var validIDs []string
+			for _, idStr := range ids {
+				id := strings.TrimSpace(idStr)
+				if id == "" {
+					continue
 				}
-				return err
+				const q = `SELECT id FROM finance_categories WHERE id = $1 AND category_type = 'expense' AND is_active = TRUE`
+				var exists string
+				if err := tx.QueryRowContext(ctx, q, id).Scan(&exists); err != nil {
+					if errors.Is(err, sql.ErrNoRows) {
+						return domain.ErrCategoryNotFound
+					}
+					return err
+				}
+				validIDs = append(validIDs, exists)
 			}
-			out = &cleanID
+			joined := strings.Join(validIDs, ",")
+			out = &joined
 			return nil
 		}
 
@@ -368,7 +376,15 @@ func (r *RepositoryPG) ResolveCategoryID(ctx context.Context, tenantID, actorUse
 		}
 
 		normalizedName := strings.TrimSpace(*categoryName)
-		const findQuery = `
+		names := strings.Split(normalizedName, ",")
+		var resolvedIDs []string
+		for _, nameStr := range names {
+			name := strings.TrimSpace(nameStr)
+			if name == "" {
+				continue
+			}
+
+			const findQuery = `
 SELECT id
 FROM finance_categories
 WHERE category_type = 'expense'
@@ -376,29 +392,32 @@ WHERE category_type = 'expense'
   AND is_active = TRUE
 LIMIT 1`
 
-		var existingID string
-		if err := tx.QueryRowContext(ctx, findQuery, normalizedName).Scan(&existingID); err == nil {
-			out = &existingID
-			return nil
-		} else if !errors.Is(err, sql.ErrNoRows) {
-			return err
-		}
+			var existingID string
+			if err := tx.QueryRowContext(ctx, findQuery, name).Scan(&existingID); err == nil {
+				resolvedIDs = append(resolvedIDs, existingID)
+				continue
+			} else if !errors.Is(err, sql.ErrNoRows) {
+				return err
+			}
 
-		newID := uuid.NewString()
-		now := time.Now().UTC()
-		const insertQuery = `
+			newID := uuid.NewString()
+			now := time.Now().UTC()
+			const insertQuery = `
 INSERT INTO finance_categories (
   id, name, category_type, parent_id, is_active, created_by, created_at, updated_at
 ) VALUES ($1,$2,'expense',NULL,TRUE,$3,$4,$4)`
 
-		if _, err := tx.ExecContext(ctx, insertQuery, newID, normalizedName, actorUserID, now); err != nil {
-			if err := tx.QueryRowContext(ctx, findQuery, normalizedName).Scan(&existingID); err == nil {
-				out = &existingID
-				return nil
+			if _, err := tx.ExecContext(ctx, insertQuery, newID, name, actorUserID, now); err != nil {
+				if err := tx.QueryRowContext(ctx, findQuery, name).Scan(&existingID); err == nil {
+					resolvedIDs = append(resolvedIDs, existingID)
+					continue
+				}
+				return err
 			}
-			return err
+			resolvedIDs = append(resolvedIDs, newID)
 		}
-		out = &newID
+		joined := strings.Join(resolvedIDs, ",")
+		out = &joined
 		return nil
 	})
 	return out, err
@@ -483,11 +502,11 @@ LEFT JOIN LATERAL (
       AND t.transaction_date >= b.start_date
       AND (b.end_date IS NULL OR t.transaction_date <= b.end_date)
       AND (
-          b.category_id IS NULL 
-          OR t.category_id = b.category_id
+          b.category_id IS NULL OR b.category_id = ''
+          OR t.category_id::text = ANY(string_to_array(b.category_id, ','))
           OR t.category_id IN (
               WITH RECURSIVE cat_tree AS (
-                  SELECT id FROM finance_categories WHERE parent_id = b.category_id
+                  SELECT id FROM finance_categories WHERE parent_id::text = ANY(string_to_array(b.category_id, ','))
                   UNION ALL
                   SELECT c.id FROM finance_categories c JOIN cat_tree ct ON c.parent_id = ct.id
               )
@@ -498,14 +517,14 @@ LEFT JOIN LATERAL (
 WHERE b.deleted_at IS NULL 
   AND b.status = 'active'
   AND (b.end_date IS NULL OR b.end_date >= CURRENT_DATE)
-  AND (b.category_id IS NULL OR b.category_id = $1 OR $1 IN (
+  AND (b.category_id IS NULL OR b.category_id = '' OR $1 = ANY(string_to_array(b.category_id, ',')) OR EXISTS (
       WITH RECURSIVE cat_tree AS (
           SELECT parent_id FROM finance_categories WHERE id = $1
           UNION ALL
           SELECT c.parent_id FROM finance_categories c JOIN cat_tree ct ON c.id = ct.parent_id
           WHERE c.parent_id IS NOT NULL
       )
-      SELECT parent_id FROM cat_tree WHERE parent_id = b.category_id
+      SELECT 1 FROM cat_tree ct WHERE ct.parent_id::text = ANY(string_to_array(b.category_id, ','))
   ))`
 
 		rows, err := tx.QueryContext(ctx, q, categoryID)

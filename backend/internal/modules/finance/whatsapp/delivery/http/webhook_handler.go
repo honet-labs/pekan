@@ -38,6 +38,7 @@ func (h *WebhookHandler) HandleIncomingMessage(w http.ResponseWriter, r *http.Re
 	var sender, message string
 	var fromJid string
 	var mediaURL string
+	var participant string
 
 	// Handle Form Data
 	if strings.Contains(r.Header.Get("Content-Type"), "application/x-www-form-urlencoded") || 
@@ -69,6 +70,14 @@ func (h *WebhookHandler) HandleIncomingMessage(w http.ResponseWriter, r *http.Re
 				if u, ok := raw["url"].(string); ok {
 					mediaURL = u
 				}
+				if g, ok := raw["group"].(string); ok && g != "" {
+					fromJid = g
+					if m, ok := raw["member"].(string); ok && m != "" {
+						participant = m
+					} else {
+						participant = sender
+					}
+				}
 
 				// Try Evolution API format
 				if dataObj, ok := raw["data"].(map[string]interface{}); ok {
@@ -95,6 +104,9 @@ func (h *WebhookHandler) HandleIncomingMessage(w http.ResponseWriter, r *http.Re
 								mediaURL = urlStr
 							}
 						}
+					}
+					if part, ok := dataObj["participant"].(string); ok && part != "" {
+						participant = strings.Split(part, "@")[0]
 					}
 				}
 
@@ -124,6 +136,9 @@ func (h *WebhookHandler) HandleIncomingMessage(w http.ResponseWriter, r *http.Re
 					}
 					if urlStr, ok := payload["mediaUrl"].(string); ok && urlStr != "" {
 						mediaURL = urlStr
+					}
+					if part, ok := payload["participant"].(string); ok && part != "" {
+						participant = strings.Split(part, "@")[0]
 					}
 				}
 
@@ -174,6 +189,48 @@ func (h *WebhookHandler) HandleIncomingMessage(w http.ResponseWriter, r *http.Re
 
 	// Clean up sender format (e.g., remove "+" from "+62812...")
 	sender = strings.ReplaceAll(sender, "+", "")
+	participant = strings.ReplaceAll(participant, "+", "")
+
+	isGroup := false
+	if fromJid != "" && (strings.Contains(fromJid, "@g.us") || strings.Contains(fromJid, "@us")) {
+		isGroup = true
+	}
+
+	if isGroup {
+		// Only process if the bot is mentioned/tagged
+		botPhone := h.service.GetWhatsAppBotNumber(r.Context())
+		botPhoneClean := strings.ReplaceAll(botPhone, "+", "")
+		
+		isMentioned := false
+		if botPhoneClean != "" && strings.Contains(message, "@"+botPhoneClean) {
+			isMentioned = true
+		}
+		
+		lowerMsg := strings.ToLower(message)
+		if strings.Contains(lowerMsg, "@pekan") || strings.Contains(lowerMsg, "@bot") {
+			isMentioned = true
+		}
+		
+		if !isMentioned {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		
+		// If mentioned, clean the mention tags from the message
+		if botPhoneClean != "" {
+			message = strings.ReplaceAll(message, "@"+botPhoneClean, "")
+		}
+		message = strings.ReplaceAll(message, "@pekan", "")
+		message = strings.ReplaceAll(message, "@PEKAN", "")
+		message = strings.ReplaceAll(message, "@bot", "")
+		message = strings.ReplaceAll(message, "@BOT", "")
+		message = strings.TrimSpace(message)
+		
+		// For group chat, use participant as the sender
+		if participant != "" {
+			sender = participant
+		}
+	}
 
 	recipient := sender
 	if fromJid != "" {
@@ -232,7 +289,14 @@ func (h *WebhookHandler) HandleIncomingMessage(w http.ResponseWriter, r *http.Re
 	if qErr != nil {
 		logJSON("error", "enqueue_failed", map[string]any{"sender": sender, "error": qErr.Error()})
 		// Fallback to sync processing if database enqueue fails
-		replyText, err := h.service.ProcessAIChat(r.Context(), sender, message)
+		var tIDVal, uIDVal string
+		if tenantID != nil {
+			tIDVal = *tenantID
+		}
+		if userID != nil {
+			uIDVal = *userID
+		}
+		replyText, err := h.service.ProcessAIChat(r.Context(), sender, message, tIDVal, uIDVal)
 		if err != nil {
 			logJSON("error", "ai_chat_fallback_error", map[string]any{"sender": sender, "error": err.Error()})
 		}

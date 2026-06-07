@@ -86,21 +86,21 @@ export function EntityTransactionsModal({
                <p className="text-muted" style={{ fontSize: '1.1rem' }}>{t("common.noItems") || "Tidak ada data transaksi"}</p>
             </div>
           ) : (
-            <div className="data-table-wrap table-mobile-stack" style={{ border: 'none', borderRadius: '0' }}>
+            <div className="data-table-wrap table-mobile-stack entity-transactions-table-wrap" style={{ border: 'none', borderRadius: '0' }}>
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th style={{ paddingLeft: '1.5rem' }}>TID</th>
+                    <th>TID</th>
                     <th>{t("transactions.table.date")}</th>
                     <th>{t("transactions.table.type")}</th>
                     <th>{t("transactions.table.total")}</th>
-                    <th style={{ paddingRight: '1.5rem' }}>{t("transactions.table.description")}</th>
+                    <th>{t("transactions.table.description")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {items.map((item) => (
                     <tr key={item.id}>
-                      <td data-label="TID" style={{ paddingLeft: '1.5rem' }}>
+                      <td data-label="TID">
                         <span style={{ fontWeight: 600, color: 'var(--primary-color)', fontSize: '0.85rem' }}>{item.tid}</span>
                       </td>
                       <td data-label={t("transactions.table.date")} style={{ whiteSpace: 'nowrap' }}>{item.transaction_date}</td>
@@ -110,7 +110,7 @@ export function EntityTransactionsModal({
                         </span>
                       </td>
                       <td data-label={t("transactions.table.total")} style={{ fontWeight: 600 }}>{formatAmount(item.amount_minor, item.currency)}</td>
-                      <td data-label={t("transactions.table.description")} style={{ paddingRight: '1.5rem', fontSize: '0.9rem' }}>
+                      <td data-label={t("transactions.table.description")} style={{ fontSize: '0.9rem' }}>
                         {item.description || item.merchant_name || "-"}
                       </td>
                     </tr>

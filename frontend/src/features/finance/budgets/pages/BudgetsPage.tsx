@@ -5,19 +5,7 @@ import { useFinanceMasterData } from "../../masterdata/hooks/useFinanceMasterDat
 import { useI18n } from "../../../../core/i18n/i18n";
 import { AttachmentPanel } from "../../attachments/components/AttachmentPanel";
 import { EntityTransactionsModal } from "../../transactions/components/EntityTransactionsModal";
-
-const initialForm = {
-  name: "",
-  category_id: "",
-  category_name: "",
-  amount_limit_minor: 0,
-  currency: "IDR",
-  period: "monthly",
-  start_date: "",
-  end_date: "",
-  alert_threshold_pct: 80,
-  status: "active"
-};
+import { BudgetForm } from "../components/BudgetForm";
 
 export function BudgetsPage(): JSX.Element {
   const { locale, t } = useI18n();
@@ -27,65 +15,15 @@ export function BudgetsPage(): JSX.Element {
   );
   const { items, loading, error, create, update, remove } = useBudgets();
   const { categories } = useFinanceMasterData();
-  const [form, setForm] = useState(initialForm);
   const [editing, setEditing] = useState<Budget | null>(null);
   const [selectedBudgetID, setSelectedBudgetID] = useState<string | null>(null);
   const [transactionViewEntity, setTransactionViewEntity] = useState<Budget | null>(null);
 
-  const categoryOptions = useMemo(
-    () => categories.filter((category) => category.category_type === "expense"),
-    [categories]
-  );
-
   const title = useMemo(() => (editing ? t("budgets.form.update") : t("budgets.form.create")), [editing, t]);
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    try {
-      const normalizedCategoryName = form.category_name.trim();
-      const matchedCategory = categoryOptions.find((category) => category.name.toLowerCase() === normalizedCategoryName.toLowerCase());
-      const payload = {
-        name: form.name,
-        category_id: matchedCategory?.id,
-        category_name: normalizedCategoryName ? (matchedCategory ? matchedCategory.name : normalizedCategoryName) : undefined,
-        amount_limit_minor: Number(form.amount_limit_minor),
-        currency: form.currency,
-        period: form.period,
-        start_date: form.start_date,
-        end_date: form.end_date || undefined,
-        alert_threshold_pct: form.alert_threshold_pct || undefined,
-        status: form.status
-      };
-      if (editing) {
-        const updated = await update(editing.id, payload);
-        setSelectedBudgetID(updated.id);
-      } else {
-        const created = await create(payload);
-        setSelectedBudgetID(created.id);
-      }
-      setEditing(null);
-      setForm(initialForm);
-    } catch {
-      // Hook already stores error state; keep page stable.
-    }
-  };
-
   const startEdit = (item: Budget) => {
-    const categoryName = item.category_name ?? categories.find((category) => category.id === item.category_id)?.name ?? "";
     setEditing(item);
     setSelectedBudgetID(item.id);
-    setForm({
-      name: item.name,
-      category_id: item.category_id ?? "",
-      category_name: categoryName,
-      amount_limit_minor: item.amount_limit_minor,
-      currency: item.currency,
-      period: item.period,
-      start_date: item.start_date,
-      end_date: item.end_date ?? "",
-      alert_threshold_pct: item.alert_threshold_pct ?? 80,
-      status: item.status
-    });
   };
 
   return (
@@ -100,107 +38,39 @@ export function BudgetsPage(): JSX.Element {
       {error ? <div className="alert error">{error}</div> : null}
 
       <div className="card-grid two-col tight">
-        <form className="card surface form-grid" onSubmit={handleSubmit}>
-          <h3 className="form-title">{title}</h3>
-          <label className="form-field">
-            {t("budgets.form.name")}
-            <input
-              className="input-control"
-              value={form.name}
-              onChange={(event) => setForm({ ...form, name: event.target.value })}
-              required
-            />
-          </label>
-          <label className="form-field">
-            {t("budgets.form.category")}
-            <input
-              className="input-control"
-              list="budget-category-options"
-              value={form.category_name}
-              onChange={(event) => setForm({ ...form, category_name: event.target.value })}
-              placeholder={t("transactions.form.categoryPlaceholder")}
-            />
-            <datalist id="budget-category-options">
-              {categoryOptions.map((category) => (
-                <option key={category.id} value={category.name} />
-              ))}
-            </datalist>
-          </label>
-          <label className="form-field">
-            {t("budgets.form.limit")}
-            <input
-              className="input-control"
-              type="number"
-              value={form.amount_limit_minor}
-              onChange={(event) => setForm({ ...form, amount_limit_minor: Number(event.target.value) })}
-              required
-            />
-          </label>
-          <label className="form-field">
-            {t("budgets.form.currency")}
-            <input
-              className="input-control"
-              value={form.currency}
-              onChange={(event) => setForm({ ...form, currency: event.target.value })}
-            />
-          </label>
-          <label className="form-field">
-            {t("budgets.form.period")}
-            <select
-              className="input-control"
-              value={form.period}
-              onChange={(event) => setForm({ ...form, period: event.target.value })}
-            >
-              <option value="monthly">{t("budgets.period.monthly")}</option>
-              <option value="weekly">{t("budgets.period.weekly")}</option>
-              <option value="yearly">{t("budgets.period.yearly")}</option>
-              <option value="custom">{t("budgets.period.custom")}</option>
-            </select>
-          </label>
-          <label className="form-field">
-            {t("budgets.form.startDate")}
-            <input
-              className="input-control"
-              type="date"
-              value={form.start_date}
-              onChange={(event) => setForm({ ...form, start_date: event.target.value })}
-              required
-            />
-          </label>
-          <label className="form-field">
-            {t("budgets.form.endDate")}
-            <input
-              className="input-control"
-              type="date"
-              value={form.end_date}
-              onChange={(event) => setForm({ ...form, end_date: event.target.value })}
-            />
-          </label>
-          <label className="form-field">
-            {t("budgets.form.alert")}
-            <input
-              className="input-control"
-              type="number"
-              value={form.alert_threshold_pct}
-              onChange={(event) => setForm({ ...form, alert_threshold_pct: Number(event.target.value) })}
-            />
-          </label>
-          <label className="form-field">
-            {t("budgets.form.status")}
-            <select
-              className="input-control"
-              value={form.status}
-              onChange={(event) => setForm({ ...form, status: event.target.value })}
-            >
-              <option value="active">{t("budgets.status.active")}</option>
-              <option value="paused">{t("budgets.status.paused")}</option>
-              <option value="ended">{t("budgets.status.ended")}</option>
-            </select>
-          </label>
-          <button className="btn btn-primary" type="submit">
-            {editing ? t("budgets.form.updateBtn") : t("budgets.form.createBtn")}
-          </button>
-        </form>
+        <div className="stack-col">
+          <h3 className="form-title" style={{ margin: 0, marginBottom: "0.5rem" }}>{title}</h3>
+          <BudgetForm
+            key={editing ? editing.id : "new"}
+            categories={categories}
+            initialValue={editing ? {
+              name: editing.name,
+              category_id: editing.category_id ?? "",
+              category_name: editing.category_name ?? "",
+              amount_limit_minor: editing.amount_limit_minor,
+              currency: editing.currency,
+              period: editing.period,
+              start_date: editing.start_date,
+              end_date: editing.end_date ?? "",
+              alert_threshold_pct: editing.alert_threshold_pct ?? 80,
+              notes: editing.notes ?? "",
+              status: editing.status
+            } : undefined}
+            initialCategoryName={editing?.category_name ?? ""}
+            submitLabel={editing ? t("budgets.form.updateBtn") : t("budgets.form.createBtn")}
+            onSubmit={async (payload) => {
+              if (editing) {
+                const updated = await update(editing.id, payload);
+                setSelectedBudgetID(updated.id);
+                setEditing(null);
+              } else {
+                const created = await create(payload);
+                setSelectedBudgetID(created.id);
+              }
+            }}
+            onCancel={editing ? () => setEditing(null) : undefined}
+          />
+        </div>
 
         <div className="stack-col">
           <div className="card surface">
