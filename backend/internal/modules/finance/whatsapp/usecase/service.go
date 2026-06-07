@@ -185,11 +185,10 @@ func (s *Service) ProcessLogin(ctx context.Context, phoneNumber, code string) er
 	cleanExpected := cleanPhoneNumber(expectedPhone)
 	cleanReceived := cleanPhoneNumber(phoneNumber)
 
-	// Bypass strict phone number comparison to support WhatsApp internal LID (Long Identifier) formats,
-	// different gateway representations (e.g. 179010646573138@lid), and allow users to link their preferred WhatsApp account.
-	// Security is guaranteed since the high-entropy OTP code (expires in 10 mins) can only be generated from their secure WebUI dashboard session.
-	_ = cleanExpected
-	_ = cleanReceived
+	// Validate that the sender's phone number strictly matches the phone number in their user profile.
+	if cleanExpected != cleanReceived {
+		return fmt.Errorf("nomor handphone Anda tidak cocok dengan profil (Profil: %s, WA: %s)", cleanExpected, cleanReceived)
+	}
 
 	// 2. Delete any existing sessions for this phone number or user to allow seamless re-linking/switching
 	_ = s.repo.DeleteSessionByPhone(ctx, phoneNumber)
