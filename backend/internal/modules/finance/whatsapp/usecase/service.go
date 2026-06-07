@@ -159,6 +159,87 @@ func (s *Service) ConnectDirect(ctx context.Context, tenantID, userID, phoneNumb
 	return nil
 }
 
+func (s *Service) resolveJIDViaWAHA(ctx context.Context, phone string) (string, error) {
+	configJSON, err := s.settings.GetGlobalSettingRaw(ctx, "notification_wa_waha")
+	if err != nil || configJSON == "" {
+		return "", fmt.Errorf("konfigurasi WAHA belum diatur")
+	}
+	var cfg struct {
+		ApiUrl  string `json:"apiUrl"`
+		ApiKey  string `json:"apiKey"`
+		Session string `json:"session"`
+	}
+	if err := json.Unmarshal([]byte(configJSON), &cfg); err != nil || cfg.ApiUrl == "" {
+		return "", fmt.Errorf("konfigurasi WAHA tidak valid")
+	}
+
+	session := cfg.Session
+	if session == "" {
+		session = "default"
+	}
+
+	// Clean the phone number to digits only (e.g. 62859...)
+	var cleanPhone string
+	for _, char := range phone {
+		if char >= '0' && char <= '9' {
+			cleanPhone += string(char)
+		}
+	}
+	// If it starts with 08, replace with 628
+	if strings.HasPrefix(cleanPhone, "08") {
+		cleanPhone = "62" + strings.TrimPrefix(cleanPhone, "0")
+	}
+
+	// Construct WAHA check endpoint:
+	// If ApiUrl is "http://localhost:3000/api/sendText", we get base as "http://localhost:3000"
+	baseApiUrl := cfg.ApiUrl
+	if idx := strings.Index(baseApiUrl, "/api/"); idx != -1 {
+		baseApiUrl = baseApiUrl[:idx]
+	}
+	checkUrl := strings.TrimSuffix(baseApiUrl, "/") + "/api/contacts/check"
+
+	payload, _ := json.Marshal(map[string]any{
+		"check":   []string{cleanPhone},
+		"session": session,
+	})
+
+	req, err := http.NewRequestWithContext(ctx, "POST", checkUrl, strings.NewReader(string(payload)))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if cfg.ApiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+cfg.ApiKey)
+		req.Header.Set("X-Api-Key", cfg.ApiKey)
+	}
+
+	resp, err := (&http.Client{Timeout: 5 * time.Second}).Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("WAHA API check error (status %d): %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var respPayload []struct {
+		Phone  string `json:"phone"`
+		Exists bool   `json:"exists"`
+		JID    string `json:"jid"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&respPayload); err != nil {
+		return "", err
+	}
+
+	if len(respPayload) > 0 && respPayload[0].Exists && respPayload[0].JID != "" {
+		return respPayload[0].JID, nil
+	}
+
+	return "", fmt.Errorf("contact not found or doesn't exist on WhatsApp")
+}
+
 func (s *Service) ProcessLogin(ctx context.Context, phoneNumber, code string) error {
 	// 1. Validate the code
 	token, err := s.repo.GetOTPToken(ctx, code)
@@ -184,10 +265,33 @@ func (s *Service) ProcessLogin(ctx context.Context, phoneNumber, code string) er
 	cleanExpected := cleanPhoneNumber(expectedPhone)
 	cleanReceived := cleanPhoneNumber(phoneNumber)
 
-	// Bypass strict phone number comparison to support WhatsApp internal LID (Long Identifier) formats
-	// which cannot be matched to regular phone numbers.
-	isLID := !strings.HasPrefix(cleanReceived, "08") && len(cleanReceived) > 13
-	if cleanExpected != cleanReceived && !isLID {
+	fmt.Printf("[DEBUG-LOGIN] expectedPhone: %q (clean: %q) | receivedPhone: %q (clean: %q)\n", expectedPhone, cleanExpected, phoneNumber, cleanReceived)
+
+	match := false
+	if cleanExpected == cleanReceived {
+		match = true
+		fmt.Println("[DEBUG-LOGIN] Direct match succeeded")
+	} else {
+		fmt.Println("[DEBUG-LOGIN] Direct match failed, attempting WAHA resolution...")
+		resolvedJID, rErr := s.resolveJIDViaWAHA(ctx, expectedPhone)
+		fmt.Printf("[DEBUG-LOGIN] WAHA resolvedJID: %q | error: %v\n", resolvedJID, rErr)
+		if rErr == nil && resolvedJID != "" {
+			cleanResolved := cleanPhoneNumber(resolvedJID)
+			fmt.Printf("[DEBUG-LOGIN] cleanResolved: %q | cleanReceived: %q\n", cleanResolved, cleanReceived)
+			if cleanResolved == cleanReceived {
+				match = true
+				fmt.Println("[DEBUG-LOGIN] WAHA match succeeded")
+			} else {
+				fmt.Println("[DEBUG-LOGIN] WAHA match failed")
+			}
+		} else {
+			fmt.Println("[DEBUG-LOGIN] WAHA resolution skipped or failed")
+		}
+	}
+
+	fmt.Printf("[DEBUG-LOGIN] Final match outcome: %t\n", match)
+
+	if !match {
 		return fmt.Errorf("nomor handphone Anda tidak cocok dengan profil akun PEKAN")
 	}
 
