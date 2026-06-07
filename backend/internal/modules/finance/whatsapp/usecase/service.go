@@ -270,31 +270,18 @@ func (s *Service) ProcessLogin(ctx context.Context, phoneNumber, code string) er
 	cleanExpected := cleanPhoneNumber(expectedPhone)
 	cleanReceived := cleanPhoneNumber(phoneNumber)
 
-	fmt.Printf("[DEBUG-LOGIN] expectedPhone: %q (clean: %q) | receivedPhone: %q (clean: %q)\n", expectedPhone, cleanExpected, phoneNumber, cleanReceived)
-
 	match := false
 	if cleanExpected == cleanReceived {
 		match = true
-		fmt.Println("[DEBUG-LOGIN] Direct match succeeded")
 	} else {
-		fmt.Println("[DEBUG-LOGIN] Direct match failed, attempting WAHA resolution...")
 		resolvedJID, rErr := s.resolveJIDViaWAHA(ctx, expectedPhone)
-		fmt.Printf("[DEBUG-LOGIN] WAHA resolvedJID: %q | error: %v\n", resolvedJID, rErr)
 		if rErr == nil && resolvedJID != "" {
 			cleanResolved := cleanPhoneNumber(resolvedJID)
-			fmt.Printf("[DEBUG-LOGIN] cleanResolved: %q | cleanReceived: %q\n", cleanResolved, cleanReceived)
 			if cleanResolved == cleanReceived {
 				match = true
-				fmt.Println("[DEBUG-LOGIN] WAHA match succeeded")
-			} else {
-				fmt.Println("[DEBUG-LOGIN] WAHA match failed")
 			}
-		} else {
-			fmt.Println("[DEBUG-LOGIN] WAHA resolution skipped or failed")
 		}
 	}
-
-	fmt.Printf("[DEBUG-LOGIN] Final match outcome: %t\n", match)
 
 	if !match {
 		return fmt.Errorf("nomor handphone Anda tidak cocok dengan profil akun PEKAN")
