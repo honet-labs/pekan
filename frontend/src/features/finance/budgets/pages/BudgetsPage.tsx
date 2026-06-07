@@ -93,11 +93,11 @@ export function BudgetsPage(): JSX.Element {
                 <tbody>
                   {items.map((item) => (
                     <tr key={item.id}>
-                      <td>{item.ida}</td>
-                      <td>{item.name}</td>
-                      <td>{item.category_name ?? t("budgets.form.allCategories")}</td>
-                      <td>Rp {numberFormatter.format(item.amount_limit_minor)}</td>
-                      <td>
+                      <td data-label="IDA">{item.ida}</td>
+                      <td data-label={t("budgets.table.name")}>{item.name}</td>
+                      <td data-label={t("budgets.form.category")}>{item.category_name ?? t("budgets.form.allCategories")}</td>
+                      <td data-label={t("budgets.table.limit")}>Rp {numberFormatter.format(item.amount_limit_minor)}</td>
+                      <td data-label={t("budgets.table.progress")}>
                         <div className="progress-cell">
                           <span>{Number(item.progress_percent ?? 0).toFixed(2)}%</span>
                           <div className="progress-track">
@@ -108,9 +108,9 @@ export function BudgetsPage(): JSX.Element {
                           </div>
                         </div>
                       </td>
-                      <td>{t(`budgets.period.${item.period}`)}</td>
-                      <td>{t(`budgets.status.${item.status}`)}</td>
-                      <td>
+                      <td data-label={t("budgets.table.period")}>{t(`budgets.period.${item.period}`)}</td>
+                      <td data-label={t("budgets.table.status")}>{t(`budgets.status.${item.status}`)}</td>
+                      <td data-label={t("budgets.table.action")}>
                         <div className="table-actions">
                           <button
                             className="btn btn-primary-light"
