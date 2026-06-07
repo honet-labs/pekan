@@ -39,6 +39,7 @@ func (h *WebhookHandler) HandleIncomingMessage(w http.ResponseWriter, r *http.Re
 	var fromJid string
 	var mediaURL string
 	var participant string
+	var raw map[string]interface{}
 
 	// Handle Form Data
 	if strings.Contains(r.Header.Get("Content-Type"), "application/x-www-form-urlencoded") || 
@@ -54,7 +55,6 @@ func (h *WebhookHandler) HandleIncomingMessage(w http.ResponseWriter, r *http.Re
 		bodyBytes, err := io.ReadAll(r.Body)
 		if err == nil && len(bodyBytes) > 0 {
 			fmt.Printf("[WA-WEBHOOK] RAW BODY: %s\n", string(bodyBytes))
-			var raw map[string]interface{}
 			if err := json.Unmarshal(bodyBytes, &raw); err == nil {
 				// Try generic / Fonnte format
 				if s, ok := raw["sender"].(string); ok {
@@ -197,36 +197,81 @@ func (h *WebhookHandler) HandleIncomingMessage(w http.ResponseWriter, r *http.Re
 	}
 
 	if isGroup {
-		// Only process if the bot is mentioned/tagged
+		// Extract dynamic bot info from webhook root 'me' if available
+		var meId, meName string
+		if raw != nil {
+			if meObj, ok := raw["me"].(map[string]interface{}); ok {
+				if id, ok := meObj["id"].(string); ok {
+					meId = strings.Split(id, "@")[0]
+				}
+				if name, ok := meObj["pushName"].(string); ok {
+					meName = name
+				}
+			}
+		}
+
 		botPhone := h.service.GetWhatsAppBotNumber(r.Context())
 		botPhoneClean := strings.ReplaceAll(botPhone, "+", "")
-		
+		if botPhoneClean == "" {
+			botPhoneClean = meId
+		}
+
 		isMentioned := false
 		if botPhoneClean != "" && strings.Contains(message, "@"+botPhoneClean) {
 			isMentioned = true
 		}
-		
+		if botPhoneClean != "" && strings.Contains(message, botPhoneClean) && strings.Contains(message, "@") {
+			isMentioned = true
+		}
+
+		// Fallback check by bot's pushName (e.g., "Aish | Support HONET")
 		lowerMsg := strings.ToLower(message)
+		if meName != "" {
+			cleanMeName := strings.ToLower(strings.TrimSpace(meName))
+			if strings.Contains(lowerMsg, "@"+cleanMeName) || strings.Contains(lowerMsg, "@~"+cleanMeName) {
+				isMentioned = true
+			}
+			parts := strings.Split(cleanMeName, "|")
+			for _, part := range parts {
+				trimmedPart := strings.TrimSpace(part)
+				if trimmedPart != "" && (strings.Contains(lowerMsg, "@"+trimmedPart) || strings.Contains(lowerMsg, "@~"+trimmedPart)) {
+					isMentioned = true
+				}
+			}
+		}
+
 		if strings.Contains(lowerMsg, "@pekan") || strings.Contains(lowerMsg, "@bot") {
 			isMentioned = true
 		}
-		
+
 		if !isMentioned {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
-		
-		// If mentioned, clean the mention tags from the message
+
+		// Clean mentions from message
 		if botPhoneClean != "" {
 			message = strings.ReplaceAll(message, "@"+botPhoneClean, "")
+			message = strings.ReplaceAll(message, botPhoneClean, "")
+		}
+		if meName != "" {
+			message = strings.ReplaceAll(message, "@"+meName, "")
+			message = strings.ReplaceAll(message, "@~"+meName, "")
+			parts := strings.Split(meName, "|")
+			for _, part := range parts {
+				trimmedPart := strings.TrimSpace(part)
+				if trimmedPart != "" {
+					message = strings.ReplaceAll(message, "@"+trimmedPart, "")
+					message = strings.ReplaceAll(message, "@~"+trimmedPart, "")
+				}
+			}
 		}
 		message = strings.ReplaceAll(message, "@pekan", "")
 		message = strings.ReplaceAll(message, "@PEKAN", "")
 		message = strings.ReplaceAll(message, "@bot", "")
 		message = strings.ReplaceAll(message, "@BOT", "")
 		message = strings.TrimSpace(message)
-		
-		// For group chat, use participant as the sender
+
 		if participant != "" {
 			sender = participant
 		}
