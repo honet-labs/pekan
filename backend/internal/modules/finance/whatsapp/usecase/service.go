@@ -186,7 +186,10 @@ func (s *Service) ProcessLogin(ctx context.Context, phoneNumber, code string) er
 	cleanReceived := cleanPhoneNumber(phoneNumber)
 
 	// Validate that the sender's phone number strictly matches the phone number in their user profile.
-	if cleanExpected != cleanReceived {
+	// However, we must bypass this if WhatsApp is sending an LID (Long Identifier, e.g., 179010646573138)
+	// because LID formats cannot be matched to regular phone numbers. Indonesian numbers start with 08.
+	isLID := !strings.HasPrefix(cleanReceived, "08") && len(cleanReceived) > 13
+	if cleanExpected != cleanReceived && !isLID {
 		return fmt.Errorf("nomor handphone Anda tidak cocok dengan profil (Profil: %s, WA: %s)", cleanExpected, cleanReceived)
 	}
 
