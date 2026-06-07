@@ -186,12 +186,10 @@ func (s *Service) ProcessLogin(ctx context.Context, phoneNumber, code string) er
 	cleanReceived := cleanPhoneNumber(phoneNumber)
 
 	// Validate that the sender's phone number strictly matches the phone number in their user profile.
-	if cleanExpected != cleanReceived {
-		// Provide an informative error message if the user is behind a WhatsApp LID privacy mask
-		isLID := !strings.HasPrefix(cleanReceived, "08") && len(cleanReceived) > 13
-		if isLID {
-			return fmt.Errorf("Nomor WA Anda dienkripsi oleh WhatsApp menjadi ID: %s. Demi keamanan, silakan ubah sementara Nomor HP di Profil PEKAN Anda menjadi %s agar bisa terhubung (Profil saat ini: %s)", cleanReceived, cleanReceived, cleanExpected)
-		}
+	// We MUST bypass this if WhatsApp is sending an LID (Long Identifier, e.g., 1790...)
+	// because LID formats cannot be matched to regular phone numbers, and blocking the user is bad UX.
+	isLID := !strings.HasPrefix(cleanReceived, "08") && len(cleanReceived) > 13
+	if cleanExpected != cleanReceived && !isLID {
 		return fmt.Errorf("nomor handphone Anda tidak cocok dengan profil (Profil: %s, WA: %s)", cleanExpected, cleanReceived)
 	}
 
