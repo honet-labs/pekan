@@ -445,9 +445,11 @@ func (r *RepositoryPG) GetFinancialContext(ctx context.Context, tenantID, userID
 
 		// 3. Get active budgets with spent_amount_minor calculated on the fly
 		const budgetQ = `
-			SELECT b.name, COALESCE(c.name, 'Semua Kategori') as category_name, b.amount_limit_minor, COALESCE(spent.spent_amount_minor, 0) as spent_amount_minor
+			SELECT b.name, 
+			       COALESCE((SELECT string_agg(c.name, ', ') FROM finance_categories c WHERE c.id::text = ANY(string_to_array(b.category_id, ','))), 'Semua Kategori') as category_name, 
+			       b.amount_limit_minor, 
+			       COALESCE(spent.spent_amount_minor, 0) as spent_amount_minor
 			FROM finance_budgets b
-			LEFT JOIN finance_categories c ON b.category_id = c.id
 			LEFT JOIN LATERAL (
 				SELECT COALESCE(SUM(t.amount_minor), 0) AS spent_amount_minor
 				FROM finance_transactions t
@@ -456,11 +458,11 @@ func (r *RepositoryPG) GetFinancialContext(ctx context.Context, tenantID, userID
 				  AND t.transaction_date >= b.start_date
 				  AND (b.end_date IS NULL OR t.transaction_date <= b.end_date)
 				  AND (
-					  b.category_id IS NULL 
-					  OR t.category_id = b.category_id
+					  b.category_id IS NULL OR b.category_id = ''
+					  OR t.category_id::text = ANY(string_to_array(b.category_id, ','))
 					  OR t.category_id IN (
 						  WITH RECURSIVE cat_tree AS (
-							  SELECT id FROM finance_categories WHERE parent_id = b.category_id
+							  SELECT id FROM finance_categories WHERE parent_id::text = ANY(string_to_array(b.category_id, ','))
 							  UNION ALL
 							  SELECT cc.id FROM finance_categories cc JOIN cat_tree ct ON cc.parent_id = ct.id
 						  )

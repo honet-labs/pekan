@@ -178,7 +178,7 @@ SELECT
   b.id,
   b.name,
   b.category_id,
-  c.name AS category_name,
+  COALESCE((SELECT string_agg(c.name, ', ') FROM finance_categories c WHERE c.id::text = ANY(string_to_array(b.category_id, ',')) AND c.tenant_id = b.tenant_id), 'Semua Kategori') AS category_name,
   b.amount_limit_minor,
   b.currency,
   b.period,
@@ -191,7 +191,6 @@ SELECT
   END AS status,
   b.updated_at
 FROM finance_budgets b
-LEFT JOIN finance_categories c ON c.id = b.category_id AND c.tenant_id = b.tenant_id
 WHERE %s
 ORDER BY b.updated_at DESC`, strings.Join(clauses, " AND "))
 
