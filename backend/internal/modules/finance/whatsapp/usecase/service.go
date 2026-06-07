@@ -377,6 +377,11 @@ func (s *Service) parseTransactionWithLLM(ctx context.Context, message string) (
 		return nil, fmt.Errorf("AI Provider API key not configured")
 	}
 
+	// Normalize anthropic/claude aliases
+	if providerCode == "claude" {
+		providerCode = "anthropic"
+	}
+
 	modelName, _ := s.settings.GetGlobalSettingRaw(ctx, "receipt_model_" + providerCode)
 	if modelName == "" {
 		switch providerCode {
@@ -433,6 +438,45 @@ func (s *Service) parseTransactionWithLLM(ctx context.Context, message string) (
 			return nil, fmt.Errorf("gemini returned no content candidates")
 		}
 		jsonText = parsed.Candidates[0].Content.Parts[0].Text
+	} else if providerCode == "anthropic" {
+		url := "https://api.anthropic.com/v1/messages"
+		payload := map[string]any{
+			"model":      modelName,
+			"max_tokens": 2048,
+			"system":     parseTransactionPrompt(todayDate),
+			"messages": []any{
+				map[string]any{"role": "user", "content": fmt.Sprintf("User Message: %q", message)},
+			},
+		}
+		body, _ := json.Marshal(payload)
+		req, _ := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+		req.Header.Set("x-api-key", apiKey)
+		req.Header.Set("anthropic-version", "2023-06-01")
+		req.Header.Set("Content-Type", "application/json")
+		
+		resp, err := client.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+		
+		if resp.StatusCode != http.StatusOK {
+			raw, _ := io.ReadAll(resp.Body)
+			return nil, fmt.Errorf("anthropic error (status %d): %s", resp.StatusCode, string(raw))
+		}
+		
+		var parsed struct {
+			Content []struct {
+				Text string `json:"text"`
+			} `json:"content"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
+			return nil, err
+		}
+		if len(parsed.Content) == 0 {
+			return nil, fmt.Errorf("anthropic returned no content")
+		}
+		jsonText = parsed.Content[0].Text
 	} else if providerCode == "openai" || providerCode == "sumopod" || providerCode == "openai_compatible" {
 		baseURL := "https://api.openai.com/v1"
 		if providerCode == "sumopod" {
@@ -854,6 +898,10 @@ func (s *Service) generateInteractiveResponseWithLLM(ctx context.Context, messag
 		}
 	}
 	providerCode = strings.ToLower(strings.TrimSpace(providerCode))
+	// Normalize anthropic/claude aliases
+	if providerCode == "claude" {
+		providerCode = "anthropic"
+	}
 
 	apiKey, err := s.settings.GetGlobalSettingRaw(ctx, "receipt_api_key_" + providerCode)
 	if err != nil || apiKey == "" {
@@ -970,7 +1018,7 @@ func (s *Service) generateInteractiveResponseWithLLM(ctx context.Context, messag
 			return "", fmt.Errorf("openai-compatible returned empty choices")
 		}
 		return parsed.Choices[0].Message.Content, nil
-	} else if providerCode == "claude" {
+	} else if providerCode == "anthropic" {
 		url := "https://api.anthropic.com/v1/messages"
 		payload := map[string]any{
 			"model":      modelName,
@@ -1194,6 +1242,10 @@ func (s *Service) scanReceiptWithLLM(ctx context.Context, content []byte, mimeTy
 		providerCode = "gemini" // fallback
 	}
 	providerCode = strings.ToLower(strings.TrimSpace(providerCode))
+	// Normalize anthropic/claude aliases
+	if providerCode == "claude" {
+		providerCode = "anthropic"
+	}
 
 	apiKey, err := s.settings.GetGlobalSettingRaw(ctx, "receipt_api_key_" + providerCode)
 	if err != nil || apiKey == "" {
@@ -1282,6 +1334,52 @@ Do not include markdown fences. Return PURE JSON only.`
 			return parsedReceipt{}, fmt.Errorf("gemini returned no content candidates")
 		}
 		jsonText = parsed.Candidates[0].Content.Parts[0].Text
+	} else if providerCode == "anthropic" {
+		url := "https://api.anthropic.com/v1/messages"
+		payload := map[string]any{
+			"model":      modelName,
+			"max_tokens": 2048,
+			"system":     prompt,
+			"messages": []any{
+				map[string]any{"role": "user", "content": []any{
+					map[string]any{"type": "text", "text": "Read this shopping receipt image and extract the fields."},
+					map[string]any{"type": "image", "source": map[string]any{
+						"type":       "base64",
+						"media_type": mimeType,
+						"data":       base64.StdEncoding.EncodeToString(content),
+					}},
+				}},
+			},
+		}
+		body, _ := json.Marshal(payload)
+		req, _ := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+		req.Header.Set("x-api-key", apiKey)
+		req.Header.Set("anthropic-version", "2023-06-01")
+		req.Header.Set("Content-Type", "application/json")
+		
+		resp, err := client.Do(req)
+		if err != nil {
+			return parsedReceipt{}, err
+		}
+		defer resp.Body.Close()
+		
+		if resp.StatusCode != http.StatusOK {
+			raw, _ := io.ReadAll(resp.Body)
+			return parsedReceipt{}, fmt.Errorf("anthropic error (status %d): %s", resp.StatusCode, string(raw))
+		}
+		
+		var parsed struct {
+			Content []struct {
+				Text string `json:"text"`
+			} `json:"content"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
+			return parsedReceipt{}, err
+		}
+		if len(parsed.Content) == 0 {
+			return parsedReceipt{}, fmt.Errorf("anthropic returned no content")
+		}
+		jsonText = parsed.Content[0].Text
 	} else if providerCode == "openai" || providerCode == "sumopod" || providerCode == "openai_compatible" {
 		baseURL := "https://api.openai.com/v1"
 		if providerCode == "sumopod" {
