@@ -26,7 +26,7 @@ func withSchema(ctx context.Context, db *sql.DB, schemaName string, fn func(tx *
 	}
 	defer tx.Rollback()
 
-	_, err = tx.ExecContext(ctx, fmt.Sprintf("SET LOCAL search_path TO %s, public", schemaName))
+	_, err = tx.ExecContext(ctx, fmt.Sprintf("SET LOCAL search_path TO \"%s\", public", schemaName))
 	if err != nil {
 		return fmt.Errorf("failed to set search_path: %w", err)
 	}

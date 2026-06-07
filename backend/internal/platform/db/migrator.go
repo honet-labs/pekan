@@ -24,7 +24,7 @@ func (m *Migrator) MigrateTenantSchema(ctx context.Context, schemaName string, m
 	log.Printf("[Migrator] Starting migration for schema: %s", schemaName)
 
 	// 1. Create Schema
-	if _, err := m.db.ExecContext(ctx, fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", schemaName)); err != nil {
+	if _, err := m.db.ExecContext(ctx, fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS \"%s\"", schemaName)); err != nil {
 		return fmt.Errorf("failed to create schema %s: %w", schemaName, err)
 	}
 
@@ -37,7 +37,7 @@ func (m *Migrator) MigrateTenantSchema(ctx context.Context, schemaName string, m
 	defer tx.Rollback()
 
 	// Set search_path for the transaction
-	if _, err := tx.ExecContext(ctx, fmt.Sprintf("SET LOCAL search_path TO %s", schemaName)); err != nil {
+	if _, err := tx.ExecContext(ctx, fmt.Sprintf("SET LOCAL search_path TO \"%s\"", schemaName)); err != nil {
 		return fmt.Errorf("failed to set search_path to %s: %w", schemaName, err)
 	}
 
