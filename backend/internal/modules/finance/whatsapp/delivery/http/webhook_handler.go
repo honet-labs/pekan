@@ -251,9 +251,6 @@ func (h *WebhookHandler) HandleIncomingMessage(w http.ResponseWriter, r *http.Re
 	} else if strings.HasPrefix(cleanMsg, "wa-") && len(cleanMsg) == 9 {
 		loginCode = strings.ToUpper(strings.TrimSpace(message))
 		isOtpLogin = true
-	} else if strings.HasPrefix(cleanMsg, "confirm-wa-") && len(cleanMsg) == 17 {
-		loginCode = strings.ToUpper(strings.TrimSpace(message))
-		isOtpLogin = true
 	}
 
 	if isOtpLogin {
