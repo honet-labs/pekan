@@ -161,14 +161,22 @@ func (s *Service) ConnectDirect(ctx context.Context, tenantID, userID, phoneNumb
 
 // ProcessLogin is called by the Webhook when a user sends !login <CODE>
 func (s *Service) ProcessLogin(ctx context.Context, phoneNumber, code string) error {
+	// If the code is confirm-wa-xxxxxx, extract the actual code
+	isConfirmed := false
+	actualCode := code
+	if strings.HasPrefix(strings.ToUpper(code), "CONFIRM-") {
+		isConfirmed = true
+		actualCode = strings.TrimPrefix(strings.ToUpper(code), "CONFIRM-")
+	}
+
 	// 1. Validate the code
-	token, err := s.repo.GetOTPToken(ctx, code)
+	token, err := s.repo.GetOTPToken(ctx, actualCode)
 	if err != nil {
 		return err // ErrTokenNotFound
 	}
 	
 	if time.Now().UTC().After(token.ExpiresAt) {
-		_ = s.repo.DeleteOTPToken(ctx, code)
+		_ = s.repo.DeleteOTPToken(ctx, actualCode)
 		return domain.ErrTokenNotFound
 	}
 
@@ -185,12 +193,28 @@ func (s *Service) ProcessLogin(ctx context.Context, phoneNumber, code string) er
 	cleanExpected := cleanPhoneNumber(expectedPhone)
 	cleanReceived := cleanPhoneNumber(phoneNumber)
 
-	// Validate that the sender's phone number strictly matches the phone number in their user profile.
-	// We MUST bypass this if WhatsApp is sending an LID (Long Identifier, e.g., 1790...)
-	// because LID formats cannot be matched to regular phone numbers, and blocking the user is bad UX.
-	isLID := !strings.HasPrefix(cleanReceived, "08") && len(cleanReceived) > 13
-	if cleanExpected != cleanReceived && !isLID {
-		return fmt.Errorf("nomor handphone Anda tidak cocok dengan profil (Profil: %s, WA: %s)", cleanExpected, cleanReceived)
+	// Determine if the received phone number is a WhatsApp LID (Long Identifier) privacy mask.
+	// Typically, LIDs do not start with a normal country/local code format (e.g. 08...) and are longer than 13 digits.
+	isLIDReceived := !strings.HasPrefix(cleanReceived, "08") && len(cleanReceived) > 13
+
+	if cleanExpected != cleanReceived {
+		// If the login is already out-of-band confirmed via the user's primary registered WhatsApp number, allow it.
+		if isConfirmed {
+			// Bypassed: successfully confirmed
+		} else if isLIDReceived {
+			// If it's an LID, we cannot compare it directly. To prevent unauthorized hijacking (e.g. User B trying to use User A's code),
+			// we send a confirmation challenge directly to User A's primary registered WhatsApp number (which only they can receive).
+			confirmMsg := fmt.Sprintf("🔒 *Konfirmasi Hubungkan Akun PEKAN*\n\nSebuah WhatsApp dengan ID Privasi `%s` mencoba menghubungkan ke akun PEKAN Anda.\n\nJika ini adalah Anda, silakan salin dan kirim kembali pesan di bawah ini ke bot PEKAN:\n\nconfirm-%s", cleanReceived, actualCode)
+			
+			// Send the challenge
+			_ = s.SendWhatsAppMessage(ctx, expectedPhone, confirmMsg)
+
+			// Return an error to the LID sender instructing them to copy-paste the confirmation challenge
+			return fmt.Errorf("Nomor WA Anda terdeteksi menggunakan ID Privasi (%s). Kami telah mengirimkan pesan verifikasi ke nomor HP utama di profil Anda (%s). Silakan kirim pesan konfirmasi tersebut ke sini agar dapat terhubung", cleanReceived, expectedPhone)
+		} else {
+			// If it's a normal number (like User B trying to use User A's code), block them immediately
+			return fmt.Errorf("nomor handphone Anda tidak cocok dengan profil (Profil: %s, WA: %s)", cleanExpected, cleanReceived)
+		}
 	}
 
 	// 2. Delete any existing sessions for this phone number or user to allow seamless re-linking/switching
@@ -212,7 +236,7 @@ func (s *Service) ProcessLogin(ctx context.Context, phoneNumber, code string) er
 	}
 
 	// 4. Cleanup the used token
-	_ = s.repo.DeleteOTPToken(ctx, code)
+	_ = s.repo.DeleteOTPToken(ctx, actualCode)
 
 	return nil
 }

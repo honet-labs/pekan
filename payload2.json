@@ -1,0 +1,1 @@
+{"config": {"webhooks": [{"url": "https://pekan.honet.web.id/api/v1/webhook/whatsapp", "events": ["message"]}]}}  
