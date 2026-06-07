@@ -295,7 +295,7 @@ func (s *Service) parseTransactionWithLLM(ctx context.Context, message string) (
 
 	todayDate := time.Now().Format("2006-01-02")
 	var jsonText string
-	client := &http.Client{Timeout: 15 * time.Second}
+	client := &http.Client{Timeout: 45 * time.Second}
 
 	if providerCode == "gemini" {
 		url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", modelName, apiKey)
@@ -407,6 +407,15 @@ func (s *Service) parseTransactionWithLLM(ctx context.Context, message string) (
 	
 	if start >= 0 && end > start {
 		jsonText = jsonText[start : end+1]
+	}
+
+	jsonText = strings.TrimSpace(jsonText)
+	// Handle raw multiple blocks like []\n[]
+	if strings.Contains(jsonText, "]\n[") || strings.Contains(jsonText, "]\r\n[") {
+		idx := strings.Index(jsonText, "]")
+		if idx >= 0 {
+			jsonText = jsonText[:idx+1]
+		}
 	}
 
 	var out []parsedTransaction
