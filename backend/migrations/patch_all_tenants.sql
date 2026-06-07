@@ -14,6 +14,22 @@ BEGIN
         EXECUTE format('
             DO $inner$ 
             BEGIN 
+                -- Ensure table exists first
+                CREATE TABLE IF NOT EXISTS %1$I.finance_transaction_items (
+                    id UUID PRIMARY KEY,
+                    transaction_id UUID NOT NULL REFERENCES %1$I.finance_transactions(id) ON DELETE CASCADE,
+                    item_name VARCHAR(255) NOT NULL,
+                    quantity DECIMAL(12,2) NOT NULL DEFAULT 1,
+                    price_minor BIGINT NOT NULL DEFAULT 0,
+                    discount_minor BIGINT NOT NULL DEFAULT 0,
+                    total_minor BIGINT NOT NULL DEFAULT 0,
+                    notes TEXT NULL,
+                    created_by UUID NOT NULL DEFAULT ''00000000-0000-0000-0000-000000000000''::uuid,
+                    updated_by UUID NOT NULL DEFAULT ''00000000-0000-0000-0000-000000000000''::uuid,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                );
+
                 -- Rename price_per_unit_minor to price_minor if it exists
                 IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=''%1$I'' AND table_name=''finance_transaction_items'' AND column_name=''price_per_unit_minor'') THEN
                     ALTER TABLE %1$I.finance_transaction_items RENAME COLUMN price_per_unit_minor TO price_minor;
