@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -35,6 +36,37 @@ func logJSON(level, event string, fields map[string]any) {
 }
 
 func (h *WebhookHandler) HandleIncomingMessage(w http.ResponseWriter, r *http.Request) {
+	// Webhook token validation
+	webhookSecret := os.Getenv("WHATSAPP_WEBHOOK_SECRET")
+	if webhookSecret == "" {
+		webhookSecret = h.service.GetWebhookSecret(r.Context())
+	}
+
+	if webhookSecret != "" {
+		incomingToken := r.URL.Query().Get("token")
+		if incomingToken == "" {
+			incomingToken = r.Header.Get("X-Webhook-Token")
+		}
+		if incomingToken == "" {
+			authHeader := r.Header.Get("Authorization")
+			if strings.HasPrefix(authHeader, "Bearer ") {
+				incomingToken = strings.TrimPrefix(authHeader, "Bearer ")
+			} else {
+				incomingToken = authHeader
+			}
+		}
+
+		if incomingToken == "" || incomingToken != webhookSecret {
+			logJSON("error", "webhook_unauthorized", map[string]any{
+				"ip":  r.RemoteAddr,
+				"url": r.URL.String(),
+			})
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte("Unauthorized webhook request"))
+			return
+		}
+	}
+
 	var sender, message string
 	var fromJid string
 	var mediaURL string

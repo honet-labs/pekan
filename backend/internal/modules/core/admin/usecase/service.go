@@ -19,6 +19,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -115,6 +116,11 @@ type BootstrapTenantInput struct {
 }
 
 func (s *Service) BootstrapTenant(ctx context.Context, in BootstrapTenantInput) error {
+	in.TenantCode = strings.ToUpper(strings.TrimSpace(in.TenantCode))
+	if matched, _ := regexp.MatchString(`^[A-Z0-9_-]{3,20}$`, in.TenantCode); !matched {
+		return fmt.Errorf("invalid tenant code format: must be 3-20 alphanumeric characters, underscores or dashes")
+	}
+
 	tenantID := uuid.NewString()
 	userID := uuid.NewString()
 	membershipID := uuid.NewString()
@@ -399,6 +405,11 @@ func (s *Service) GetGlobalSettingRaw(ctx context.Context, key string) (string, 
 
 // BootstrapTenantDirect creates a tenant using an already-hashed password (used by self-registration flow).
 func (s *Service) BootstrapTenantDirect(ctx context.Context, tenantCode, tenantName, adminEmail, adminName, passwordHash string) error {
+	tenantCode = strings.ToUpper(strings.TrimSpace(tenantCode))
+	if matched, _ := regexp.MatchString(`^[A-Z0-9_-]{3,20}$`, tenantCode); !matched {
+		return fmt.Errorf("invalid tenant code format: must be 3-20 alphanumeric characters, underscores or dashes")
+	}
+
 	tenantID := uuid.NewString()
 	userID := uuid.NewString()
 	membershipID := uuid.NewString()

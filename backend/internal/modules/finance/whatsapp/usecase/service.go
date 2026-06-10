@@ -1479,4 +1479,10 @@ func (s *Service) GetWhatsAppBotNumber(ctx context.Context) string {
 	return strings.TrimSpace(num)
 }
 
+func (s *Service) GetWebhookSecret(ctx context.Context) string {
+	secret, _ := s.settings.GetGlobalSettingRaw(ctx, "whatsapp_webhook_secret")
+	return strings.TrimSpace(secret)
+}
+
+
 
