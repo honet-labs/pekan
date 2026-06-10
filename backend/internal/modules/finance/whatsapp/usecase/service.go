@@ -1123,8 +1123,8 @@ func waBotSystemPrompt(finContext *domain.FinancialContext, instructions string)
 	return sb.String()
 }
 
-func (s *Service) EnqueueMessage(ctx context.Context, phoneNumber, message string, tenantID, userID *string) (string, error) {
-	return s.repo.EnqueueMessage(ctx, phoneNumber, message, tenantID, userID)
+func (s *Service) EnqueueMessage(ctx context.Context, phoneNumber, message string, tenantID, userID *string, messageID string) (string, error) {
+	return s.repo.EnqueueMessage(ctx, phoneNumber, message, tenantID, userID, messageID)
 }
 
 func (s *Service) StartQueueWorker(ctx context.Context, numWorkers int) {

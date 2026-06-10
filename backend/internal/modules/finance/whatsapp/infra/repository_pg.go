@@ -496,12 +496,12 @@ func (r *RepositoryPG) GetFinancialContext(ctx context.Context, tenantID, userID
 	return &finContext, nil
 }
 
-func (r *RepositoryPG) EnqueueMessage(ctx context.Context, phoneNumber, message string, tenantID, userID *string) (string, error) {
+func (r *RepositoryPG) EnqueueMessage(ctx context.Context, phoneNumber, message string, tenantID, userID *string, messageID string) (string, error) {
 	var queueID string
 	err := db.WithTenantTx(ctx, r.conn, func(tx *sql.Tx) error {
 		const q = `
-INSERT INTO public.whatsapp_bot_queue (phone_number, message, status, tenant_id, user_id, received_at)
-VALUES ($1, $2, 'pending', $3, $4, NOW())
+INSERT INTO public.whatsapp_bot_queue (phone_number, message, status, tenant_id, user_id, received_at, message_id)
+VALUES ($1, $2, 'pending', $3, $4, NOW(), $5)
 RETURNING id`
 		var tID, uID sql.NullString
 		if tenantID != nil && *tenantID != "" {
@@ -510,9 +510,20 @@ RETURNING id`
 		if userID != nil && *userID != "" {
 			uID = sql.NullString{String: *userID, Valid: true}
 		}
-		return tx.QueryRowContext(ctx, q, phoneNumber, message, tID, uID).Scan(&queueID)
+		var msgID sql.NullString
+		if messageID != "" {
+			msgID = sql.NullString{String: messageID, Valid: true}
+		}
+		return tx.QueryRowContext(ctx, q, phoneNumber, message, tID, uID, msgID).Scan(&queueID)
 	})
-	return queueID, err
+
+	if err != nil {
+		if strings.Contains(err.Error(), "unique constraint") || strings.Contains(err.Error(), "23505") {
+			return "", domain.ErrDuplicateMessage
+		}
+		return "", err
+	}
+	return queueID, nil
 }
 
 func (r *RepositoryPG) GetPendingQueueItems(ctx context.Context, limit int) ([]domain.QueueItem, error) {

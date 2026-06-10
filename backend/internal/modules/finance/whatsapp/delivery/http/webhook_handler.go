@@ -1,7 +1,9 @@
 package http
 
 import (
+	"crypto/md5"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"pekan/backend/internal/modules/finance/whatsapp/domain"
 	"pekan/backend/internal/modules/finance/whatsapp/usecase"
 )
 
@@ -71,6 +74,7 @@ func (h *WebhookHandler) HandleIncomingMessage(w http.ResponseWriter, r *http.Re
 	var fromJid string
 	var mediaURL string
 	var participant string
+	var messageID string
 	var raw map[string]interface{}
 
 	// Handle Form Data
@@ -82,6 +86,7 @@ func (h *WebhookHandler) HandleIncomingMessage(w http.ResponseWriter, r *http.Re
 			message = r.FormValue("message")
 			if message == "" { message = r.FormValue("text") }
 			mediaURL = r.FormValue("url")
+			messageID = r.FormValue("id")
 		}
 	} else {
 		bodyBytes, err := io.ReadAll(r.Body)
@@ -102,6 +107,9 @@ func (h *WebhookHandler) HandleIncomingMessage(w http.ResponseWriter, r *http.Re
 				if u, ok := raw["url"].(string); ok {
 					mediaURL = u
 				}
+				if idVal, ok := raw["id"]; ok {
+					messageID = fmt.Sprintf("%v", idVal)
+				}
 				if g, ok := raw["group"].(string); ok && g != "" {
 					fromJid = g
 					if m, ok := raw["member"].(string); ok && m != "" {
@@ -117,6 +125,9 @@ func (h *WebhookHandler) HandleIncomingMessage(w http.ResponseWriter, r *http.Re
 						if remoteJid, ok := keyObj["remoteJid"].(string); ok {
 							sender = strings.Split(remoteJid, "@")[0]
 							fromJid = remoteJid
+						}
+						if idVal, ok := keyObj["id"].(string); ok {
+							messageID = idVal
 						}
 					}
 					if msgObj, ok := dataObj["message"].(map[string]interface{}); ok {
@@ -155,6 +166,9 @@ func (h *WebhookHandler) HandleIncomingMessage(w http.ResponseWriter, r *http.Re
 						sender = strings.Split(from, "@")[0]
 						fromJid = from
 					}
+					if idVal, ok := payload["id"].(string); ok {
+						messageID = idVal
+					}
 					if body, ok := payload["body"].(string); ok {
 						message = body
 					}
@@ -184,6 +198,9 @@ func (h *WebhookHandler) HandleIncomingMessage(w http.ResponseWriter, r *http.Re
 										if msgMap, ok := messagesObj[0].(map[string]interface{}); ok {
 											if from, ok := msgMap["from"].(string); ok {
 												sender = from
+											}
+											if idVal, ok := msgMap["id"].(string); ok {
+												messageID = idVal
 											}
 											if textMap, ok := msgMap["text"].(map[string]interface{}); ok {
 												if body, ok := textMap["body"].(string); ok {
@@ -351,6 +368,13 @@ func (h *WebhookHandler) HandleIncomingMessage(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// Generate fallback messageID if empty to prevent fast-retry duplicates
+	if messageID == "" && sender != "" && message != "" {
+		timeBucket := time.Now().Unix() / 15
+		hashInput := fmt.Sprintf("%s_%s_%d", sender, message, timeBucket)
+		messageID = fmt.Sprintf("fb_%x", md5.Sum([]byte(hashInput)))
+	}
+
 	// 2. Not a login command. Push to asynchronous database queue.
 	var tenantID *string
 	var userID *string
@@ -362,8 +386,14 @@ func (h *WebhookHandler) HandleIncomingMessage(w http.ResponseWriter, r *http.Re
 		userID = &uID
 	}
 
-	_, qErr := h.service.EnqueueMessage(r.Context(), recipient, message, tenantID, userID)
+	_, qErr := h.service.EnqueueMessage(r.Context(), recipient, message, tenantID, userID, messageID)
 	if qErr != nil {
+		if errors.Is(qErr, domain.ErrDuplicateMessage) {
+			logJSON("info", "duplicate_message_ignored", map[string]any{"sender": sender, "message_id": messageID})
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
 		logJSON("error", "enqueue_failed", map[string]any{"sender": sender, "error": qErr.Error()})
 		// Fallback to sync processing if database enqueue fails
 		var tIDVal, uIDVal string

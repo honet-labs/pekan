@@ -10,6 +10,7 @@ var (
 	ErrTokenNotFound    = errors.New("whatsapp otp token not found or expired")
 	ErrSessionNotFound  = errors.New("whatsapp session not found")
 	ErrAlreadyConnected = errors.New("whatsapp number already connected to an account")
+	ErrDuplicateMessage = errors.New("duplicate whatsapp message")
 )
 
 type OTPToken struct {
@@ -107,7 +108,7 @@ type Repository interface {
 	GetFinancialContext(ctx context.Context, tenantID, userID, tenantCode string) (*FinancialContext, error)
 
 	// Asynchronous Queue Operations
-	EnqueueMessage(ctx context.Context, phoneNumber, message string, tenantID, userID *string) (string, error)
+	EnqueueMessage(ctx context.Context, phoneNumber, message string, tenantID, userID *string, messageID string) (string, error)
 	GetPendingQueueItems(ctx context.Context, limit int) ([]QueueItem, error)
 	UpdateQueueItemStatus(ctx context.Context, id string, status string, replyMessage *string, errorMessage *string, latencyMs *int) error
 }
