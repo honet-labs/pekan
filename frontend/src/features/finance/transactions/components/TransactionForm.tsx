@@ -137,8 +137,11 @@ export function TransactionForm({
     const receiptDiscount = Number(form.receipt_discount_minor || 0);
     let nextAmount = form.amount_minor;
     if (subtotal > 0 || tax > 0 || serviceCharge > 0 || receiptDiscount > 0) {
-      const base = subtotal > 0 ? subtotal : itemsTotal;
-      nextAmount = Math.max(base + tax + serviceCharge - receiptDiscount, 0);
+      if (subtotal > 0) {
+        nextAmount = Math.max(subtotal + serviceCharge - receiptDiscount, 0);
+      } else {
+        nextAmount = Math.max(itemsTotal + tax + serviceCharge - receiptDiscount, 0);
+      }
     } else if (items.length > 0) {
       nextAmount = itemsTotal;
     }

@@ -702,7 +702,11 @@ func buildDraftSuggestion(ex domain.ReceiptExtraction) DraftTransactionSuggestio
 	receiptDiscountMinor := convertToMinor(currency, ex.Discount)
 	amountMinor := convertToMinor(currency, ex.Total)
 	if amountMinor <= 0 {
-		amountMinor = subtotalMinor + taxMinor + serviceMinor - receiptDiscountMinor
+		if convertToMinor(currency, ex.Subtotal) > 0 {
+			amountMinor = subtotalMinor + serviceMinor - receiptDiscountMinor
+		} else {
+			amountMinor = subtotalMinor + taxMinor + serviceMinor - receiptDiscountMinor
+		}
 		if amountMinor < 0 {
 			amountMinor = 0
 		}
