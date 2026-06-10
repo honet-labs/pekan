@@ -243,7 +243,6 @@ func NewServer(cfg config.Config) (*Server, error) {
 	router.Use(middleware.SecurityHeaders)
 	router.Use(middleware.CORS(cfg.CORSAllowedOrigins))
 	router.Use(middleware.RequestBodyLimit(cfg.RequestBodyMaxBytes))
-	router.Use(middleware.SanitizeInput)
 	router.Use(middleware.Recovery)
 	router.Use(chimw.StripSlashes)
 
