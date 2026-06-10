@@ -1158,6 +1158,12 @@ func (s *Service) processNextQueueItem(ctx context.Context) {
 		return
 	}
 
+	s.logJSON("info", "queue_item_processing", map[string]any{
+		"id":           item.ID,
+		"phone_number": item.PhoneNumber,
+		"message":      item.Message,
+	})
+
 	startTime := time.Now()
 	var replyMsg string
 	var errMsg string
@@ -1182,6 +1188,13 @@ func (s *Service) processNextQueueItem(ctx context.Context) {
 		if statusErr != nil {
 			s.logJSON("error", "queue_status_update_failed", map[string]any{"id": item.ID, "error": statusErr.Error()})
 		}
+
+		s.logJSON("error", "queue_item_processed_failed", map[string]any{
+			"id":           item.ID,
+			"phone_number": item.PhoneNumber,
+			"latency_ms":   latency,
+			"error":        errMsg,
+		})
 		
 		// Send a friendly error message to the user on failure
 		fallback := "Maaf, terjadi kesalahan saat memproses pesan Anda. Asisten AI kami sedang mengalami kendala jaringan. Silakan coba kirimkan kembali pesan Anda dalam beberapa saat lagi."
@@ -1195,12 +1208,25 @@ func (s *Service) processNextQueueItem(ctx context.Context) {
 		if err != nil {
 			errMsg = fmt.Sprintf("failed to send: %v", err)
 			_ = s.repo.UpdateQueueItemStatus(ctx, item.ID, "failed", &replyMsg, &errMsg, &latency)
+			
+			s.logJSON("error", "queue_item_send_failed", map[string]any{
+				"id":           item.ID,
+				"phone_number": item.PhoneNumber,
+				"latency_ms":   latency,
+				"error":        errMsg,
+			})
 			return
 		}
 	}
 
 	// Success
 	_ = s.repo.UpdateQueueItemStatus(ctx, item.ID, "success", &replyMsg, nil, &latency)
+	s.logJSON("info", "queue_item_processed_success", map[string]any{
+		"id":           item.ID,
+		"phone_number": item.PhoneNumber,
+		"latency_ms":   latency,
+		"reply":        replyMsg,
+	})
 }
 
 func (s *Service) GetSessionByPhone(ctx context.Context, phoneNumber string) (domain.Session, error) {

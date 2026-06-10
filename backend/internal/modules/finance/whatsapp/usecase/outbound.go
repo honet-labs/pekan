@@ -19,14 +19,31 @@ func (s *Service) SendWhatsAppMessage(ctx context.Context, phone, message string
 		provider = "wa_waha" // Default fallback
 	}
 
+	var err error
 	switch provider {
 	case "wa_fonnte":
-		return s.sendWAViaFonnte(ctx, phone, message)
+		err = s.sendWAViaFonnte(ctx, phone, message)
 	case "wa": // Meta/Official
-		return s.sendWAViaMeta(ctx, phone, message)
+		err = s.sendWAViaMeta(ctx, phone, message)
 	default:
-		return s.sendWAViaWAHA(ctx, phone, message)
+		err = s.sendWAViaWAHA(ctx, phone, message)
 	}
+
+	if err != nil {
+		s.logJSON("error", "send_whatsapp_message_failed", map[string]any{
+			"phone_number": phone,
+			"provider":     provider,
+			"error":        err.Error(),
+		})
+		return err
+	}
+
+	s.logJSON("info", "send_whatsapp_message_success", map[string]any{
+		"phone_number": phone,
+		"provider":     provider,
+		"message":      message,
+	})
+	return nil
 }
 
 func (s *Service) sendWAViaWAHA(ctx context.Context, phone, message string) error {
