@@ -38,8 +38,8 @@ export function ReminderCreatePage(): JSX.Element {
       await create({
         title: form.title,
         description: form.description || undefined,
-        amount_minor: form.amount_minor || undefined,
-        currency: form.currency || undefined,
+        amount_minor: form.amount_minor,
+        currency: form.currency,
         due_date: form.due_date,
         repeat_interval: form.repeat_interval,
         status: form.status,
@@ -92,8 +92,10 @@ export function ReminderCreatePage(): JSX.Element {
               <input 
                 className="input-control" 
                 type="number" 
+                min="0"
                 value={form.amount_minor} 
                 onChange={(event) => setForm({ ...form, amount_minor: Number(event.target.value) })} 
+                required
                 disabled={saving}
               />
             </label>
@@ -103,6 +105,7 @@ export function ReminderCreatePage(): JSX.Element {
                 className="input-control" 
                 value={form.currency} 
                 onChange={(event) => setForm({ ...form, currency: event.target.value })} 
+                required
                 disabled={saving}
               />
             </label>

@@ -84,8 +84,8 @@ export function ReminderDetailPage(): JSX.Element {
       const payload: ReminderPayload = {
         title: form.title,
         description: form.description || undefined,
-        amount_minor: form.amount_minor || undefined,
-        currency: form.currency || undefined,
+        amount_minor: form.amount_minor,
+        currency: form.currency,
         due_date: form.due_date,
         repeat_interval: form.repeat_interval,
         status: form.status,
@@ -154,11 +154,11 @@ export function ReminderDetailPage(): JSX.Element {
             <div className="form-grid two-col">
               <label className="form-field">
                 {t("reminders.form.amount")}
-                <input className="input-control" type="number" value={form.amount_minor} onChange={(event) => setForm({ ...form, amount_minor: Number(event.target.value) })} />
+                <input className="input-control" type="number" min="0" value={form.amount_minor} onChange={(event) => setForm({ ...form, amount_minor: Number(event.target.value) })} required />
               </label>
               <label className="form-field">
                 {t("reminders.form.currency")}
-                <input className="input-control" value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value })} />
+                <input className="input-control" value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value })} required />
               </label>
             </div>
             <label className="form-field">

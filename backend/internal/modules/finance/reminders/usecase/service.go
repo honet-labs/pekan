@@ -290,13 +290,10 @@ func validateInput(title string, amount *int64, currency *string, dueDate time.T
 	if dueDate.IsZero() {
 		return domain.ErrInvalidDate
 	}
-	if amount != nil && *amount < 0 {
+	if amount == nil || *amount < 0 {
 		return domain.ErrInvalidAmount
 	}
-	if amount != nil && currency == nil {
-		return domain.ErrInvalidCurrency
-	}
-	if currency != nil && len(strings.TrimSpace(*currency)) != 3 {
+	if currency == nil || len(strings.TrimSpace(*currency)) != 3 {
 		return domain.ErrInvalidCurrency
 	}
 	if repeat != "" && !isAllowedRepeat(repeat) {
