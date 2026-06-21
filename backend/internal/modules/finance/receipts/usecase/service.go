@@ -25,6 +25,7 @@ import (
 	_ "image/png"
 
 	"pekan/backend/internal/modules/finance/receipts/domain"
+	"pekan/backend/internal/platform/imageutil"
 	"pekan/backend/internal/platform/storage"
 )
 
@@ -426,10 +427,10 @@ func (s *Service) ScanReceipt(ctx context.Context, in ScanReceiptInput) (ScanRec
 
 	fileKey := fmt.Sprintf("%s/finance/receipt-scan/%s", in.TenantID, scan.ID)
 	
-	// Image Optimization: Resize if too large (> 1.5MB)
+	// Image Optimization: Compress JPEG and PNG using unified imageutil
 	processedContent := in.Content
-	if len(in.Content) > 1500000 && (mimeType == "image/jpeg" || mimeType == "image/png" || mimeType == "image/jpg") {
-		optimized, err := s.optimizeImage(in.Content, mimeType)
+	if mimeType == "image/jpeg" || mimeType == "image/png" || mimeType == "image/jpg" {
+		optimized, err := imageutil.CompressImage(bytes.NewReader(in.Content), mimeType)
 		if err == nil {
 			processedContent = optimized
 		}
@@ -1176,50 +1177,7 @@ func compactProviderError(raw []byte, status int) string {
 	}
 	return fmt.Sprintf("HTTP %d: %s", status, trimmed)
 }
-func (s *Service) optimizeImage(data []byte, mimeType string) ([]byte, error) {
-	img, _, err := image.Decode(bytes.NewReader(data))
-	if err != nil {
-		return nil, err
-	}
 
-	bounds := img.Bounds()
-	width := bounds.Dx()
-	height := bounds.Dy()
-
-	// Max dimension 1600px
-	maxDim := 1600
-	if width <= maxDim && height <= maxDim {
-		// Just re-encode with lower quality if it's already small enough in dimensions but large in file size
-		var buf bytes.Buffer
-		if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 75}); err != nil {
-			return nil, err
-		}
-		return buf.Bytes(), nil
-	}
-
-	var newW, newH int
-	if width > height {
-		newW = maxDim
-		newH = (height * maxDim) / width
-	} else {
-		newH = maxDim
-		newW = (width * maxDim) / height
-	}
-
-	newImg := image.NewRGBA(image.Rect(0, 0, newW, newH))
-	for y := 0; y < newH; y++ {
-		for x := 0; x < newW; x++ {
-			newImg.Set(x, y, img.At(x*width/newW, y*height/newH))
-		}
-	}
-
-	var buf bytes.Buffer
-	if err := jpeg.Encode(&buf, newImg, &jpeg.Options{Quality: 75}); err != nil {
-		return nil, err
-	}
-
-	return buf.Bytes(), nil
-}
 
 type providerWithKey struct {
 	config domain.ProviderConfig
