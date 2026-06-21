@@ -19,10 +19,7 @@ import (
 	"sort"
 	"strings"
 	"time"
-	"image"
-	_ "image/gif"
-	"image/jpeg"
-	_ "image/png"
+
 
 	"pekan/backend/internal/modules/finance/receipts/domain"
 	"pekan/backend/internal/platform/imageutil"
