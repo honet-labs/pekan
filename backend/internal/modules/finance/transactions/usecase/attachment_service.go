@@ -16,6 +16,7 @@ import (
 	"pekan/backend/internal/modules/finance/transactions/domain"
 	receiptDomain "pekan/backend/internal/modules/finance/receipts/domain"
 	"pekan/backend/internal/platform/access"
+	"pekan/backend/internal/platform/imageutil"
 	"pekan/backend/internal/platform/storage"
 )
 
@@ -99,6 +100,25 @@ func (s *AttachmentService) Upload(ctx context.Context, in UploadAttachmentInput
 		return domain.Attachment{}, domain.ErrInvalidFileType
 	}
 
+	// Read with size limit
+	limitedReader := io.LimitReader(replayableStream, maxAttachmentBytes+1)
+	fileBytes, err := io.ReadAll(limitedReader)
+	if err != nil {
+		return domain.Attachment{}, err
+	}
+	if int64(len(fileBytes)) > maxAttachmentBytes {
+		return domain.Attachment{}, domain.ErrFileTooLarge
+	}
+
+	finalBytes := fileBytes
+	if detectedMIME == "image/jpeg" || detectedMIME == "image/png" {
+		compressedBytes, err := imageutil.CompressImage(bytes.NewReader(fileBytes), detectedMIME)
+		if err == nil {
+			finalBytes = compressedBytes
+		}
+	}
+	actualSize := int64(len(finalBytes))
+
 	fileID := uuid.NewString()
 	storedFilename := fileID + "_" + sanitizeFilename(in.OriginalFilename)
 	objectKey := filepath.ToSlash(filepath.Join(
@@ -109,26 +129,15 @@ func (s *AttachmentService) Upload(ctx context.Context, in UploadAttachmentInput
 		storedFilename,
 	))
 
-	sizeLimiter := &io.LimitedReader{
-		R: replayableStream,
-		N: maxAttachmentBytes + 1,
-	}
-
 	putOut, err := s.storage.Put(ctx, storage.PutObjectInput{
 		TenantID:    in.TenantID,
 		Module:      "finance.transactions",
 		ObjectKey:   objectKey,
 		ContentType: detectedMIME,
-		Body:        sizeLimiter,
+		Body:        bytes.NewReader(finalBytes),
 	})
 	if err != nil {
 		return domain.Attachment{}, err
-	}
-
-	actualSize := (maxAttachmentBytes + 1) - sizeLimiter.N
-	if sizeLimiter.N <= 0 {
-		_ = s.storage.Delete(ctx, storage.GetObjectInput{ObjectKey: putOut.ObjectKey})
-		return domain.Attachment{}, domain.ErrFileTooLarge
 	}
 
 	attachment, err := s.repo.CreateAttachmentRecord(ctx, domain.CreateAttachmentRecordInput{
