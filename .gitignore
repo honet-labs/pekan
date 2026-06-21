@@ -23,6 +23,7 @@ backend/data/
 backend/tmp/
 backend/logs/
 backend/dist/
+backend/backend
 backend/backend.exe
 
 # Frontend (Node / React)
@@ -33,6 +34,16 @@ frontend/out/
 .next/
 node_modules/
 
+# Build Artifacts
+*.tsbuildinfo
+
+# Debug / Test Payloads
+payload*.json
+
+# One-off Utility Scripts (local paths)
+frontend/*.ps1
+frontend/*.py
+
 # OS & IDE
 .DS_Store
 Thumbs.db
@@ -40,3 +51,4 @@ Thumbs.db
 .vscode/
 *.sublime-project
 *.sublime-workspace
+
