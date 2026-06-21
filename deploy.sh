@@ -27,6 +27,16 @@ run_remote_cmd() {
     fi
 }
 
+# Run Local CI/CD Gatekeeper Check
+echo "🛡️  Running Local CI/CD Gatekeeper Check..."
+LOCAL_PROJECT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if ! bash "$LOCAL_PROJECT_PATH/local-ci.sh"; then
+    echo "❌ Deployment aborted: Local CI/CD checks failed."
+    exit 1
+fi
+echo "✅ Local CI/CD checks passed. Continuing with deployment..."
+echo ""
+
 echo "📤 [1/6] Verifying file upload..."
 run_remote_cmd "ls -lh /tmp/deploy/PEKAN.tar.gz && echo '✅ File ready'"
 

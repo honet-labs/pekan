@@ -19,6 +19,15 @@ echo "📍 Target: $REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH"
 echo "📦 Source: $LOCAL_PROJECT_PATH"
 echo ""
 
+# Run Local CI/CD Gatekeeper Check
+echo "🛡️  Running Local CI/CD Gatekeeper Check..."
+if ! bash "$LOCAL_PROJECT_PATH/local-ci.sh"; then
+    echo "❌ Deployment aborted: Local CI/CD checks failed."
+    exit 1
+fi
+echo "✅ Local CI/CD checks passed. Continuing with deployment..."
+echo ""
+
 # Step 1: Prepare deployment on local machine
 echo "📋 [STEP 1/4] Preparing deployment..."
 echo "  ✓ Checking backend compilation..."
