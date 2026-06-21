@@ -4,7 +4,7 @@
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-5-646CFF?style=flat-square&logo=vite)](https://vitejs.dev/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15%2B-4169E1?style=flat-square&logo=postgresql)](https://www.postgresql.org/)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](LICENSE)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
 **PEKAN** adalah platform pengelolaan keuangan berskala enterprise/SaaS yang dibangun dengan arsitektur **Clean Architecture & Domain-Driven Design (DDD)**. Memadukan kekuatan **Go (Golang)** di backend dengan **React + Vite** di frontend, serta dilengkapi asisten keuangan cerdas berbasis **AI** melalui integrasi **WhatsApp Chat Bot** dan **OCR Receipt Scanner**.
 
@@ -586,7 +586,7 @@ go test ./tests/... -v
 
 ## Lisensi
 
-Proyek ini dirilis di bawah lisensi **[Apache License 2.0](LICENSE)**. Anda bebas menggunakan, memodifikasi, dan mendistribusikan kode ini baik untuk keperluan komersial maupun non-komersial.
+Proyek ini dirilis di bawah lisensi **[MIT License](LICENSE)**. Anda bebas menggunakan, memodifikasi, dan mendistribusikan kode ini baik untuk keperluan komersial maupun non-komersial.
 
 ---
 
