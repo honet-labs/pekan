@@ -220,6 +220,13 @@ func (s *Service) GetByID(ctx context.Context, tenantID, transactionID string) (
 		return domain.Transaction{}, err
 	}
 	trx.Items = items
+
+	attachmentsMap, err := s.repo.ListAttachmentsByTransactionIDs(ctx, tenantID, []string{transactionID})
+	if err != nil {
+		return domain.Transaction{}, err
+	}
+	trx.Attachments = attachmentsMap[transactionID]
+
 	return trx, nil
 }
 
@@ -266,6 +273,10 @@ func (s *Service) List(ctx context.Context, in ListInput) ([]domain.Transaction,
 	if err != nil {
 		return nil, 0, err
 	}
+	attachmentsMap, err := s.repo.ListAttachmentsByTransactionIDs(ctx, in.TenantID, transactionIDs)
+	if err != nil {
+		return nil, 0, err
+	}
 	for idx := range items {
 		items[idx].SavingsIDs = idMap[items[idx].ID]
 		items[idx].SavingsNames = nameMap[items[idx].ID]
@@ -274,6 +285,7 @@ func (s *Service) List(ctx context.Context, in ListInput) ([]domain.Transaction,
 			return nil, 0, itemErr
 		}
 		items[idx].Items = transactionItems
+		items[idx].Attachments = attachmentsMap[items[idx].ID]
 	}
 	return items, total, nil
 }
@@ -301,6 +313,10 @@ func (s *Service) ListBySavingsID(ctx context.Context, tenantID, savingsID strin
 	if err != nil {
 		return nil, err
 	}
+	attachmentsMap, err := s.repo.ListAttachmentsByTransactionIDs(ctx, tenantID, transactionIDs)
+	if err != nil {
+		return nil, err
+	}
 	for idx := range items {
 		items[idx].SavingsIDs = idMap[items[idx].ID]
 		items[idx].SavingsNames = nameMap[items[idx].ID]
@@ -309,6 +325,7 @@ func (s *Service) ListBySavingsID(ctx context.Context, tenantID, savingsID strin
 			return nil, itemErr
 		}
 		items[idx].Items = transactionItems
+		items[idx].Attachments = attachmentsMap[items[idx].ID]
 	}
 	return items, nil
 }

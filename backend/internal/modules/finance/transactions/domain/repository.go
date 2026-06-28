@@ -33,4 +33,5 @@ type Repository interface {
 	ReplaceItems(ctx context.Context, tenantID, transactionID, actorUserID string, items []TransactionItem) error
 	ListItems(ctx context.Context, tenantID, transactionID string) ([]TransactionItem, error)
 	ListItemsByTransactionIDs(ctx context.Context, tenantID string, transactionIDs []string) (map[string][]TransactionItem, error)
+	ListAttachmentsByTransactionIDs(ctx context.Context, tenantID string, transactionIDs []string) (map[string][]Attachment, error)
 }

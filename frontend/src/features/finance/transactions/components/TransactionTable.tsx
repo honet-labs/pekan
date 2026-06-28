@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Transaction } from "../api/transaction.types";
+import { openTransactionAttachment } from "../api/transaction.api";
 import { useI18n } from "../../../../core/i18n/i18n";
 import { DeleteConfirmModal } from "../../../../core/components/DeleteConfirmModal";
 import { TransactionItemsModal } from "./TransactionItemsModal";
@@ -75,7 +76,40 @@ export function TransactionTable({ items, onDelete }: Props): JSX.Element {
     return merchant || desc || "-";
   };
 
-  const totalColumns = 11;
+  const renderAttachments = (item: Transaction): JSX.Element | string => {
+    if (!Array.isArray(item.attachments) || item.attachments.length === 0) {
+      return "-";
+    }
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+        {item.attachments.map((att) => (
+          <button
+            key={att.id}
+            className="btn btn-ghost-inline btn-sm"
+            type="button"
+            onClick={() => openTransactionAttachment(item.id, att.id).catch(() => undefined)}
+            style={{
+              fontSize: '11px',
+              padding: '4px 8px',
+              borderRadius: '6px',
+              border: '1px solid var(--border)',
+              backgroundColor: 'rgba(255, 255, 255, 0.05)',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              maxWidth: '120px',
+              cursor: 'pointer'
+            }}
+            title={att.original_filename}
+          >
+            📎 {att.original_filename}
+          </button>
+        ))}
+      </div>
+    );
+  };
+
+  const totalColumns = 12;
 
   async function handleConfirmDelete(): Promise<void> {
     if (!itemToDelete) {
@@ -106,6 +140,7 @@ export function TransactionTable({ items, onDelete }: Props): JSX.Element {
               <th>{t("transactions.items.qty")}</th>
               <th>{t("transactions.table.user")}</th>
               <th>{t("transactions.table.description")}</th>
+              <th>{t("transactions.attachments.title") || "Lampiran"}</th>
               <th>{t("transactions.table.action")}</th>
             </tr>
           </thead>
@@ -126,6 +161,9 @@ export function TransactionTable({ items, onDelete }: Props): JSX.Element {
                 <td data-label={t("transactions.items.qty")}>{renderQty(item)}</td>
                 <td data-label={t("transactions.table.user")}>{renderUser(item)}</td>
                 <td data-label={t("transactions.table.description")}>{renderDescription(item)}</td>
+                <td data-label={t("transactions.attachments.title") || "Lampiran"}>
+                  {renderAttachments(item)}
+                </td>
                 <td data-label={t("transactions.table.action")}>
                   <div className="table-actions">
                     <Link to={item.id} className="btn btn-ghost-inline">

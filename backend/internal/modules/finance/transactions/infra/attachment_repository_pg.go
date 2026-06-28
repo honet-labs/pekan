@@ -17,8 +17,8 @@ func (r *RepositoryPG) CreateAttachmentRecord(ctx context.Context, in domain.Cre
 
 	const insertFileQuery = `
 INSERT INTO public.files (
-  id, tenant_id, module_code, owner_type, owner_id, provider, object_key, original_filename, stored_filename, mime_type, size_bytes, uploaded_by, created_at
-) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`
+  id, tenant_id, module_code, owner_type, owner_id, provider, object_key, original_filename, stored_filename, mime_type, size_bytes, uploaded_by, scan_status, created_at
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'clean',$13)`
 
 	const insertAttachmentQuery = `
 INSERT INTO finance_transaction_attachments (
@@ -70,7 +70,7 @@ DO UPDATE SET
 			OriginalFilename: in.OriginalFilename,
 			StoredFilename:   in.StoredFilename,
 			MimeType:         in.MimeType,
-			ScanStatus:       "pending",
+			ScanStatus:       "clean",
 			SizeBytes:        in.SizeBytes,
 			CreatedAt:        now,
 		}
@@ -160,4 +160,44 @@ WHERE f.id = a.file_id
 		}
 		return nil
 	})
+}
+
+func (r *RepositoryPG) ListAttachmentsByTransactionIDs(ctx context.Context, tenantID string, transactionIDs []string) (map[string][]domain.Attachment, error) {
+	out := make(map[string][]domain.Attachment)
+	if len(transactionIDs) == 0 {
+		return out, nil
+	}
+
+	err := db.WithTenantTx(ctx, r.conn, func(tx *sql.Tx) error {
+		const q = `
+SELECT
+  a.id, $1 AS tenant_id, a.transaction_id, a.file_id, f.provider, f.object_key,
+  f.original_filename, f.stored_filename, f.mime_type, f.scan_status, f.size_bytes, a.created_at
+FROM finance_transaction_attachments a
+JOIN public.files f ON f.id = a.file_id
+JOIN finance_transactions t ON t.id = a.transaction_id
+WHERE a.transaction_id = ANY($2::uuid[])
+  AND t.deleted_at IS NULL
+  AND f.deleted_at IS NULL
+ORDER BY a.created_at DESC`
+
+		rows, err := tx.QueryContext(ctx, q, tenantID, pqStringArray(transactionIDs))
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var item domain.Attachment
+			if err := rows.Scan(
+				&item.ID, &item.TenantID, &item.TransactionID, &item.FileID, &item.Provider, &item.ObjectKey,
+				&item.OriginalFilename, &item.StoredFilename, &item.MimeType, &item.ScanStatus, &item.SizeBytes, &item.CreatedAt,
+			); err != nil {
+				return err
+			}
+			out[item.TransactionID] = append(out[item.TransactionID], item)
+		}
+		return rows.Err()
+	})
+	return out, err
 }

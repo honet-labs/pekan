@@ -37,6 +37,7 @@ export type Transaction = {
   created_at: string;
   updated_at: string;
   items?: TransactionItem[];
+  attachments?: TransactionAttachment[];
 };
 
 export type CreateTransactionPayload = {

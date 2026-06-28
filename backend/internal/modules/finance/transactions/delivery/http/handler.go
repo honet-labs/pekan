@@ -469,10 +469,22 @@ func toResponse(trx domain.Transaction) TransactionResponse {
 			ID:                item.ID,
 			ItemName:          item.ItemName,
 			Quantity:          item.Quantity,
-			PriceMinor: item.PriceMinor,
+			PriceMinor:        item.PriceMinor,
 			DiscountMinor:     item.DiscountMinor,
 			TotalMinor:        item.TotalMinor,
 			Notes:             item.Notes,
+		})
+	}
+	attachments := make([]AttachmentResponse, 0, len(trx.Attachments))
+	for _, att := range trx.Attachments {
+		attachments = append(attachments, AttachmentResponse{
+			ID:               att.ID,
+			TransactionID:    att.TransactionID,
+			OriginalFilename: att.OriginalFilename,
+			MimeType:         att.MimeType,
+			ScanStatus:       att.ScanStatus,
+			SizeBytes:        att.SizeBytes,
+			CreatedAt:        att.CreatedAt.UTC().Format(time.RFC3339),
 		})
 	}
 	return TransactionResponse{
@@ -502,6 +514,7 @@ func toResponse(trx domain.Transaction) TransactionResponse {
 		CreatedAt:            trx.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:            trx.UpdatedAt.UTC().Format(time.RFC3339),
 		Items:                items,
+		Attachments:          attachments,
 	}
 }
 

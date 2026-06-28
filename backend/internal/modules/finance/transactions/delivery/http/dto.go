@@ -92,6 +92,7 @@ type TransactionResponse struct {
 	CreatedAt            string                    `json:"created_at"`
 	UpdatedAt            string                    `json:"updated_at"`
 	Items                []TransactionItemResponse `json:"items,omitempty"`
+	Attachments          []AttachmentResponse      `json:"attachments,omitempty"`
 }
 
 type AttachmentResponse struct {

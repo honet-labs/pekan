@@ -233,6 +233,10 @@ func (f *fakeTransactionRepo) ListItemsByTransactionIDs(_ context.Context, _ str
 	return map[string][]transactiondomain.TransactionItem{}, nil
 }
 
+func (f *fakeTransactionRepo) ListAttachmentsByTransactionIDs(_ context.Context, _ string, _ []string) (map[string][]transactiondomain.Attachment, error) {
+	return map[string][]transactiondomain.Attachment{}, nil
+}
+
 type fakeAttachmentRepo struct{}
 
 func (f *fakeAttachmentRepo) EnsureTransactionExists(_ context.Context, _, _ string) error {

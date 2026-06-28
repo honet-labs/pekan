@@ -40,6 +40,7 @@ type Transaction struct {
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
 	Items                []TransactionItem
+	Attachments          []Attachment
 }
 
 type TransactionItem struct {
