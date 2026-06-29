@@ -928,8 +928,22 @@ func (s *Service) generateInteractiveResponseWithLLM(ctx context.Context, messag
 	}
 
 	client := &http.Client{Timeout: 30 * time.Second}
-	instructions, _ := s.settings.GetGlobalSettingRaw(ctx, "wa_bot_system_instructions")
+	instructions, instErr := s.settings.GetGlobalSettingRaw(ctx, "wa_bot_system_instructions")
+	if instErr != nil {
+		s.logJSON("warn", "llm_fetch_global_instructions_failed", map[string]any{
+			"key":   "wa_bot_system_instructions",
+			"error": instErr.Error(),
+		})
+	}
 	systemPrompt := waBotSystemPrompt(finContext, instructions)
+
+	s.logJSON("info", "llm_generate_prompt_constructed", map[string]any{
+		"provider":         providerCode,
+		"model":            modelName,
+		"instructions_len": len(instructions),
+		"instructions_raw": instructions,
+		"system_prompt":    systemPrompt,
+	})
 
 	if providerCode == "gemini" {
 		url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", modelName, apiKey)
@@ -1484,19 +1498,52 @@ Do not include markdown fences. Return PURE JSON only.`
 func (s *Service) ProcessWebChat(ctx context.Context, tenantID, userID, message string) (string, error) {
 	tenantCode, err := s.repo.GetTenantCode(ctx, tenantID)
 	if err != nil {
+		s.logJSON("error", "web_chat_get_tenant_code_failed", map[string]any{
+			"tenant_id": tenantID,
+			"error":     err.Error(),
+		})
 		return "", fmt.Errorf("failed to get tenant code: %w", err)
 	}
 
 	finContext, err := s.repo.GetFinancialContext(ctx, tenantID, userID, tenantCode)
 	if err != nil {
-		s.logJSON("warn", "web_chat_fetch_financial_context_failed", map[string]any{"tenant_id": tenantID, "user_id": userID, "error": err.Error()})
+		s.logJSON("warn", "web_chat_fetch_financial_context_failed", map[string]any{
+			"tenant_id": tenantID,
+			"user_id":   userID,
+			"error":     err.Error(),
+		})
 		finContext = &domain.FinancialContext{}
 	}
 
+	s.logJSON("info", "web_chat_processing_start", map[string]any{
+		"tenant_id":   tenantID,
+		"user_id":     userID,
+		"tenant_code": tenantCode,
+		"message":     message,
+		"fin_context": map[string]any{
+			"total_income":    finContext.TotalIncome,
+			"total_expense":   finContext.TotalExpense,
+			"active_budgets":  len(finContext.ActiveBudgets),
+			"recent_tx_count": len(finContext.RecentTx),
+		},
+	})
+
 	reply, err := s.generateInteractiveResponseWithLLM(ctx, message, finContext)
 	if err != nil {
+		s.logJSON("error", "web_chat_processing_failed", map[string]any{
+			"tenant_id": tenantID,
+			"user_id":   userID,
+			"error":     err.Error(),
+		})
 		return "", err
 	}
+
+	s.logJSON("info", "web_chat_processing_success", map[string]any{
+		"tenant_id": tenantID,
+		"user_id":   userID,
+		"reply":     reply,
+	})
+
 	return reply, nil
 }
 

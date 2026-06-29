@@ -249,7 +249,7 @@ func (r *RepositoryPG) GetGlobalSetting(ctx context.Context, key string) (string
 	// Use WithTenantTx just to get a connection and handle search_path if needed,
 	// though global_settings is likely in 'public' schema.
 	err := db.WithTenantTx(ctx, r.conn, func(tx *sql.Tx) error {
-		const q = `SELECT value, is_encrypted FROM global_settings WHERE key = $1`
+		const q = `SELECT value, is_encrypted FROM public.global_settings WHERE key = $1`
 		err := tx.QueryRowContext(ctx, q, key).Scan(&val, &enc)
 		if err == sql.ErrNoRows {
 			return nil // handled outside

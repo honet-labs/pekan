@@ -477,7 +477,7 @@ AND NOT EXISTS (SELECT 1 FROM tenant_memberships WHERE user_id = $1)`
 
 
 func (r *RepositoryPG) GetGlobalSetting(ctx context.Context, key string) (string, bool, error) {
-	const q = `SELECT value, is_encrypted FROM global_settings WHERE key = $1`
+	const q = `SELECT value, is_encrypted FROM public.global_settings WHERE key = $1`
 	var val string
 	var enc bool
 	err := r.conn.QueryRowContext(ctx, q, key).Scan(&val, &enc)
