@@ -192,24 +192,10 @@ export function transactionAttachmentViewURL(transactionID: string, attachmentID
 }
 
 export async function openTransactionAttachment(transactionID: string, attachmentID: string): Promise<void> {
-  const newWindow = window.open("", "_blank", "noopener,noreferrer");
+  const url = transactionAttachmentViewURL(transactionID, attachmentID);
+  const newWindow = window.open(url, "_blank", "noopener,noreferrer");
   if (!newWindow) {
     throw new Error("Popup blocked");
   }
-  try {
-    const response = await fetch(transactionAttachmentViewURL(transactionID, attachmentID), {
-      credentials: "include"
-    });
-    if (!response.ok) {
-      newWindow.close();
-      throw new Error("Failed to open attachment");
-    }
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    newWindow.location.href = url;
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
-  } catch (err) {
-    newWindow.close();
-    throw err;
-  }
 }
+
