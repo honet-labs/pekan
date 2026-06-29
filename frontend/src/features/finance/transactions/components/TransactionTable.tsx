@@ -77,12 +77,13 @@ export function TransactionTable({ items, onDelete }: Props): JSX.Element {
   };
 
   const renderAttachments = (item: Transaction): JSX.Element | string => {
-    if (!Array.isArray(item.attachments) || item.attachments.length === 0) {
+    const attachments = item.attachments;
+    if (!Array.isArray(attachments) || attachments.length === 0) {
       return "N/A";
     }
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-        {item.attachments.map((att, idx) => (
+        {attachments.map((att, idx) => (
           <button
             key={att.id}
             className="btn btn-ghost-inline btn-sm"
@@ -102,7 +103,7 @@ export function TransactionTable({ items, onDelete }: Props): JSX.Element {
             }}
             title={att.original_filename}
           >
-            📎 {item.attachments.length > 1 ? `Lihat Gambar ${idx + 1}` : "Lihat Gambar"}
+            📎 {attachments.length > 1 ? `Lihat Gambar ${idx + 1}` : "Lihat Gambar"}
           </button>
         ))}
       </div>
