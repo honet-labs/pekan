@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Transaction } from "../api/transaction.types";
-import { openTransactionAttachment } from "../api/transaction.api";
+import { Transaction, TransactionAttachment } from "../api/transaction.types";
+import { openTransactionAttachment, transactionAttachmentViewURL } from "../api/transaction.api";
 import { useI18n } from "../../../../core/i18n/i18n";
 import { DeleteConfirmModal } from "../../../../core/components/DeleteConfirmModal";
 import { TransactionItemsModal } from "./TransactionItemsModal";
@@ -16,6 +16,8 @@ export function TransactionTable({ items, onDelete }: Props): JSX.Element {
   const [itemToDelete, setItemToDelete] = useState<Transaction | null>(null);
   const [itemToView, setItemToView] = useState<Transaction | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [activeSliderImages, setActiveSliderImages] = useState<{ transactionId: string; attachments: TransactionAttachment[] } | null>(null);
+  const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
 
   const formatAmount = (amount: number, currency: string) => {
     if (currency.toUpperCase() === "IDR") {
@@ -82,30 +84,26 @@ export function TransactionTable({ items, onDelete }: Props): JSX.Element {
       return "N/A";
     }
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-        {attachments.map((att, idx) => (
-          <button
-            key={att.id}
-            className="btn btn-ghost-inline btn-sm"
-            type="button"
-            onClick={() => openTransactionAttachment(item.id, att.id).catch(() => undefined)}
-            style={{
-              fontSize: '11px',
-              padding: '4px 8px',
-              borderRadius: '6px',
-              border: '1px solid var(--border)',
-              backgroundColor: 'rgba(255, 255, 255, 0.05)',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              maxWidth: '120px',
-              cursor: 'pointer'
-            }}
-            title={att.original_filename}
-          >
-            📎 {attachments.length > 1 ? `Lihat Gambar ${idx + 1}` : "Lihat Gambar"}
-          </button>
-        ))}
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <button
+          className="btn btn-ghost-inline btn-sm"
+          type="button"
+          onClick={() => {
+            setCurrentImageIndex(0);
+            setActiveSliderImages({ transactionId: item.id, attachments });
+          }}
+          style={{
+            fontSize: '11px',
+            padding: '4px 8px',
+            borderRadius: '6px',
+            border: '1px solid var(--border)',
+            backgroundColor: 'rgba(255, 255, 255, 0.05)',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          📎 Lihat Gambar
+        </button>
       </div>
     );
   };
@@ -206,6 +204,145 @@ export function TransactionTable({ items, onDelete }: Props): JSX.Element {
           }
         }}
       />
+
+      {activeSliderImages && activeSliderImages.attachments.length > 0 && (
+        <div 
+          className="slider-overlay"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 9999,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            flexDirection: 'column',
+            padding: '20px'
+          }}
+          onClick={() => setActiveSliderImages(null)}
+        >
+          <div 
+            className="slider-container"
+            style={{
+              position: 'relative',
+              maxWidth: '90%',
+              maxHeight: '80%',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              backgroundColor: '#111827',
+              border: '1px solid #374151',
+              borderRadius: '12px',
+              padding: '16px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setActiveSliderImages(null)}
+              style={{
+                position: 'absolute',
+                top: '-15px',
+                right: '-15px',
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                backgroundColor: '#ef4444',
+                color: '#fff',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.3)',
+                zIndex: 10
+              }}
+            >
+              ✕
+            </button>
+
+            {activeSliderImages.attachments.length > 1 && (
+              <button
+                onClick={() => setCurrentImageIndex((prev) => (prev === 0 ? activeSliderImages.attachments.length - 1 : prev - 1))}
+                style={{
+                  position: 'absolute',
+                  left: '16px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                  color: '#fff',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  borderRadius: '50%',
+                  width: '40px',
+                  height: '40px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '18px',
+                  zIndex: 5,
+                  backdropFilter: 'blur(4px)'
+                }}
+              >
+                ◀
+              </button>
+            )}
+
+            <img
+              src={transactionAttachmentViewURL(
+                activeSliderImages.transactionId,
+                activeSliderImages.attachments[currentImageIndex].id
+              )}
+              alt={activeSliderImages.attachments[currentImageIndex].original_filename}
+              style={{
+                maxWidth: '100%',
+                maxHeight: '70vh',
+                objectFit: 'contain',
+                borderRadius: '6px'
+              }}
+            />
+
+            {activeSliderImages.attachments.length > 1 && (
+              <button
+                onClick={() => setCurrentImageIndex((prev) => (prev === activeSliderImages.attachments.length - 1 ? 0 : prev + 1))}
+                style={{
+                  position: 'absolute',
+                  right: '16px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                  color: '#fff',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  borderRadius: '50%',
+                  width: '40px',
+                  height: '40px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '18px',
+                  zIndex: 5,
+                  backdropFilter: 'blur(4px)'
+                }}
+              >
+                ▶
+              </button>
+            )}
+          </div>
+
+          <div style={{ marginTop: '16px', textAlign: 'center', color: '#fff' }}>
+            <p style={{ margin: 0, fontSize: '14px', fontWeight: 'bold' }}>
+              {activeSliderImages.attachments[currentImageIndex].original_filename}
+            </p>
+            {activeSliderImages.attachments.length > 1 && (
+              <span style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px', display: 'inline-block' }}>
+                {currentImageIndex + 1} / {activeSliderImages.attachments.length}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 }
