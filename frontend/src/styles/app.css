@@ -2668,6 +2668,7 @@ button.app-nav-link {
   .chatbot-container form input {
     font-size: 0.875rem !important;
     padding: 8px 10px !important;
+    min-width: 0;
   }
   .chatbot-container form button {
     padding: 0 16px !important;

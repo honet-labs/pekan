@@ -359,128 +359,135 @@ export function RemindersPage(): JSX.Element {
                               <div>
                                 {item.total_tenor && item.total_tenor > 1 ? (
                                   <div style={{ display: "grid", gap: "10px" }}>
-                                    {Array.from({ length: item.total_tenor }).map((_, index) => {
-                                      const slotIndex = index + 1;
-                                      const isPaid = slotIndex <= payments.length;
-                                      const payment = isPaid ? payments[slotIndex - 1] : null;
-                                      const installmentDueDate = getDueDateForInstallment(item.due_date, item.repeat_interval, slotIndex);
-                                      
-                                      return (
-                                        <div key={slotIndex} className="installment-slot-row">
-                                          <div className="installment-slot-info">
-                                            <div className="installment-slot-badge-container">
-                                              <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--text)" }}>
-                                                Cicilan Ke-{slotIndex} dari {item.total_tenor}
-                                              </span>
-                                              <span className={`pill ${isPaid ? "income" : "transfer"}`} style={{ fontSize: "0.75rem", padding: "2px 8px", fontWeight: 600 }}>
-                                                {isPaid ? "LUNAS" : "BELUM BAYAR"}
+                                    {(() => {
+                                      const sortedPayments = [...payments].sort((a, b) => {
+                                        const timeA = a.created_at ? new Date(a.created_at).getTime() : new Date(a.paid_at).getTime();
+                                        const timeB = b.created_at ? new Date(b.created_at).getTime() : new Date(b.paid_at).getTime();
+                                        return timeA - timeB;
+                                      });
+                                      return Array.from({ length: item.total_tenor }).map((_, index) => {
+                                        const slotIndex = index + 1;
+                                        const isPaid = slotIndex <= sortedPayments.length;
+                                        const payment = isPaid ? sortedPayments[slotIndex - 1] : null;
+                                        const installmentDueDate = getDueDateForInstallment(item.due_date, item.repeat_interval, slotIndex);
+                                        
+                                        return (
+                                          <div key={slotIndex} className="installment-slot-row">
+                                            <div className="installment-slot-info">
+                                              <div className="installment-slot-badge-container">
+                                                <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--text)" }}>
+                                                  Cicilan Ke-{slotIndex} dari {item.total_tenor}
+                                                </span>
+                                                <span className={`pill ${isPaid ? "income" : "transfer"}`} style={{ fontSize: "0.75rem", padding: "2px 8px", fontWeight: 600 }}>
+                                                  {isPaid ? "LUNAS" : "BELUM BAYAR"}
+                                                </span>
+                                              </div>
+                                              <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>
+                                                Jatuh Tempo: {installmentDueDate}
                                               </span>
                                             </div>
-                                            <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>
-                                              Jatuh Tempo: {installmentDueDate}
-                                            </span>
-                                          </div>
-                                          
-                                          <div className="installment-slot-actions">
-                                            {isPaid && payment ? (
-                                              <div className="installment-payment-actions-wrapper">
-                                                <div className="installment-payment-info">
-                                                  <span style={{ fontWeight: 600, fontSize: "0.9rem", color: "var(--primary)" }}>
-                                                    Rp {numberFormatter.format(payment.amount_minor)}
-                                                  </span>
-                                                  <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-                                                    Bayar: {payment.paid_at}
-                                                  </span>
-                                                  {payment.notes && (
-                                                    <span style={{ fontSize: "0.75rem", color: "var(--text)", fontStyle: "italic" }}>
-                                                      "{payment.notes}"
+                                            
+                                            <div className="installment-slot-actions">
+                                              {isPaid && payment ? (
+                                                <div className="installment-payment-actions-wrapper">
+                                                  <div className="installment-payment-info">
+                                                    <span style={{ fontWeight: 600, fontSize: "0.9rem", color: "var(--primary)" }}>
+                                                      Rp {numberFormatter.format(payment.amount_minor)}
                                                     </span>
-                                                  )}
-                                                </div>
-                                                
-                                                <div className="installment-payment-buttons">
-                                                  {payment.proof_image_url && (
+                                                    <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                                                      Bayar: {payment.paid_at}
+                                                    </span>
+                                                    {payment.notes && (
+                                                      <span style={{ fontSize: "0.75rem", color: "var(--text)", fontStyle: "italic" }}>
+                                                        "{payment.notes}"
+                                                      </span>
+                                                    )}
+                                                  </div>
+                                                  
+                                                  <div className="installment-payment-buttons">
+                                                    {payment.proof_image_url && (
+                                                      <button
+                                                        type="button"
+                                                        className="btn btn-ghost-inline"
+                                                        style={{ fontSize: "0.75rem", padding: "4px 8px", display: "inline-flex", alignItems: "center", gap: "4px" }}
+                                                        onClick={() => openPaymentProofImage(item.id, payment.id).catch(console.error)}
+                                                      >
+                                                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>
+                                                        </svg>
+                                                        Bukti
+                                                      </button>
+                                                    )}
                                                     <button
                                                       type="button"
                                                       className="btn btn-ghost-inline"
-                                                      style={{ fontSize: "0.75rem", padding: "4px 8px", display: "inline-flex", alignItems: "center", gap: "4px" }}
-                                                      onClick={() => openPaymentProofImage(item.id, payment.id).catch(console.error)}
+                                                      style={{ fontSize: "0.75rem", padding: "4px 8px" }}
+                                                      onClick={() => {
+                                                        setSelectedItemForDetail(item);
+                                                        setEditingPayment(payment);
+                                                        setIsAddingPayment(true);
+                                                      }}
                                                     >
-                                                      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>
-                                                      </svg>
-                                                      Bukti
+                                                      Edit
                                                     </button>
-                                                  )}
-                                                  <button
-                                                    type="button"
-                                                    className="btn btn-ghost-inline"
-                                                    style={{ fontSize: "0.75rem", padding: "4px 8px" }}
-                                                    onClick={() => {
-                                                      setSelectedItemForDetail(item);
-                                                      setEditingPayment(payment);
-                                                      setIsAddingPayment(true);
-                                                    }}
-                                                  >
-                                                    Edit
-                                                  </button>
-                                                  <button
-                                                    type="button"
-                                                    className="btn btn-ghost-inline danger"
-                                                    style={{ fontSize: "0.75rem", padding: "4px 8px" }}
-                                                    onClick={() => {
-                                                      if (confirm("Hapus riwayat pembayaran ini?")) {
-                                                        removePayment(item.id, payment.id)
-                                                          .then(async () => {
-                                                            success("Pembayaran dihapus");
-                                                            const updated = await fetchPayments(item.id);
-                                                            setReminderPaymentsMap(prev => ({ ...prev, [item.id]: updated }));
-                                                            
-                                                            // Rollback status/tenor
-                                                            if (item.total_tenor && item.total_tenor > 1) {
-                                                              const totalTenor = item.total_tenor;
-                                                              const paidCount = updated.length;
-                                                              const isFullyPaid = paidCount >= totalTenor;
-                                                              await update(item.id, {
-                                                                title: item.title,
-                                                                description: item.description,
-                                                                amount_minor: item.amount_minor,
-                                                                currency: item.currency,
-                                                                due_date: item.due_date,
-                                                                repeat_interval: item.repeat_interval,
-                                                                status: isFullyPaid ? "paid" : "pending",
-                                                                total_tenor: totalTenor,
-                                                                current_tenor: Math.min(paidCount, totalTenor)
-                                                              });
-                                                            } else {
-                                                              await markStatus(item.id, "pending");
-                                                            }
-                                                          })
-                                                          .catch((err: unknown) => showError(err instanceof Error ? err.message : "Gagal menghapus pembayaran"));
-                                                      }
-                                                    }}
-                                                  >
-                                                    Hapus
-                                                  </button>
+                                                    <button
+                                                      type="button"
+                                                      className="btn btn-ghost-inline danger"
+                                                      style={{ fontSize: "0.75rem", padding: "4px 8px" }}
+                                                      onClick={() => {
+                                                        if (confirm("Hapus riwayat pembayaran ini?")) {
+                                                          removePayment(item.id, payment.id)
+                                                            .then(async () => {
+                                                              success("Pembayaran dihapus");
+                                                              const updated = await fetchPayments(item.id);
+                                                              setReminderPaymentsMap(prev => ({ ...prev, [item.id]: updated }));
+                                                              
+                                                              // Rollback status/tenor
+                                                              if (item.total_tenor && item.total_tenor > 1) {
+                                                                const totalTenor = item.total_tenor;
+                                                                const paidCount = updated.length;
+                                                                const isFullyPaid = paidCount >= totalTenor;
+                                                                await update(item.id, {
+                                                                  title: item.title,
+                                                                  description: item.description,
+                                                                  amount_minor: item.amount_minor,
+                                                                  currency: item.currency,
+                                                                  due_date: item.due_date,
+                                                                  repeat_interval: item.repeat_interval,
+                                                                  status: isFullyPaid ? "paid" : "pending",
+                                                                  total_tenor: totalTenor,
+                                                                  current_tenor: Math.min(paidCount, totalTenor)
+                                                                });
+                                                              } else {
+                                                                await markStatus(item.id, "pending");
+                                                              }
+                                                            })
+                                                            .catch((err: unknown) => showError(err instanceof Error ? err.message : "Gagal menghapus pembayaran"));
+                                                        }
+                                                      }}
+                                                    >
+                                                      Hapus
+                                                    </button>
+                                                  </div>
                                                 </div>
-                                              </div>
-                                            ) : (
-                                              <button
-                                                className="btn btn-primary"
-                                                style={{ fontSize: "0.8rem", padding: "6px 12px" }}
-                                                onClick={() => {
-                                                  setSelectedItemForDetail(item);
-                                                  setEditingPayment(null);
-                                                  setIsAddingPayment(true);
-                                                }}
-                                              >
-                                                + Catat Pembayaran
-                                              </button>
-                                            )}
+                                              ) : (
+                                                <button
+                                                  className="btn btn-primary"
+                                                  style={{ fontSize: "0.8rem", padding: "6px 12px" }}
+                                                  onClick={() => {
+                                                    setSelectedItemForDetail(item);
+                                                    setEditingPayment(null);
+                                                    setIsAddingPayment(true);
+                                                  }}
+                                                >
+                                                  + Catat Pembayaran
+                                                </button>
+                                              )}
+                                            </div>
                                           </div>
-                                        </div>
-                                      );
-                                    })}
+                                        );
+                                      });
+                                    })()}
                                   </div>
                                 ) : (
                                   <div>

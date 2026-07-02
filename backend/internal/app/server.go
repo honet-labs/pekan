@@ -192,6 +192,9 @@ func NewServer(cfg config.Config) (*Server, error) {
 
 	transactionRepo := infra.NewRepositoryPG(conn)
 	transactionUC := usecase.NewService(transactionRepo, authorizer, auditLogger)
+	if rdb != nil {
+		transactionUC.WithRedis(rdb)
+	}
 	transactionAttachmentUC := usecase.NewAttachmentService(transactionRepo, receiptRepo, authorizer, auditLogger, storageProvider)
 	transactionHandler := transactionhttp.NewHandler(transactionUC, transactionAttachmentUC)
 

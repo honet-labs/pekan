@@ -450,6 +450,7 @@ export function ChatbotPage(): JSX.Element {
               disabled={sending}
               style={{
                 flex: 1,
+                minWidth: 0,
                 background: "var(--surface-soft)",
                 border: "1px solid var(--border)",
                 borderRadius: "8px",

@@ -3,9 +3,11 @@ package usecase
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"pekan/backend/internal/modules/finance/transactions/domain"
 	"pekan/backend/internal/platform/access"
 	"pekan/backend/internal/platform/security"
@@ -34,6 +36,7 @@ type Service struct {
 	authz         Authorizer
 	audit         AuditLogger
 	budgetChecker budgetAlertChecker
+	redis         *redis.Client
 }
 
 func NewService(repo domain.Repository, authz Authorizer, audit AuditLogger) *Service {
@@ -46,6 +49,31 @@ func NewService(repo domain.Repository, authz Authorizer, audit AuditLogger) *Se
 
 func (s *Service) WithBudgetChecker(bc budgetAlertChecker) {
 	s.budgetChecker = bc
+}
+
+func (s *Service) WithRedis(rdb *redis.Client) {
+	s.redis = rdb
+}
+
+func (s *Service) clearCache(ctx context.Context, tenantID string) {
+	if s.redis == nil {
+		return
+	}
+	pattern := fmt.Sprintf("finance:dashboard:summary:%s:*", tenantID)
+	var cursor uint64
+	for {
+		keys, nextCursor, err := s.redis.Scan(ctx, cursor, pattern, 100).Result()
+		if err != nil {
+			break
+		}
+		if len(keys) > 0 {
+			s.redis.Del(ctx, keys...)
+		}
+		cursor = nextCursor
+		if cursor == 0 {
+			break
+		}
+	}
 }
 
 type CreateInput struct {
@@ -191,6 +219,7 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (domain.Transactio
 	if s.audit != nil {
 		_ = s.audit.Write(ctx, "finance.transaction.create", "finance_transaction", created.ID, nil, created)
 	}
+	s.clearCache(ctx, in.TenantID)
 	return created, nil
 }
 
@@ -478,6 +507,7 @@ func (s *Service) Update(ctx context.Context, in UpdateInput) (domain.Transactio
 	if s.audit != nil {
 		_ = s.audit.Write(ctx, "finance.transaction.update", "finance_transaction", updated.ID, beforeSnapshot, updated)
 	}
+	s.clearCache(ctx, in.TenantID)
 	return updated, nil
 }
 
@@ -525,6 +555,7 @@ func (s *Service) Delete(ctx context.Context, tenantID, actorUserID, transaction
 	if s.audit != nil {
 		_ = s.audit.Write(ctx, "finance.transaction.delete", "finance_transaction", transactionID, nil, map[string]any{"deleted": true})
 	}
+	s.clearCache(ctx, tenantID)
 	return nil
 }
 
