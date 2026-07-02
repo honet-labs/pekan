@@ -427,7 +427,7 @@ func (h *Handler) DownloadAttachment(w http.ResponseWriter, r *http.Request) {
 		dispositionType = "inline"
 	}
 	w.Header().Set("Content-Disposition", fmt.Sprintf("%s; filename=%q", dispositionType, out.Attachment.OriginalFilename))
-	w.Header().Set("Cache-Control", "private, max-age=0, no-store")
+	w.Header().Set("Cache-Control", "private, max-age=604800")
 	w.WriteHeader(http.StatusOK)
 	_, _ = io.Copy(w, out.Reader)
 }

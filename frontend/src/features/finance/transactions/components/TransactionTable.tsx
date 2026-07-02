@@ -305,6 +305,20 @@ export function TransactionTable({ items, onDelete }: Props): JSX.Element {
               }}
             />
 
+            {/* Preload other images in background to speed up slider navigation */}
+            <div style={{ display: 'none' }}>
+              {activeSliderImages.attachments.map((att, idx) => {
+                if (idx === currentImageIndex) return null;
+                return (
+                  <img
+                    key={att.id}
+                    src={transactionAttachmentViewURL(activeSliderImages.transactionId, att.id)}
+                    alt="preload"
+                  />
+                );
+              })}
+            </div>
+
             {activeSliderImages.attachments.length > 1 && (
               <button
                 onClick={() => setCurrentImageIndex((prev) => (prev === activeSliderImages.attachments.length - 1 ? 0 : prev + 1))}

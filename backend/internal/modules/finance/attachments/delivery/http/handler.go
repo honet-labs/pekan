@@ -180,7 +180,7 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 	filename := strconv.Quote(out.Attachment.OriginalFilename)
 	w.Header().Set("Content-Type", out.Attachment.MimeType)
 	w.Header().Set("Content-Disposition", fmt.Sprintf("%s; filename=%s", disposition, filename))
-	w.Header().Set("Cache-Control", "private, max-age=0, no-store")
+	w.Header().Set("Cache-Control", "private, max-age=604800")
 	w.WriteHeader(http.StatusOK)
 	_, _ = io.Copy(w, out.Reader)
 }
