@@ -1,0 +1,54 @@
+# Environment & Secrets
+*.env
+*.env.*
+!.env.example
+!.env.server.example
+
+# Database Dumps & Patches
+*.sql
+!backend/migrations/*.sql
+!backend/migrations/**/*.sql
+*.db
+*.sqlite
+
+# Archives & Backup Packages
+*.tar.gz
+*.zip
+*.rar
+*.tgz
+
+# Backend (Go)
+backend/bin/
+backend/data/
+backend/tmp/
+backend/logs/
+backend/dist/
+backend/backend
+backend/backend.exe
+
+# Frontend (Node / React)
+frontend/node_modules/
+frontend/dist/
+frontend/.next/
+frontend/out/
+.next/
+node_modules/
+
+# Build Artifacts
+*.tsbuildinfo
+
+# Debug / Test Payloads
+payload*.json
+
+# One-off Utility Scripts (local paths)
+frontend/*.ps1
+frontend/*.py
+
+# OS & IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+

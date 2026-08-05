@@ -1,0 +1,197 @@
+{
+  "info": {
+    "_postman_id": "a5cf4d8c-a8e0-4ab7-b8e8-9ea5f2f331ce",
+    "name": "PEKAN API",
+    "description": "Postman collection for PEKAN modular multi-tenant SaaS API.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8080/api/v1" },
+    { "key": "tenant_id", "value": "11111111-1111-1111-1111-111111111111" },
+    { "key": "access_token", "value": "" },
+    { "key": "refresh_token", "value": "" },
+    { "key": "transaction_id", "value": "88888888-8888-8888-8888-888888888888" },
+    { "key": "attachment_id", "value": "99999999-9999-9999-9999-999999999999" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"owner@pekan.local\",\n  \"password\": \"password\",\n  \"tenant_id\": \"{{tenant_id}}\"\n}"
+            },
+            "url": "{{base_url}}/auth/login"
+          }
+        },
+        {
+          "name": "Refresh",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+            },
+            "url": "{{base_url}}/auth/refresh"
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+            },
+            "url": "{{base_url}}/auth/logout"
+          }
+        },
+        {
+          "name": "Logout All",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/auth/logout-all"
+          }
+        },
+        {
+          "name": "Me Context",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/me/context"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Finance Master Data",
+      "item": [
+        {
+          "name": "List Accounts",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/finance/accounts"
+          }
+        },
+        {
+          "name": "Create Account",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Wallet A\",\n  \"account_type\": \"cash\",\n  \"currency\": \"IDR\",\n  \"opening_balance_minor\": 0\n}"
+            },
+            "url": "{{base_url}}/finance/accounts"
+          }
+        },
+        {
+          "name": "List Categories",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/finance/categories"
+          }
+        },
+        {
+          "name": "Create Category",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Transport\",\n  \"category_type\": \"expense\"\n}"
+            },
+            "url": "{{base_url}}/finance/categories"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Finance Transactions",
+      "item": [
+        {
+          "name": "List Transactions",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/finance/transactions?page=1&page_size=20"
+          }
+        },
+        {
+          "name": "Create Transaction",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_id\": \"55555555-5555-5555-5555-555555555555\",\n  \"category_id\": \"66666666-6666-6666-6666-666666666666\",\n  \"type\": \"expense\",\n  \"amount_minor\": 120000,\n  \"currency\": \"IDR\",\n  \"transaction_date\": \"2026-03-24\",\n  \"description\": \"Belanja\"\n}"
+            },
+            "url": "{{base_url}}/finance/transactions"
+          }
+        },
+        {
+          "name": "Set Attachment Scan Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scan_status\": \"clean\",\n  \"reason\": \"manual verification\"\n}"
+            },
+            "url": "{{base_url}}/finance/transactions/{{transaction_id}}/attachments/{{attachment_id}}/scan-status"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Entitlement",
+      "item": [
+        {
+          "name": "Set Feature Override",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"feature_code\": \"finance.transactions.write\",\n  \"is_enabled\": false,\n  \"reason\": \"temporary lock\"\n}"
+            },
+            "url": "{{base_url}}/tenants/{{tenant_id}}/feature-overrides"
+          }
+        },
+        {
+          "name": "Get Effective Entitlements",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/tenants/{{tenant_id}}/entitlements/effective"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,3 @@
+-- This migration has been moved to manual/manual_migrate_default.sql
+-- to prevent it from dropping and seeding the tenant schema automatically on every deployment.
+-- Do not add SQL queries here.
