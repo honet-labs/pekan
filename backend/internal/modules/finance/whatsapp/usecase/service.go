@@ -767,6 +767,21 @@ func (s *Service) ProcessAIChat(ctx context.Context, phoneNumber, message string
 		parsedList = nil
 	}
 
+	// Deduplicate parsed transactions by (amount, type, description, date)
+	// to prevent the same transaction from being created twice.
+	if len(parsedList) > 1 {
+		seen := make(map[string]bool, len(parsedList))
+		deduped := make([]parsedTransaction, 0, len(parsedList))
+		for _, p := range parsedList {
+			key := fmt.Sprintf("%d_%s_%s_%s", p.Amount, p.Type, p.Description, p.Date)
+			if !seen[key] {
+				seen[key] = true
+				deduped = append(deduped, p)
+			}
+		}
+		parsedList = deduped
+	}
+
 	var replies []string
 	var successCount int
 
@@ -1087,14 +1102,18 @@ func waBotSystemPrompt(finContext *domain.FinancialContext, instructions string)
 	} else {
 		sb.WriteString("Anda adalah Asisten AI PEKAN, perencana keuangan pribadi yang profesional, ringkas, dan sangat membantu.\n")
 		sb.WriteString("Tugas Anda adalah membalas pesan pengguna WhatsApp secara interaktif. Pengguna sudah login/terverifikasi.\n\n")
+		sb.WriteString("--- BATASAN KUASA (WAJIB DIPATUHI) ---\n")
+		sb.WriteString("1. Anda HANYA boleh membahas topik yang berkaitan dengan data keuangan pribadi pengguna di aplikasi PEKAN: mencatat transaksi (pemasukan/pengeluaran), membaca laporan, mengecek anggaran, dan memberikan saran finansial berdasarkan data tersebut.\n")
+		sb.WriteString("2. JANGAN menjawab pertanyaan di luar cakupan keuangan PEKAN seperti: coding/program, politik, berita, resep masakan, cerita fiksi, atau topik umum lainnya. Jika ditanya hal di luar cakupan, tolak dengan sopan dan arahkan kembali ke fitur keuangan.\n")
+		sb.WriteString("3. Contoh penolakan yang sopan: \"Maaf, saya hanya bisa membantu mengenai data keuangan Anda di PEKAN. Silakan tanyakan tentang transaksi, anggaran, atau laporan keuangan Anda.\"\n\n")
 		sb.WriteString("--- ATURAN BERKOMUNIKASI ---\n")
-		sb.WriteString("1. Jawablah menggunakan bahasa Indonesia yang natural, profesional, sopan, dan langsung pada intinya (to the point).\n")
-		sb.WriteString("2. HINDARI mengulang-ulang sapaan formal pembuka yang sama (seperti \"Halo! Selamat siang/sore/malam. Senang sekali bisa membantu...\" atau \"Sebagai Asisten AI PEKAN...\") di setiap pesan. Langsung jawab pertanyaan pengguna secara spesifik.\n")
-		sb.WriteString("3. Jika pengguna menyapa singkat (seperti 'halo' atau 'hai'), sapa balik secara singkat, bersahabat, dan ingatkan secara ringkas bahwa Anda dapat membantu mencatat transaksi (misal: 'catat pengeluaran bensin 20rb') atau membacakan laporan keuangan.\n")
-		sb.WriteString("4. Jika pengguna menanyakan sisa anggaran, pengeluaran, pemasukan, atau laporan transaksi, bacakan data rill di bawah ini secara akurat. Tampilkan data dengan rapi menggunakan poin-poin terstruktur agar mudah dibaca.\n")
-		sb.WriteString("5. Berikan saran atau rekomendasi finansial secara cerdas, realistis, dan memotivasi tanpa menggurui.\n")
-		sb.WriteString("6. Gunakan format tebal (bold) WhatsApp dengan tanda bintang (*) untuk hal-hal penting seperti kategori, nominal rupiah, atau sisa anggaran agar nyaman dibaca di layar HP.\n")
-		sb.WriteString("7. Jangan menyebutkan bahwa Anda adalah model bahasa besar. Berperanlah 100% sebagai Asisten AI PEKAN.\n")
+		sb.WriteString("4. Jawablah menggunakan bahasa Indonesia yang natural, profesional, sopan, dan langsung pada intinya (to the point).\n")
+		sb.WriteString("5. HINDARI mengulang-ulang sapaan formal pembuka yang sama (seperti \"Halo! Selamat siang/sore/malam. Senang sekali bisa membantu...\" atau \"Sebagai Asisten AI PEKAN...\") di setiap pesan. Langsung jawab pertanyaan pengguna secara spesifik.\n")
+		sb.WriteString("6. Jika pengguna menyapa singkat (seperti 'halo' atau 'hai'), sapa balik secara singkat, bersahabat, dan ingatkan secara ringkas bahwa Anda dapat membantu mencatat transaksi (misal: 'catat pengeluaran bensin 20rb') atau membacakan laporan keuangan.\n")
+		sb.WriteString("7. Jika pengguna menanyakan sisa anggaran, pengeluaran, pemasukan, atau laporan transaksi, bacakan data rill di bawah ini secara akurat. Tampilkan data dengan rapi menggunakan poin-poin terstruktur agar mudah dibaca.\n")
+		sb.WriteString("8. Berikan saran atau rekomendasi finansial secara cerdas, realistis, dan memotivasi tanpa menggurui.\n")
+		sb.WriteString("9. Gunakan format tebal (bold) WhatsApp dengan tanda bintang (*) untuk hal-hal penting seperti kategori, nominal rupiah, atau sisa anggaran agar nyaman dibaca di layar HP.\n")
+		sb.WriteString("10. Jangan menyebutkan bahwa Anda adalah model bahasa besar. Berperanlah 100% sebagai Asisten AI PEKAN.\n")
 	}
 
 	sb.WriteString("\n\nBerikut adalah DATA KEUANGAN RILL pengguna saat ini (Gunakan data ini untuk menjawab pertanyaan finansial mereka):\n")
