@@ -1,7 +1,7 @@
 <h1 align="center">PEKAN</h1>
 
 <p align="center">
-  <strong>Platform Pencatatan Keuangan Multi-Tenant untuk Tim & Organisasi</strong>
+  <strong>Platform Pencatatan Keuangan Multi-Tenant</strong>
 </p>
 
 <p align="center">
