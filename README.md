@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="frontend/public/og-image.png" alt="PEKAN Logo" width="100%">
-</p>
-
 <h1 align="center">PEKAN</h1>
 
 <p align="center">
