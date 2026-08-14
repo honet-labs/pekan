@@ -42,8 +42,7 @@ Yang membedakan PEKAN: **asisten AI** yang bisa mencatat transaksi langsung dari
 - [Tech Stack](#tech-stack)
 - [Struktur Proyek](#struktur-proyek)
 - [Database](#database)
-- [Instalasi Cepat](#instalasi-cepat)
-- [Instalasi Manual (Development)](#instalasi-manual-development)
+- [Instalasi](#instalasi)
 - [Deployment Produksi](#deployment-produksi)
 - [Konfigurasi](#konfigurasi)
 - [API Endpoints](#api-endpoints)
@@ -429,12 +428,14 @@ DATABASE_URL="postgres://..." go run ./scripts/migrate_tenants.go
 
 ---
 
-## Instalasi Cepat
+## Instalasi
 
-Butuh waktu ~5 menit untuk server yang sudah punya Docker.
+### Instalasi Cepat (~5 menit)
+
+Butuh Docker, Go, dan Node.js sudah terinstall.
 
 ```bash
-# 1. Clone
+# 1. Clone repository
 git clone https://github.com/honet-labs/pekan.git
 cd pekan
 
@@ -447,17 +448,17 @@ cp .env.example .env
 # Edit .env — isi JWT_SECRET dengan random string yang kuat:
 #   openssl rand -base64 48
 
-# 4. Jalankan migrasi
-./scripts/apply_migrations.sh
+# 4. Jalankan migrasi database
+DATABASE_URL="postgres://postgres:postgres@localhost:5432/pekan?sslmode=disable" \
+  ./scripts/apply_migrations.sh
 
-# 5. Jalankan backend
-go run cmd/api/main.go          # API server → :8080
-go run cmd/ai/main.go           # AI worker (terminal terpisah)
+# 5. Jalankan backend (terminal 1)
+go run cmd/api/main.go
 
-# 6. Setup frontend (terminal baru)
+# 6. Setup & jalankan frontend (terminal 2)
 cd ../frontend
 npm install
-npm run dev                     # Dev server → :5173
+npm run dev
 ```
 
 Buka `http://localhost:5173` → login dengan:
@@ -465,116 +466,11 @@ Buka `http://localhost:5173` → login dengan:
 - **Email**: `owner@pekan.local`
 - **Password**: `password`
 
----
+### Panduan Lengkap
 
-## Instalasi Manual (Development)
+Untuk panduan instalasi **step-by-step** yang lebih detail (termasuk install prasyarat, troubleshooting, production deployment), lihat:
 
-### Prasyarat
-
-| Software | Versi | Untuk Apa |
-| :--- | :--- | :--- |
-| **Go** | 1.23+ | Backend |
-| **Node.js** | 20+ LTS | Frontend build |
-| **PostgreSQL** | 16+ | Database |
-| **Redis** | 7+ | Rate limiting (opsional) |
-| **Docker** | 24+ | (Opsional) Jalankan DB & Redis |
-
-### Langkah 1 — Database
-
-**Menggunakan Docker (recommended):**
-
-```bash
-docker run -d --name pekan-postgres \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=pekan \
-  -p 5432:5432 \
-  postgres:16-alpine
-
-docker run -d --name pekan-redis \
-  -p 6379:6379 \
-  redis:7-alpine
-```
-
-**Atau PostgreSQL native:**
-
-```bash
-sudo -u postgres createdb pekan
-sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres';"
-```
-
-### Langkah 2 — Backend
-
-```bash
-cd backend
-
-# Konfigurasi
-cp .env.example .env
-
-# Generate JWT secret
-openssl rand -base64 48
-# Copy hasilnya ke JWT_SECRET di .env
-
-# Install dependencies
-go mod tidy
-
-# Jalankan migrasi
-./scripts/apply_migrations.sh       # Linux/macOS
-.\scripts\apply_migrations.ps1      # Windows
-
-# (Opsional) Masukkan data demo
-./scripts/apply_demo_seed.sh
-
-# Jalankan API server
-go run cmd/api/main.go
-# → http://localhost:8080
-
-# Jalankan AI queue worker (terminal terpisah)
-go run cmd/ai/main.go
-
-# Jalankan background worker (terminal terpisah)
-go run cmd/worker/main.go
-```
-
-### Langkah 3 — Frontend
-
-```bash
-cd frontend
-
-# Install dependencies
-npm install
-
-# Jalankan dev server
-npm run dev
-# → http://localhost:5173
-```
-
-### Langkah 4 — Verifikasi
-
-```bash
-# Cek API health
-curl http://localhost:8080/api/v1/healthz
-
-# Cek frontend
-open http://localhost:5173
-```
-
-### Login
-
-| Field | Nilai |
-| :--- | :--- |
-| URL | `http://localhost:5173` |
-| Tenant Code | `default` |
-| Email | `owner@pekan.local` |
-| Password | `password` |
-| Role | Owner (full access) |
-
-### Menjalankan Test
-
-```bash
-cd backend
-go test ./tests/... -v
-```
+> **[INSTALL.md](INSTALL.md)** — Panduan lengkap instalasi PEKAN
 
 ---
 
@@ -862,6 +758,7 @@ Kontribusi sangat dipersilakan! Berikut cara berkontribusi:
 
 | Dokumen | Deskripsi |
 | :--- | :--- |
+| [**Instalasi (INSTALL.md)**](INSTALL.md) | **Panduan lengkap instalasi dari nol** |
 | [Technical Blueprint](docs/01-TECHNICAL-BLUEPRINT.md) | Arsitektur teknis lengkap |
 | [Database Schema](docs/02-DATABASE-SCHEMA.md) | Skema database detail |
 | [Security Review](docs/03-SECURITY-ARCHITECTURE-REVIEW.md) | Review keamanan |

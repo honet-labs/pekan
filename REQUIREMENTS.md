@@ -13,7 +13,7 @@ This document outlines the recommended specifications and technology stack for d
 ### Frontend
 - **Framework**: React 18+ with TypeScript
 - **Build Tool**: Vite
-- **State Management**: Zustand (Lightweight & Reactive)
+- **State Management**: `useSyncExternalStore` (React built-in, lightweight & reactive)
 - **Styling**: Vanilla CSS (Premium Custom Design)
 
 ### Infrastructure & Storage
