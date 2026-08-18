@@ -1,0 +1,132 @@
+services:
+  pekan-postgres:
+    image: postgres:16-alpine
+    container_name: pekan-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pekan
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    command: postgres -c ssl=off -c max_connections=100
+    ports:
+      - "5432:5432"
+    volumes:
+      - pekan_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d pekan"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - pekan-network
+
+  pekan-redis:
+    image: redis:7-alpine
+    container_name: pekan-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - pekan_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - pekan-network
+
+  pekan-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pekan-api
+    restart: unless-stopped
+    entrypoint: ["/app/pekan-api"]
+    env_file:
+      - ./backend/.env
+    environment:
+      HTTP_PORT: 8080
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:-postgres}@pekan-postgres:5432/pekan?sslmode=disable
+      RATE_LIMIT_REDIS_URL: redis://pekan-redis:6379/0
+    ports:
+      - "8080:8080"
+    depends_on:
+      pekan-postgres:
+        condition: service_healthy
+      pekan-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/v1/healthz"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    networks:
+      - pekan-network
+
+  pekan-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pekan-worker
+    restart: unless-stopped
+    entrypoint: ["/app/pekan-worker"]
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:-postgres}@pekan-postgres:5432/pekan?sslmode=disable
+    depends_on:
+      pekan-postgres:
+        condition: service_healthy
+    networks:
+      - pekan-network
+
+  pekan-ai:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pekan-ai
+    restart: unless-stopped
+    entrypoint: ["/app/pekan-ai"]
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:-postgres}@pekan-postgres:5432/pekan?sslmode=disable
+    depends_on:
+      pekan-postgres:
+        condition: service_healthy
+    networks:
+      - pekan-network
+
+  pekan-web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: pekan-web
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      pekan-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/healthz"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    networks:
+      - pekan-network
+
+volumes:
+  pekan_postgres_data:
+    name: pekan_postgres_data
+  pekan_redis_data:
+    name: pekan_redis_data
+
+networks:
+  pekan-network:
+    name: pekan-network
+    driver: bridge

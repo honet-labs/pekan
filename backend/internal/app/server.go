@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"time"
 
-
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/redis/go-redis/v9"
@@ -65,6 +64,7 @@ import (
 	"pekan/backend/internal/platform/auth"
 	"pekan/backend/internal/platform/config"
 	"pekan/backend/internal/platform/db"
+	"pekan/backend/internal/platform/health"
 	"pekan/backend/internal/platform/middleware"
 	"pekan/backend/internal/platform/session"
 	"pekan/backend/internal/platform/storage"
@@ -238,8 +238,13 @@ func NewServer(cfg config.Config) (*Server, error) {
 	whatsappHandler := financewhatsapphttp.NewHandler(whatsappUC)
 	whatsappWebhookHandler := financewhatsapphttp.NewWebhookHandler(whatsappUC)
 
+	logger := middleware.NewLogger()
+
+	healthChecker := health.NewChecker(conn, rdb)
+
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
+	router.Use(middleware.StructuredLogger(logger))
 	router.Use(middleware.SecurityHeaders)
 	router.Use(middleware.CORS(cfg.CORSAllowedOrigins))
 	router.Use(middleware.RequestBodyLimit(cfg.RequestBodyMaxBytes))
@@ -250,8 +255,7 @@ func NewServer(cfg config.Config) (*Server, error) {
 		if cfg.APIRequestTimeout > 0 {
 			r.Use(chimw.Timeout(cfg.APIRequestTimeout))
 		}
-		
-		
+
 		if cfg.APIRateLimitPerMinute > 0 {
 			r.Use(middleware.NewIPRateLimiterWithStore(
 				cfg.APIRateLimitPerMinute,
@@ -261,7 +265,8 @@ func NewServer(cfg config.Config) (*Server, error) {
 			))
 		}
 
-		transactionhttp.RegisterHealth(r)
+		r.Get("/healthz", healthChecker.Handle)
+		r.Get("/livez", healthChecker.HandleLive)
 		
 		// Public Routes (with specific rate limits)
 		r.Group(func(r chi.Router) {
