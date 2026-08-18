@@ -7,22 +7,21 @@ Panduan lengkap installasi PEKAN dari nol, baik untuk **development** (lokal) ma
 ## Daftar Isi
 
 - [Prasyarat](#prasyarat)
-- [1. Clone Repository](#1-clone-repository)
-- [2. Setup Database](#2-setup-database)
-- [3. Setup Backend](#3-setup-backend)
-- [4. Setup Frontend](#4-setup-frontend)
-- [5. Jalankan Aplikasi](#5-jalankan-aplikasi)
-- [6. Verifikasi](#6-verifikasi)
-- [7. Login Pertama](#7-login-pertama)
-- [8. Menjalankan Test](#8-menjalankan-test)
+- [Instalasi Development (Lokal)](#instalasi-development-lokal)
+- [Instalasi Produksi](#instalasi-produksi)
+  - [Opsi A: Docker (Recommended)](#opsi-a-docker-recommended)
+  - [Opsi B: Systemd (Native)](#opsi-b-systemd-native)
+- [Update Versi](#update-versi)
+- [Konfigurasi](#konfigurasi)
+- [Login Pertama](#login-pertama)
 - [Troubleshooting](#troubleshooting)
-- [Production Deployment](#production-deployment)
+- [Backup & Restore](#backup--restore)
 
 ---
 
 ## Prasyarat
 
-Pastikan komputer Anda sudah terinstall software berikut:
+### Development (Lokal)
 
 | Software | Versi Minimal | Cara Cek | Untuk Apa |
 | :--- | :--- | :--- | :--- |
@@ -34,306 +33,350 @@ Pastikan komputer Anda sudah terinstall software berikut:
 | **Redis** | 7+ (opsional) | `redis-cli --version` | Rate limiting & session |
 | **Docker** | 24+ (opsional) | `docker --version` | Jalankan PostgreSQL & Redis |
 
-### Install Prasyarat (Linux/Ubuntu)
+### Produksi — Docker
+
+| Software | Versi Minimal | Cara Cek |
+| :--- | :--- | :--- |
+| **Docker** | 24+ | `docker --version` |
+| **Docker Compose** | 2.20+ | `docker compose version` |
+| **Git** | 2.0+ | `git --version` |
+
+> **Catatan**: Docker Compose plugin sudah termasuk dalam installer. Tidak perlu install Go, Node.js, PostgreSQL, atau Redis secara terpisah — semuanya berjalan di dalam container.
+
+### Produksi — Systemd
+
+| Software | Versi Minimal | Cara Cek |
+| :--- | :--- | :--- |
+| **Git** | 2.0+ | `git --version` |
+| **Go** | 1.23+ | `go version` |
+| **Node.js** | 20+ LTS | `node --version` |
+| **PostgreSQL** | 16+ | `psql --version` |
+| **Redis** | 7+ | `redis-cli --version` |
+| **Nginx** | 1.24+ | `nginx -v` |
+
+> **Catatan**: Installer akan menginstall semua dependency secara otomatis.
+
+### Install Prasyarat Manual (Jika Dibutuhkan)
+
+<details>
+<summary><strong>Ubuntu/Debian</strong></summary>
 
 ```bash
-# Update system
 sudo apt update && sudo apt upgrade -y
-
-# Install Git
 sudo apt install -y git
 
-# Install Go 1.23+
+# Go 1.23+
 wget https://go.dev/dl/go1.23.8.linux-amd64.tar.gz
 sudo rm -rf /usr/local/go
 sudo tar -C /usr/local -xzf go1.23.8.linux-amd64.tar.gz
 echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
-echo 'export GOPATH=$HOME/go' >> ~/.bashrc
-echo 'export PATH=$PATH:$GOPATH/bin' >> ~/.bashrc
 source ~/.bashrc
 
-# Install Node.js 20 LTS
+# Node.js 20 LTS
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
-
-# Install Docker (opsional, untuk PostgreSQL & Redis)
-sudo apt install -y docker.io docker-compose-plugin
-sudo usermod -aG docker $USER
-# Logout & login lagi agar group aktif
 ```
+</details>
 
-### Install Prasyarat (macOS)
+<details>
+<summary><strong>macOS</strong></summary>
 
 ```bash
-# Install Homebrew (jika belum ada)
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-# Install semua dependencies
 brew install git go node docker docker-compose
 ```
+</details>
 
-### Install Prasyarat (Windows)
+<details>
+<summary><strong>Windows</strong></summary>
 
-1. **Git**: Download dari https://git-scm.com/download/win
-2. **Go**: Download dari https://go.dev/dl/ (pilih `.msi` installer)
-3. **Node.js**: Download dari https://nodejs.org (pilih LTS)
-4. **Docker Desktop**: Download dari https://www.docker.com/products/docker-desktop
-
-> **Tip**: Gunakan **PowerShell** atau **Windows Terminal** untuk menjalankan perintah.
+1. **Git**: https://git-scm.com/download/win
+2. **Go**: https://go.dev/dl/ (pilih `.msi` installer)
+3. **Node.js**: https://nodejs.org (pilih LTS)
+4. **Docker Desktop**: https://www.docker.com/products/docker-desktop
+</details>
 
 ---
 
-## 1. Clone Repository
+## Instalasi Development (Lokal)
+
+Untuk development di komputer lokal. Menggunakan `go run` dan `npm run dev`.
 
 ```bash
-# Clone repository ke direktori pilihan Anda
+# 1. Clone repository
 git clone https://github.com/honet-labs/pekan.git
-
-# Masuk ke direktori project
 cd pekan
 
-# Cek apakah clone berhasil (harus ada file backend/, frontend/, dll)
-ls
+# 2. Jalankan PostgreSQL & Redis via Docker
+docker compose -f deploy/docker-compose.server-test.yml up -d
+
+# 3. Setup backend
+cd backend
+cp .env.example .env
+# Edit .env — generate JWT_SECRET:
+#   openssl rand -base64 48
+
+# 4. Jalankan migrasi database
+DATABASE_URL="postgres://postgres:postgres@localhost:5432/pekan?sslmode=disable" \
+  ./scripts/apply_migrations.sh
+
+# 5. Jalankan backend (terminal 1)
+go run cmd/api/main.go
+
+# 6. Setup & jalankan frontend (terminal 2)
+cd ../frontend
+npm install
+npm run dev
 ```
 
-Setelah clone, struktur direktori Anda akan seperti ini:
+Buka `http://localhost:5173` → login dengan:
+- **Tenant**: `default`
+- **Email**: `owner@pekan.local`
+- **Password**: `password`
 
-```
-pekan/
-├── backend/        # Backend Go
-├── frontend/       # Frontend React
-├── deploy/         # Script deployment
-├── docs/           # Dokumentasi
-├── README.md
-└── INSTALL.md      # (dokumentasi ini)
+### Services Tambahan (Opsional)
+
+```bash
+# Terminal 3 — Background Worker (reminder & file scan)
+cd backend && go run cmd/worker/main.go
+
+# Terminal 4 — AI Queue Worker (WhatsApp chatbot)
+cd backend && go run cmd/ai/main.go
 ```
 
 ---
 
-## 2. Setup Database
+## Instalasi Produksi
 
 ### Opsi A: Docker (Recommended)
 
-Cara ini paling mudah dan cepat. Pastikan Docker sudah terinstall.
+Cara ini paling mudah dan cepat. Semua komponen berjalan di container Docker.
+
+**Kelebihan:**
+- Tidak perlu install Go, Node.js, PostgreSQL, atau Redis secara terpisah
+- Isolasi sempurna antar komponen
+- Mudah diupdate dan di-backup
+- Cocok untuk server dengan resource terbatas
 
 ```bash
-# Jalankan PostgreSQL dan Redis via Docker
-docker compose -f deploy/docker-compose.server-test.yml up -d
+# 1. SSH ke server
+ssh user@your-server-ip
 
-# Tunggu beberapa detik hingga container ready
-# Cek status container
-docker ps
+# 2. Clone repository
+git clone https://github.com/honet-labs/pekan.git
+cd pekan
+
+# 3. Jalankan installer Docker
+sudo bash deploy/installer-docker.sh
 ```
 
-Harus muncul 2 container yang running:
-- `pekan-postgres` (PostgreSQL 16)
-- `pekan-redis` (Redis 7)
+**Opsi installer yang tersedia:**
 
 ```bash
-# Verifikasi PostgreSQL bisa diakses
-docker exec pekan-postgres pg_isready -U postgres
+# Install dengan default (port 80)
+sudo bash deploy/installer-docker.sh
 
-# Verifikasi Redis bisa diakses
-docker exec pekan-redis redis-cli ping
-# Harus return "PONG"
+# Custom port
+sudo bash deploy/installer-docker.sh --web-port 8080
+
+# Custom install directory
+sudo bash deploy/installer-docker.sh --install-dir /var/www/pekan
+
+# Custom PostgreSQL password
+sudo bash deploy/installer-docker.sh --postgres-password "your-strong-password"
 ```
 
-### Opsi B: PostgreSQL Native
-
-Jika sudah install PostgreSQL di komputer:
+**Setelah install:**
 
 ```bash
-# Buat database pekan
-# Linux/macOS:
-sudo -u postgres createdb pekan
+# Cek status containers
+docker compose -f /opt/pekan/docker-compose.yml ps
 
-# Atau via psql:
-psql -U postgres -c "CREATE DATABASE pekan;"
+# Lihat logs
+docker compose -f /opt/pekan/docker-compose.yml logs -f pekan-api
 
-# Pastikan password user postgres sudah di-set
-psql -U postgres -c "ALTER USER postgres PASSWORD 'postgres';"
+# Restart semua
+docker compose -f /opt/pekan/docker-compose.yml restart
+
+# Stop semua
+docker compose -f /opt/pekan/docker-compose.yml down
 ```
 
-### Opsi C: Docker Individual
+**Container yang berjalan:**
 
-```bash
-# PostgreSQL saja
-docker run -d --name pekan-postgres \
-  -e POSTGRES_DB=pekan \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  -p 5432:5432 \
-  postgres:16-alpine
-
-# Redis saja
-docker run -d --name pekan-redis \
-  -p 6379:6379 \
-  redis:7-alpine
-```
+| Container | Fungsi | Port |
+| :--- | :--- | :--- |
+| `pekan-postgres` | PostgreSQL 16 | 5432 (internal) |
+| `pekan-redis` | Redis 7 | 6379 (internal) |
+| `pekan-api` | API Server | 8080 (internal) |
+| `pekan-worker` | Background Worker | - |
+| `pekan-ai` | AI Queue Worker | - |
+| `pekan-web` | Frontend Nginx | 80 (external) |
 
 ---
 
-## 3. Setup Backend
+### Opsi B: Systemd (Native)
+
+Cara ini menggunakan binary Go native dan systemd services. Performa lebih baik untuk server dengan resource besar.
+
+**Kelebihan:**
+- Performa lebih baik (tidak ada overhead container)
+- Akses langsung ke sistem file
+- Cocok untuk server production dengan traffic tinggi
+- Lebih mudah di-debug dengan journalctl
 
 ```bash
-# Masuk ke direktori backend
-cd backend
+# 1. SSH ke server
+ssh user@your-server-ip
 
-# Copy file .env.example menjadi .env
-cp .env.example .env
+# 2. Clone repository
+git clone https://github.com/honet-labs/pekan.git
+cd pekan
 
-# Generate JWT secret yang kuat
-# Linux/macOS:
-JWT_SECRET=$(openssl rand -base64 48)
-echo "JWT_SECRET=$JWT_SECRET"
-
-# Windows PowerShell:
-# $JWT_SECRET = [Convert]::ToBase64String([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(48))
-# echo "JWT_SECRET=$JWT_SECRET"
-
-# Edit file .env dan isi JWT_SECRET dengan hasil generate di atas
-# ANDA BISA MENGGUNAKAN EDITOR FAVORIT, CONTOH:
-#   nano .env        (Linux/macOS)
-#   notepad .env     (Windows)
-#   code .env        (VS Code)
+# 3. Jalankan installer Systemd
+sudo bash deploy/installer-systemd.sh
 ```
 
-**Minimal yang harus diubah di `.env`:**
+**Opsi installer yang tersedia:**
+
+```bash
+# Install dengan default
+sudo bash deploy/installer-systemd.sh
+
+# Custom port
+sudo bash deploy/installer-systemd.sh --http-port 8080 --web-port 80
+
+# Custom database
+sudo bash deploy/installer-systemd.sh --db-host 192.168.1.100 --db-port 5432
+
+# Custom install directory
+sudo bash deploy/installer-systemd.sh --install-dir /var/www/pekan
+```
+
+**Setelah install:**
+
+```bash
+# Cek status services
+systemctl status pekan-api
+systemctl status pekan-worker
+systemctl status pekan-ai
+
+# Lihat logs
+journalctl -u pekan-api -f
+journalctl -u pekan-worker -f
+
+# Restart service
+sudo systemctl restart pekan-api
+sudo systemctl restart pekan-worker
+sudo systemctl restart pekan-ai
+```
+
+**Services yang berjalan:**
+
+| Service | Fungsi |
+| :--- | :--- |
+| `pekan-api.service` | API Server (Go binary) |
+| `pekan-worker.service` | Background Worker (Go binary) |
+| `pekan-ai.service` | AI Queue Worker (Go binary) |
+| `nginx` | Reverse proxy + Frontend |
+| `postgresql` | Database |
+| `redis` | Cache & Session |
+
+---
+
+## Perbandingan Opsi Deploy
+
+| Aspek | Docker | Systemd |
+| :--- | :--- | :--- |
+| **Kemudahan Install** | Sangat Mudah | Mudah |
+| **Performa** | Baik | Lebih Baik |
+| **Resource Usage** | Lebih tinggi (container overhead) | Lebih rendah |
+| **Isolasi** | Sempurna | Biasa |
+| **Update** | `docker compose build` | Rebuild binary |
+| **Debug** | `docker compose logs` | `journalctl` |
+| **Backup** | `docker compose exec pg_dump` | `pg_dump` langsung |
+| **Cocok Untuk** | Server kecil-menengah, mudah dipindah | Server besar, traffic tinggi |
+
+---
+
+## Update Versi
+
+Script update mendukung kedua mode deployment (systemd dan docker) secara otomatis.
+
+```bash
+cd pekan
+
+# Update ke versi terbaru (auto-detect mode)
+sudo bash deploy/update-versi.sh
+
+# Skip backup sebelum update
+sudo bash deploy/update-versi.sh --no-backup
+
+# Force mode deployment
+sudo bash deploy/update-versi.sh --mode docker
+sudo bash deploy/update-versi.sh --mode systemd
+
+# Custom install directory
+sudo bash deploy/update-versi.sh --install-dir /var/www/pekan
+```
+
+**Apa yang dilakukan update:**
+1. Pull kode terbaru dari repository
+2. Backup database (kecuali `--no-backup`)
+3. Rebuild backend binaries (systemd) atau Docker images (docker)
+4. Rebuild frontend
+5. Jalankan migrasi database
+6. Restart services/containers
+7. Verifikasi health check
+
+---
+
+## Konfigurasi
+
+### File Konfigurasi
+
+| File | Lokasi | Fungsi |
+| :--- | :--- | :--- |
+| Backend `.env` | `/opt/pekan/backend/.env` | Konfigurasi API, database, JWT, dll |
+| Docker `.env` | `/opt/pekan/.env` | Password PostgreSQL (docker mode) |
+| Nginx | `/etc/nginx/sites-available/pekan` | Konfigurasi reverse proxy (systemd mode) |
+
+### Environment Variables Penting
 
 ```env
-JWT_SECRET=<paste hasil generate di sini>
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/pekan?sslmode=disable
+# Wajib diubah di production
+JWT_SECRET=<minimal-32-karakter-random>
+RECEIPT_SCAN_SECRET=<minimal-32-karakter-random>
+ADMIN_SECRET=<minimal-32-karakter-random>
+
+# Database
+DATABASE_URL=postgres://user:pass@host:5432/pekan?sslmode=require
+
+# CORS (isi dengan domain production)
+CORS_ALLOWED_ORIGINS=https://pekan.yourdomain.com
+
+# Redis (opsional, untuk rate limiting dan session)
+RATE_LIMIT_REDIS_URL=redis://127.0.0.1:6379/0
 ```
 
-> **Penting**: `JWT_SECRET` harus minimal 32 karakter dan unik. Jangan gunakan nilai default di production.
+### Konfigurasi SSL (HTTPS)
 
 ```bash
-# Install dependencies Go
-go mod tidy
+# Install Certbot
+sudo apt install -y certbot python3-certbot-nginx
 
-# Jalankan migrasi database (membuat semua tabel)
-DATABASE_URL="postgres://postgres:postgres@localhost:5432/pekan?sslmode=disable" \
-  ./scripts/apply_migrations.sh
+# Generate SSL certificate
+sudo certbot --nginx -d pekan.yourdomain.com
 
-# (Opsional) Masukkan data demo untuk testing
-DATABASE_URL="postgres://postgres:postgres@localhost:5432/pekan?sslmode=disable" \
-  ./scripts/apply_demo_seed.sh
-```
-
-### Flags Migrasi Tambahan
-
-```bash
-# Jika menggunakan Redis:
-RATE_LIMIT_REDIS_URL="redis://localhost:6379/0" ./scripts/apply_migrations.sh
-
-# Jika PostgreSQL di port lain:
-DATABASE_URL="postgres://postgres:password@other-host:5433/pekan?sslmode=disable" \
-  ./scripts/apply_migrations.sh
+# Auto-renewal
+sudo certbot renew --dry-run
 ```
 
 ---
 
-## 4. Setup Frontend
+## Login Pertama
 
-```bash
-# Buka terminal baru, masuk ke direktori frontend
-cd frontend
-
-# Install dependencies Node.js
-npm install
-
-# (Opsional) Copy .env untuk konfigurasi API URL
-cp .env.example .env
-```
-
-**Isi `.env` frontend** (default sudah benar untuk development):
-
-```env
-VITE_API_BASE_URL=http://localhost:8080/api/v1
-```
-
----
-
-## 5. Jalankan Aplikasi
-
-Anda membutuhkan **minimal 2 terminal** (3 jika ingin AI worker).
-
-### Terminal 1 — Backend API Server
-
-```bash
-cd backend
-go run cmd/api/main.go
-
-# Output yang diharapkan:
-# API listening on :8080
-```
-
-### Terminal 2 — Frontend Dev Server
-
-```bash
-cd frontend
-npm run dev
-
-# Output yang diharapkan:
-# Local: http://localhost:5173/
-```
-
-### Terminal 3 — AI Worker (Opsional, untuk WhatsApp chatbot)
-
-```bash
-cd backend
-go run cmd/ai/main.go
-
-# Output yang diharapkan:
-# [PEKAN-AI] Asynchronous AI Queue Worker Service started
-# [PEKAN-AI] Running 4 concurrent worker threads!
-```
-
-### Terminal 4 — Background Worker (Opsional, untuk reminder & file scan)
-
-```bash
-cd backend
-go run cmd/worker/main.go
-
-# Output yang diharapkan:
-# file scan worker started
-# reminder worker started
-```
-
----
-
-## 6. Verifikasi
-
-Pastikan semua komponen berjalan dengan benar:
-
-```bash
-# 1. Cek API health check
-curl http://localhost:8080/api/v1/healthz
-# Harus return: {"status":"ok"} atau response JSON
-
-# 2. Cek frontend bisa diakses
-# Buka browser: http://localhost:5173
-# Harus muncul halaman login PEKAN
-
-# 3. (Opsional) Cek AI worker
-# Tidak ada endpoint spesifik, cukup cek log di terminal tidak ada error
-```
-
-### Via PowerShell (Windows)
-
-```powershell
-# Cek API
-Invoke-WebRequest -Uri "http://localhost:8080/api/v1/healthz" -UseBasicParsing
-
-# Buka browser
-Start-Process "http://localhost:5173"
-```
-
----
-
-## 7. Login Pertama
-
-Buka browser dan akses **http://localhost:5173**
+Buka browser dan akses aplikasi Anda.
 
 ### Jika Menggunakan Data Demo
 
@@ -345,210 +388,125 @@ Buka browser dan akses **http://localhost:5173**
 
 ### Membuat Akun Baru (Tanpa Demo Seed)
 
-1. Klik **"Register"** atau **"Buat Workspace Baru"**
-2. Isi nama workspace (tenant code), email, dan password
-3. Cek email untuk kode OTP (jika email terkonfigurasi)
-4. Masukkan OTP untuk verifikasi
-5. Login dengan akun yang baru dibuat
-
----
-
-## 8. Menjalankan Test
-
-```bash
-# Jalankan semua test backend
-cd backend
-go test ./tests/... -v
-
-# Jalankan test tertentu
-go test ./tests/... -run TestTransaction -v
-
-# Jalankan CI pipeline lokal (backend + frontend checks)
-bash local-ci.sh
-```
+1. Buka aplikasi di browser
+2. Klik **"Register"** atau **"Buat Workspace Baru"**
+3. Isi nama workspace (tenant code), email, dan password
+4. Cek email untuk kode OTP (jika email terkonfigurasi)
+5. Masukkan OTP untuk verifikasi
+6. Login dengan akun yang baru dibuat
 
 ---
 
 ## Troubleshooting
 
-### Error: `command not found: go`
+### Docker Mode
 
 ```bash
-# Pastikan Go terinstall dan ada di PATH
-go version
+# Cek status containers
+docker compose -f /opt/pekan/docker-compose.yml ps
 
-# Jika tidak ditemukan, tambahkan ke PATH:
-# Linux:
-echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
-source ~/.bashrc
+# Lihat logs container tertentu
+docker compose -f /opt/pekan/docker-compose.yml logs -f pekan-api
+docker compose -f /opt/pekan/docker-compose.yml logs -f pekan-postgres
 
-# Windows: tambahkan C:\Go\bin ke System PATH
+# Restart container
+docker compose -f /opt/pekan/docker-compose.yml restart pekan-api
+
+# Masuk ke container
+docker compose -f /opt/pekan/docker-compose.yml exec pekan-api sh
+
+# Cek database
+docker compose -f /opt/pekan/docker-compose.yml exec pekan-postgres psql -U postgres pekan
 ```
 
-### Error: `command not found: psql`
+### Systemd Mode
 
 ```bash
-# Install PostgreSQL client tools
-# Ubuntu/Debian:
-sudo apt install -y postgresql-client
+# Cek status service
+systemctl status pekan-api
+systemctl status pekan-worker
+systemctl status pekan-ai
 
-# macOS:
-brew install postgresql
+# Lihat logs
+journalctl -u pekan-api -f
+journalctl -u pekan-api -n 100 --no-pager
 
-# Atau gunakan Docker untuk menjalankan psql:
-docker exec -it pekan-postgres psql -U postgres
+# Restart service
+sudo systemctl restart pekan-api
+
+# Cek database
+sudo -u postgres psql pekan
+
+# Cek Redis
+redis-cli ping
+
+# Cek Nginx
+sudo nginx -t
+sudo systemctl status nginx
 ```
 
-### Error: `connection refused` (database)
+### Error Umum
+
+| Error | Penyebab | Solusi |
+| :--- | :--- | :--- |
+| `connection refused` | Database belum running | Cek PostgreSQL: `systemctl status postgresql` atau `docker ps` |
+| `401 Unauthorized` | JWT_SECRET berubah | Login ulang untuk session baru |
+| `CORS error` | CORS_ALLOWED_ORIGINS salah | Update `.env` dan restart API |
+| `502 Bad Gateway` | Nginx tidak bisa ke API | Cek API running: `curl localhost:8080/api/v1/healthz` |
+| `permission denied` | File permission salah | `sudo chown -R pekan:pekan /opt/pekan` |
+
+---
+
+## Backup & Restore
+
+### Docker Mode
 
 ```bash
-# Cek apakah PostgreSQL running
-# Docker:
-docker ps | grep postgres
+# Backup manual
+docker compose -f /opt/pekan/docker-compose.yml exec pekan-postgres \
+  pg_dump -U postgres pekan | gzip > backup_$(date +%Y%m%d).sql.gz
 
-# Jika belum running:
-docker compose -f deploy/docker-compose.server-test.yml up -d
-
-# Jika native, cek service:
-sudo systemctl status postgresql
+# Restore
+gunzip < backup_20260819.sql.gz | \
+  docker compose -f /opt/pekan/docker-compose.yml exec -T pekan-postgres \
+  psql -U postgres pekan
 ```
 
-### Error: `pekan_access_token` cookie not set
+### Systemd Mode
 
 ```bash
-# Pastikan CORS_ALLOWED_ORIGINS di .env backend sudah benar:
-# CORS_ALLOWED_ORIGINS=http://localhost:5173
+# Backup manual
+pg_dump -U postgres pekan | gzip > backup_$(date +%Y%m%d).sql.gz
 
-# Restart backend setelah mengubah .env
+# Restore
+gunzip < backup_20260819.sql.gz | psql -U postgres pekan
 ```
 
-### Error: `401 Unauthorized` setelah login
+### Backup Otomatis
+
+Docker mode sudah mengkonfigurasi backup otomatis setiap jam 02:00. Backup tersimpan di `/opt/pekan/backups/`.
+
+Untuk systemd mode, tambahkan cron:
 
 ```bash
-# Pastikan JWT_SECRET di .env backend sudah diisi dengan benar
-# Jika mengganti JWT_SECRET, semua session lama akan invalid
-# Login ulang untuk membuat session baru
-```
+# Edit crontab
+crontab -e
 
-### Error: `ECONNREFUSED localhost:5432`
-
-```bash
-# PostgreSQL belum running atau port berbeda
-# Cek container Docker:
-docker ps
-
-# Atau cek port PostgreSQL:
-# Linux:
-sudo netstat -tulpn | grep 5432
-
-# Jika port berbeda, update DATABASE_URL di .env
-```
-
-### Frontend error: `Failed to resolve import`
-
-```bash
-# Install ulang dependencies
-cd frontend
-rm -rf node_modules package-lock.json
-npm install
-```
-
-### Error: `go.sum` mismatch
-
-```bash
-# Update dependencies Go
-cd backend
-go mod tidy
-go mod download
-```
-
-### Docker permission denied
-
-```bash
-# Tambahkan user ke group docker
-sudo usermod -aG docker $USER
-# Logout dan login lagi
+# Tambahkan baris berikut (backup setiap jam 02:00)
+0 2 * * * pg_dump -U postgres pekan | gzip > /opt/pekan/backups/pekan_$(date +\%Y\%m\%d).sql.gz
 ```
 
 ---
 
-## Production Deployment
-
-Untuk deployment di server produksi, gunakan script installer otomatis:
-
-```bash
-# SSH ke server
-ssh user@your-server-ip
-
-# Clone repository
-git clone https://github.com/honet-labs/pekan.git
-cd pekan
-
-# Jalankan installer (Ubuntu/Debian)
-sudo bash deploy/install_server.sh
-
-# Atau (Rocky Linux/AlmaLinux)
-sudo bash deploy/install_server_rocky.sh
-```
-
-### Flag Installer yang Tersedia
-
-```bash
-# Install semua komponen (default)
-sudo bash deploy/install_server.sh
-
-# Hanya install database
-sudo bash deploy/install_server.sh --only-db
-
-# Custom port dan domain
-sudo bash deploy/install_server.sh \
-  --app-env production \
-  --http-port 8080 \
-  --cors https://yourdomain.com \
-  --jwt-secret "your-strong-secret-min-32-characters"
-
-# Lewati test saat install
-sudo bash deploy/install_server.sh --skip-tests
-
-# Lewati demo seed
-sudo bash deploy/install_server.sh --skip-seed
-```
-
-### Setelah Install Produksi
-
-```bash
-# Cek semua service
-systemctl status pekan-api
-systemctl status pekan-worker
-docker ps
-
-# Cek API
-curl https://yourdomain.com/api/v1/healthz
-
-# Lihat logs
-journalctl -u pekan-api -f
-```
-
-### Backup & Restore
-
-```bash
-# Backup database
-sudo bash deploy/backup.sh
-
-# Restore database
-sudo bash deploy/restore.sh /opt/pekan/backups/pekan_backup_YYYYMMDD.tar.gz
-
-# Update aplikasi
-sudo bash deploy/update_app.sh
-```
-
-### Spesifikasi Server
+## Spesifikasi Server
 
 | Tier | vCPU | RAM | Storage | Cocok Untuk |
 | :--- | :--- | :--- | :--- | :--- |
 | **Development** | 1 Core | 2 GB | 20 GB | Testing, solo usage |
 | **Production** | 2 Core | 4 GB | 50 GB | Tim kecil (5-20 user) |
 | **Enterprise** | 4+ Core | 8 GB+ | 100 GB+ | Organisasi besar |
+
+> **Rekomendasi**: Gunakan **Docker** untuk server dengan RAM < 4 GB. Gunakan **Systemd** untuk server dengan RAM >= 4 GB dan traffic tinggi.
 
 ---
 
@@ -561,7 +519,6 @@ sudo bash deploy/update_app.sh
 | Security Review | `docs/03-SECURITY-ARCHITECTURE-REVIEW.md` | Review keamanan |
 | API Design | `docs/06-API-DESIGN.md` | Desain API |
 | WhatsApp Integration | `docs/WHATSAPP-WAHA-INTEGRATION.md` | Integrasi WhatsApp |
-| Server Installer | `docs/SERVER-INSTALLER.md` | Panduan server installer |
 
 ---
 

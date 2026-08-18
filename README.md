@@ -308,14 +308,19 @@ pekan/
 │       └── styles/app.css
 │
 ├── deploy/                           # ─── Deployment ───
-│   ├── install_server.sh             # Installer Ubuntu/Debian
-│   ├── install_server_rocky.sh       # Installer Rocky Linux
-│   ├── update_app.sh                 # Script update
+│   ├── installer-systemd.sh          # Installer Systemd (native)
+│   ├── installer-docker.sh           # Installer Docker (containers)
+│   ├── update-versi.sh               # Update versi (auto-detect mode)
+│   ├── install_server.sh             # Installer Ubuntu/Debian (legacy)
+│   ├── install_server_rocky.sh       # Installer Rocky Linux (legacy)
+│   ├── update_app.sh                 # Script update (legacy)
 │   ├── backup.sh / restore.sh        # Backup & restore
 │   └── systemd/                      # Service unit files
 │       ├── pekan-api.service
 │       ├── pekan-worker.service
 │       └── pekan-ai.service
+│
+├── docker-compose.yml                # ─── Docker Full Stack ───
 │
 ├── docs/                             # ─── Dokumentasi ───
 │   ├── 01-TECHNICAL-BLUEPRINT.md
@@ -472,50 +477,78 @@ Untuk panduan instalasi **step-by-step** yang lebih detail (termasuk install pra
 
 ## Deployment Produksi
 
-### Otomatis (Recommended)
+PEKAN menyediakan **2 opsi deployment** produksi:
 
-PEKAN punya installer script yang mengkonfigurasi semuanya: PostgreSQL, Redis, Go binary, Nginx, systemd services, dan Fail2Ban.
+### Opsi A: Docker (Recommended)
+
+Semua komponen berjalan di container. Mudah diinstall, diupdate, dan di-backup.
 
 ```bash
-# Ubuntu / Debian
-sudo bash deploy/install_server.sh
-
-# Rocky Linux / AlmaLinux
-sudo bash deploy/install_server_rocky.sh
+git clone https://github.com/honet-labs/pekan.git
+cd pekan
+sudo bash deploy/installer-docker.sh
 ```
 
-**Pilihan flag:**
+**Container yang berjalan:**
+- `pekan-postgres` (PostgreSQL 16)
+- `pekan-redis` (Redis 7)
+- `pekan-api` (API Server)
+- `pekan-worker` (Background Worker)
+- `pekan-ai` (AI Queue Worker)
+- `pekan-web` (Frontend Nginx)
+
+### Opsi B: Systemd (Native)
+
+Binary Go native dengan systemd services. Performa lebih baik untuk traffic tinggi.
 
 ```bash
-# Install semua komponen
-sudo bash deploy/install_server.sh
+git clone https://github.com/honet-labs/pekan.git
+cd pekan
+sudo bash deploy/installer-systemd.sh
+```
 
-# Hanya install database
-sudo bash deploy/install_server.sh --only-db
+**Services yang berjalan:**
+- `pekan-api.service` (API Server)
+- `pekan-worker.service` (Background Worker)
+- `pekan-ai.service` (AI Queue Worker)
+- `nginx` (Reverse Proxy + Frontend)
+- `postgresql` (Database)
+- `redis` (Cache)
 
-# Hanya update aplikasi
-sudo bash deploy/update_app.sh
+### Perbandingan Opsi
 
-# Backup database
+| Aspek | Docker | Systemd |
+| :--- | :--- | :--- |
+| **Kemudahan** | Sangat Mudah | Mudah |
+| **Performa** | Baik | Lebih Baik |
+| **Resource** | Lebih tinggi | Lebih rendah |
+| **Isolasi** | Sempurna | Biasa |
+| **Cocok Untuk** | Server kecil-menengah | Server besar, traffic tinggi |
+
+### Update Versi
+
+```bash
+# Auto-detect mode (systemd/docker)
+sudo bash deploy/update-versi.sh
+
+# Force mode
+sudo bash deploy/update-versi.sh --mode docker
+sudo bash deploy/update-versi.sh --mode systemd
+```
+
+### Backup & Restore
+
+```bash
+# Backup (Docker)
+docker compose -f /opt/pekan/docker-compose.yml exec pekan-postgres \
+  pg_dump -U postgres pekan | gzip > backup.sql.gz
+
+# Backup (Systemd)
 sudo bash deploy/backup.sh
 
-# Restore dari backup
-sudo bash deploy/restore.sh /opt/pekan/backups/pekan_backup_20260806.tar.gz
+# Restore
+sudo bash deploy/restore.sh /opt/pekan/backups/pekan_backup_YYYYMMDD.tar.gz
 ```
-
-Panduan lengkap: [docs/SERVER-INSTALLER.md](docs/SERVER-INSTALLER.md)
-
-### Manual Production
-
-| Langkah | Perintah |
-| :--- | :--- |
-| 1. Setup server | Install PostgreSQL, Redis, Nginx, Go, Node.js |
-| 2. Clone code | `git clone` ke `/opt/pekan` |
-| 3. Build backend | `go build -o /opt/pekan/bin/pekan-api ./cmd/api` |
-| 4. Build frontend | `cd frontend && npm ci && npm run build` |
-| 5. Setup Nginx | Konfigurasi reverse proxy ke `:8080` |
-| 6. Setup systemd | Buat service files untuk api, worker, ai |
-| 7. Setup SSL | Let's Encrypt / certbot |
 
 ### Cloudflare Tunnel (Server Tanpa IP Publik)
 
