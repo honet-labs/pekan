@@ -8,15 +8,9 @@ if [ -z "${BASH_VERSION:-}" ]; then
 fi
 set -Eeuo pipefail
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-
-log()   { printf "${GREEN}[INFO]${NC} %s\n" "$*"; }
-warn()  { printf "${YELLOW}[WARN]${NC} %s\n" "$*"; }
-error() { printf "${RED}[ERROR]${NC} %s\n" "$*" >&2; }
+log()   { printf '[INFO] %s\n' "$*"; }
+warn()  { printf '[WARN] %s\n' "$*"; }
+error() { printf '[ERROR] %s\n' "$*" >&2; }
 die()   { error "$*"; exit 1; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -411,34 +405,33 @@ verify_installation() {
     log "Health check berhasil!"
   fi
 
-  printf "\n"
-  printf "${GREEN}============================================${NC}\n"
-  printf "${GREEN}  PEKAN Berhasil Diinstall (Systemd)${NC}\n"
-  printf "${GREEN}============================================${NC}\n"
-  printf "\n"
-  printf "  Aplikasi : http://localhost:${WEB_PORT}\n"
-  printf "  API      : http://localhost:${HTTP_PORT}/api/v1\n"
-  printf "  Health   : http://localhost:${HTTP_PORT}/api/v1/healthz\n"
-  printf "\n"
-  printf "  ${YELLOW}Konfigurasi:${NC} ${INSTALL_DIR}/backend/.env\n"
-  printf "  ${YELLOW}Logs:${NC}       journalctl -u pekan-api -f\n"
-  printf "  ${YELLOW}Storage:${NC}    ${INSTALL_DIR}/storage\n"
-  printf "\n"
-  printf "  ${BLUE}Service Commands:${NC}\n"
-  printf "    systemctl status pekan-api\n"
-  printf "    systemctl restart pekan-api\n"
-  printf "    systemctl status pekan-worker\n"
-  printf "    systemctl status pekan-ai\n"
-  printf "\n"
+  printf '\n'
+  printf '============================================\n'
+  printf '  PEKAN Berhasil Diinstall (Systemd)\n'
+  printf '============================================\n'
+  printf '\n'
+  printf '  Aplikasi : http://localhost:%s\n' "${WEB_PORT}"
+  printf '  API      : http://localhost:%s/api/v1\n' "${HTTP_PORT}"
+  printf '  Health   : http://localhost:%s/api/v1/healthz\n' "${HTTP_PORT}"
+  printf '\n'
+  printf '  Konfigurasi: %s/backend/.env\n' "${INSTALL_DIR}"
+  printf '  Logs:       journalctl -u pekan-api -f\n'
+  printf '  Storage:    %s/storage\n' "${INSTALL_DIR}"
+  printf '\n'
+  printf '  Service Commands:\n'
+  printf '    systemctl status pekan-api\n'
+  printf '    systemctl restart pekan-api\n'
+  printf '    systemctl status pekan-worker\n'
+  printf '    systemctl status pekan-ai\n'
+  printf '\n'
 }
 
 main() {
-  printf "${BLUE}"
-  printf "╔═══════════════════════════════════════════╗\n"
-  printf "║     PEKAN Systemd Installer               ║\n"
-  printf "║     Platform Pencatatan Keuangan          ║\n"
-  printf "╚═══════════════════════════════════════════╝\n"
-  printf "${NC}\n"
+  printf '============================================\n'
+  printf '  PEKAN Systemd Installer\n'
+  printf '  Platform Pencatatan Keuangan\n'
+  printf '============================================\n'
+  printf '\n'
 
   check_root
   detect_os

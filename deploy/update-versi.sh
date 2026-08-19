@@ -8,15 +8,9 @@ if [ -z "${BASH_VERSION:-}" ]; then
 fi
 set -Eeuo pipefail
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-
-log()   { printf "${GREEN}[INFO]${NC} %s\n" "$*"; }
-warn()  { printf "${YELLOW}[WARN]${NC} %s\n" "$*"; }
-error() { printf "${RED}[ERROR]${NC} %s\n" "$*" >&2; }
+log()   { printf '[INFO] %s\n' "$*"; }
+warn()  { printf '[WARN] %s\n' "$*"; }
+error() { printf '[ERROR] %s\n' "$*" >&2; }
 die()   { error "$*"; exit 1; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -203,15 +197,15 @@ verify_update() {
     log "Health check berhasil!"
   fi
 
-  printf "\n"
-  printf "${GREEN}============================================${NC}\n"
-  printf "${GREEN}  PEKAN Berhasil Diupdate${NC}\n"
-  printf "${GREEN}============================================${NC}\n"
-  printf "\n"
-  printf "  Mode     : ${DEPLOY_MODE}\n"
-  printf "  Version  : $(get_latest_commit)\n"
-  printf "  Health   : http://localhost:8080/api/v1/healthz\n"
-  printf "\n"
+  printf '\n'
+  printf '============================================\n'
+  printf '  PEKAN Berhasil Diupdate\n'
+  printf '============================================\n'
+  printf '\n'
+  printf '  Mode     : %s\n' "${DEPLOY_MODE}"
+  printf '  Version  : %s\n' "$(get_latest_commit)"
+  printf '  Health   : http://localhost:8080/api/v1/healthz\n'
+  printf '\n'
 }
 
 show_help() {
@@ -259,12 +253,11 @@ main() {
     esac
   done
 
-  printf "${BLUE}"
-  printf "╔═══════════════════════════════════════════╗\n"
-  printf "║     PEKAN Version Updater                 ║\n"
-  printf "║     Update ke versi terbaru               ║\n"
-  printf "╚═══════════════════════════════════════════╝\n"
-  printf "${NC}\n"
+  printf '============================================\n'
+  printf '  PEKAN Version Updater\n'
+  printf '  Update ke versi terbaru\n'
+  printf '============================================\n'
+  printf '\n'
 
   log "Versi saat ini: $(get_current_version)"
 
