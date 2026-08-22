@@ -76,8 +76,9 @@ Steps performed:
   5. Write configuration files
   6. Build Docker images
   7. Start all containers
-  8. Configure automatic daily backups
-  9. Verify installation
+  8. Run database migrations
+  9. Configure automatic daily backups
+  10. Verify installation
 
 Containers created:
   - pekan-postgres  (PostgreSQL 16)
@@ -368,8 +369,39 @@ start_containers() {
   log "  All containers started"
 }
 
+run_migrations() {
+  log "Step 7/9: Running database migrations..."
+
+  cd "$INSTALL_DIR"
+
+  # Wait for PostgreSQL to be ready
+  log "  Waiting for PostgreSQL to be ready..."
+  sleep 5
+
+  # Run migrations by executing SQL files in order
+  log "  Applying migrations..."
+  
+  # Get list of SQL files sorted by number
+  MIGRATION_FILES=$(ls "$INSTALL_DIR/backend/migrations/"*.sql 2>/dev/null | sort)
+  
+  if [[ -z "$MIGRATION_FILES" ]]; then
+    warn "  No migration files found"
+    return
+  fi
+
+  for sql_file in $MIGRATION_FILES; do
+    filename=$(basename "$sql_file")
+    log "    Applying: $filename"
+    as_root docker compose exec -T pekan-postgres psql -U "$DB_USER" -d "$DB_NAME" -f "/docker-entrypoint-initdb.d/$filename" 2>/dev/null || \
+    as_root docker compose exec -T pekan-postgres psql -U "$DB_USER" -d "$DB_NAME" -c "$(cat "$sql_file")" 2>/dev/null || \
+    warn "    Failed to apply: $filename (may already exist)"
+  done
+
+  log "  Migrations completed"
+}
+
 setup_backup() {
-  log "Step 7/9: Configuring automatic backups..."
+  log "Step 8/9: Configuring automatic backups..."
 
   BACKUP_SCRIPT="$INSTALL_DIR/scripts/backup-docker.sh"
   as_root mkdir -p "$INSTALL_DIR/scripts"
@@ -401,7 +433,7 @@ BACKUP_EOF
 }
 
 save_version() {
-  log "Step 8/9: Saving version..."
+  log "Step 9/9: Saving version..."
 
   cd "$INSTALL_DIR"
   local VERSION
@@ -412,7 +444,7 @@ save_version() {
 }
 
 verify_installation() {
-  log "Step 9/9: Verifying installation..."
+  log "Step 10/10: Verifying installation..."
   sleep 5
 
   cd "$INSTALL_DIR"
@@ -482,6 +514,7 @@ main() {
   write_config
   build_images
   start_containers
+  run_migrations
   setup_backup
   save_version
   verify_installation
