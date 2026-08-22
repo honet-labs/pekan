@@ -370,7 +370,7 @@ start_containers() {
 }
 
 run_migrations() {
-  log "Step 7/9: Running database migrations..."
+  log "Step 7/10: Running database migrations..."
 
   cd "$INSTALL_DIR"
 
@@ -378,30 +378,27 @@ run_migrations() {
   log "  Waiting for PostgreSQL to be ready..."
   sleep 5
 
-  # Run migrations by executing SQL files in order
-  log "  Applying migrations..."
-  
-  # Get list of SQL files sorted by number
-  MIGRATION_FILES=$(ls "$INSTALL_DIR/backend/migrations/"*.sql 2>/dev/null | sort)
-  
-  if [[ -z "$MIGRATION_FILES" ]]; then
-    warn "  No migration files found"
-    return
-  fi
+  # Copy migrations into postgres container
+  log "  Copying migration files..."
+  as_root docker compose cp backend/migrations pekan-postgres:/tmp/migrations
 
-  for sql_file in $MIGRATION_FILES; do
-    filename=$(basename "$sql_file")
-    log "    Applying: $filename"
-    as_root docker compose exec -T pekan-postgres psql -U "$DB_USER" -d "$DB_NAME" -f "/docker-entrypoint-initdb.d/$filename" 2>/dev/null || \
-    as_root docker compose exec -T pekan-postgres psql -U "$DB_USER" -d "$DB_NAME" -c "$(cat "$sql_file")" 2>/dev/null || \
-    warn "    Failed to apply: $filename (may already exist)"
-  done
+  # Run migrations in order
+  log "  Applying migrations..."
+  as_root docker compose exec -T pekan-postgres bash -c '
+    for f in /tmp/migrations/*.sql; do
+      echo "  Applying: $(basename $f)"
+      psql -U '"$DB_USER"' -d '"$DB_NAME"' -f "$f" 2>&1 || true
+    done
+  '
+
+  # Cleanup
+  as_root docker compose exec -T pekan-postgres rm -rf /tmp/migrations
 
   log "  Migrations completed"
 }
 
 setup_backup() {
-  log "Step 8/9: Configuring automatic backups..."
+  log "Step 8/10: Configuring automatic backups..."
 
   BACKUP_SCRIPT="$INSTALL_DIR/scripts/backup-docker.sh"
   as_root mkdir -p "$INSTALL_DIR/scripts"
@@ -433,7 +430,7 @@ BACKUP_EOF
 }
 
 save_version() {
-  log "Step 9/9: Saving version..."
+  log "Step 9/10: Saving version..."
 
   cd "$INSTALL_DIR"
   local VERSION
