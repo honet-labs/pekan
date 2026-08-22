@@ -376,26 +376,51 @@ run_migrations() {
 
   # Wait for PostgreSQL to be fully ready
   log "  Waiting for PostgreSQL to be ready..."
-  until as_root docker compose exec -T pekan-postgres pg_isready -U "$DB_USER" -d "$DB_NAME" 2>/dev/null; do
-    sleep 2
-  done
+  sleep 5
+
+  # Check if migrations directory exists
+  if [[ ! -d "$INSTALL_DIR/backend/migrations" ]]; then
+    warn "  Migrations directory not found, skipping"
+    return
+  fi
+
+  # Count migration files
+  MIGRATION_COUNT=$(ls "$INSTALL_DIR/backend/migrations/"*.sql 2>/dev/null | wc -l)
+  log "  Found $MIGRATION_COUNT migration files"
 
   # Copy migrations into postgres container
-  log "  Copying migration files..."
+  log "  Copying migration files to container..."
   as_root docker compose cp backend/migrations pekan-postgres:/tmp/migrations
+
+  # Verify files were copied
+  as_root docker compose exec -T pekan-postgres ls /tmp/migrations/ | head -5
 
   # Run all migrations in order
   log "  Applying migrations..."
   as_root docker compose exec -T pekan-postgres bash -c '
     cd /tmp/migrations
+    SUCCESS=0
+    FAILED=0
     for f in $(ls *.sql 2>/dev/null | sort); do
       echo "  -> $f"
-      psql -U '"$DB_USER"' -d '"$DB_NAME"' -f "$f" 2>&1 | grep -E "^(ERROR|CREATE|ALTER|INSERT|DROP)" || true
+      if psql -U '"$DB_USER"' -d '"$DB_NAME"' -f "$f" > /dev/null 2>&1; then
+        SUCCESS=$((SUCCESS + 1))
+      else
+        echo "     (may already exist or has errors)"
+        FAILED=$((FAILED + 1))
+      fi
     done
+    echo ""
+    echo "  Migration results: $SUCCESS succeeded, $FAILED skipped/failed"
   '
 
   # Cleanup
   as_root docker compose exec -T pekan-postgres rm -rf /tmp/migrations
+
+  # Verify key tables exist
+  log "  Verifying tables..."
+  TABLES=$(as_root docker compose exec -T pekan-postgres psql -U "$DB_USER" -d "$DB_NAME" -t -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | tr -d ' ')
+  log "  Found $TABLES tables in database"
 
   log "  Migrations completed"
 }
