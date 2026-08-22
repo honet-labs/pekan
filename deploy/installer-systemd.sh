@@ -405,7 +405,7 @@ build_frontend() {
 write_env_file() {
   log "Step 9/12: Writing configuration..."
 
-  DATABASE_URL="postgres://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=disable"
+  DATABASE_URL="postgres://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=prefer"
 
   cat <<EOF | as_root tee "$INSTALL_DIR/backend/.env" >/dev/null
 APP_ENV=${APP_ENV}
@@ -445,7 +445,7 @@ run_migrations() {
 
   log "Step 10/12: Running database migrations..."
 
-  DATABASE_URL="postgres://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=disable"
+  DATABASE_URL="postgres://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=prefer"
 
   if [[ -f "$INSTALL_DIR/backend/scripts/apply_migrations.sh" ]]; then
     as_root -u "$APP_USER" bash -c "cd '$INSTALL_DIR/backend' && chmod +x ./scripts/apply_migrations.sh && DATABASE_URL='${DATABASE_URL}' ./scripts/apply_migrations.sh"

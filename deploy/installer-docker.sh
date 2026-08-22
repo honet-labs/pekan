@@ -221,7 +221,7 @@ write_config() {
   cat <<EOF | as_root tee "$INSTALL_DIR/backend/.env" >/dev/null
 APP_ENV=${APP_ENV}
 HTTP_PORT=8080
-DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD}@pekan-postgres:5432/pekan?sslmode=disable
+DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD}@pekan-postgres:5432/pekan?sslmode=prefer
 DB_MAX_OPEN_CONNS=25
 DB_MAX_IDLE_CONNS=25
 DB_CONN_MAX_LIFETIME_MINUTES=30
