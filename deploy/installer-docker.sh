@@ -131,6 +131,77 @@ parse_args() {
   done
 }
 
+prompt_config() {
+  printf '\n'
+  printf '============================================\n'
+  printf '  PEKAN Configuration Setup\n'
+  printf '============================================\n'
+  printf '\n'
+
+  # Branch
+  printf 'Git branch [%s]: ' "$BRANCH"
+  read -r input
+  if [[ -n "$input" ]]; then
+    BRANCH="$input"
+  fi
+
+  # Install directory
+  printf 'Install directory [%s]: ' "$INSTALL_DIR"
+  read -r input
+  if [[ -n "$input" ]]; then
+    INSTALL_DIR="$input"
+  fi
+
+  # Web port
+  printf 'Web port [%s]: ' "$WEB_PORT"
+  read -r input
+  if [[ -n "$input" ]]; then
+    WEB_PORT="$input"
+  fi
+
+  # Database name
+  printf 'Database name [%s]: ' "$DB_NAME"
+  read -r input
+  if [[ -n "$input" ]]; then
+    DB_NAME="$input"
+  fi
+
+  # Database user
+  printf 'Database user [%s]: ' "$DB_USER"
+  read -r input
+  if [[ -n "$input" ]]; then
+    DB_USER="$input"
+  fi
+
+  # PostgreSQL password
+  printf 'Database password (leave empty to auto-generate): '
+  read -rs input
+  printf '\n'
+  if [[ -n "$input" ]]; then
+    POSTGRES_PASSWORD="$input"
+  fi
+
+  # Confirm
+  printf '\n'
+  printf '============================================\n'
+  printf '  Configuration Summary\n'
+  printf '============================================\n'
+  printf '  Branch:       %s\n' "$BRANCH"
+  printf '  Install Dir:  %s\n' "$INSTALL_DIR"
+  printf '  Web Port:     %s\n' "$WEB_PORT"
+  printf '  Database:     %s\n' "$DB_NAME"
+  printf '  DB User:      %s\n' "$DB_USER"
+  printf '  DB Password:  %s\n' "$(if [[ -n "$POSTGRES_PASSWORD" ]]; then echo '***'; else echo '(auto-generate)'; fi)"
+  printf '============================================\n'
+  printf '\n'
+
+  printf 'Continue with installation? [Y/n]: '
+  read -r confirm
+  if [[ "$confirm" =~ ^[Nn]$ ]]; then
+    die "Installation cancelled."
+  fi
+}
+
 as_root() {
   if [[ "${EUID}" -eq 0 ]]; then "$@"; else sudo "$@"; fi
 }
@@ -394,6 +465,8 @@ verify_installation() {
 
 main() {
   parse_args "$@"
+
+  prompt_config
 
   printf '============================================\n'
   printf '  PEKAN Docker Installer\n'
