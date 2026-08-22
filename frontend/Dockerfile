@@ -9,6 +9,9 @@ COPY package.json package-lock.json ./
 RUN rm -f package-lock.json && npm install
 
 COPY . .
+
+ENV VITE_API_BASE_URL=/api/v1
+
 RUN npm run build
 
 FROM nginx:1.27-alpine AS runtime
