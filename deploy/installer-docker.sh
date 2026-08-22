@@ -388,34 +388,27 @@ run_migrations() {
   MIGRATION_COUNT=$(ls "$INSTALL_DIR/backend/migrations/"*.sql 2>/dev/null | wc -l)
   log "  Found $MIGRATION_COUNT migration files"
 
-  # Copy migrations into postgres container
-  log "  Copying migration files to container..."
-  as_root docker compose cp backend/migrations pekan-postgres:/tmp/migrations
-
-  # Verify files were copied
-  as_root docker compose exec -T pekan-postgres ls /tmp/migrations/ | head -5
-
-  # Run all migrations in order
+  # Run migrations using psql directly
   log "  Applying migrations..."
-  as_root docker compose exec -T pekan-postgres bash -c '
-    cd /tmp/migrations
-    SUCCESS=0
-    FAILED=0
-    for f in $(ls *.sql 2>/dev/null | sort); do
-      echo "  -> $f"
-      if psql -U '"$DB_USER"' -d '"$DB_NAME"' -f "$f" > /dev/null 2>&1; then
-        SUCCESS=$((SUCCESS + 1))
-      else
-        echo "     (may already exist or has errors)"
-        FAILED=$((FAILED + 1))
-      fi
-    done
-    echo ""
-    echo "  Migration results: $SUCCESS succeeded, $FAILED skipped/failed"
-  '
+  
+  SUCCESS=0
+  FAILED=0
+  
+  for sql_file in $(ls "$INSTALL_DIR/backend/migrations/"*.sql 2>/dev/null | sort); do
+    filename=$(basename "$sql_file")
+    printf "    -> %s" "$filename"
+    
+    # Execute SQL file against postgres container
+    if as_root docker compose exec -T pekan-postgres psql -U "$DB_USER" -d "$DB_NAME" -f - < "$sql_file" > /dev/null 2>&1; then
+      printf " [OK]\n"
+      SUCCESS=$((SUCCESS + 1))
+    else
+      printf " [SKIP]\n"
+      FAILED=$((FAILED + 1))
+    fi
+  done
 
-  # Cleanup
-  as_root docker compose exec -T pekan-postgres rm -rf /tmp/migrations
+  log "  Migration results: $SUCCESS succeeded, $FAILED skipped"
 
   # Verify key tables exist
   log "  Verifying tables..."
