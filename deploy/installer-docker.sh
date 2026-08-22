@@ -374,20 +374,23 @@ run_migrations() {
 
   cd "$INSTALL_DIR"
 
-  # Wait for PostgreSQL to be ready
+  # Wait for PostgreSQL to be fully ready
   log "  Waiting for PostgreSQL to be ready..."
-  sleep 5
+  until as_root docker compose exec -T pekan-postgres pg_isready -U "$DB_USER" -d "$DB_NAME" 2>/dev/null; do
+    sleep 2
+  done
 
   # Copy migrations into postgres container
   log "  Copying migration files..."
   as_root docker compose cp backend/migrations pekan-postgres:/tmp/migrations
 
-  # Run migrations in order
+  # Run all migrations in order
   log "  Applying migrations..."
   as_root docker compose exec -T pekan-postgres bash -c '
-    for f in /tmp/migrations/*.sql; do
-      echo "  Applying: $(basename $f)"
-      psql -U '"$DB_USER"' -d '"$DB_NAME"' -f "$f" 2>&1 || true
+    cd /tmp/migrations
+    for f in $(ls *.sql 2>/dev/null | sort); do
+      echo "  -> $f"
+      psql -U '"$DB_USER"' -d '"$DB_NAME"' -f "$f" 2>&1 | grep -E "^(ERROR|CREATE|ALTER|INSERT|DROP)" || true
     done
   '
 
