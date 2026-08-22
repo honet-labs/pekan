@@ -418,8 +418,23 @@ run_migrations() {
   log "  Migrations completed"
 }
 
+restart_services() {
+  log "Step 8/10: Restarting services..."
+
+  cd "$INSTALL_DIR"
+
+  # Restart all services to pick up the new database schema
+  as_root docker compose restart
+
+  # Wait for services to be healthy
+  log "  Waiting for services to be healthy..."
+  sleep 10
+
+  log "  Services restarted"
+}
+
 setup_backup() {
-  log "Step 8/10: Configuring automatic backups..."
+  log "Step 9/10: Configuring automatic backups..."
 
   BACKUP_SCRIPT="$INSTALL_DIR/scripts/backup-docker.sh"
   as_root mkdir -p "$INSTALL_DIR/scripts"
@@ -451,7 +466,7 @@ BACKUP_EOF
 }
 
 save_version() {
-  log "Step 9/10: Saving version..."
+  log "Step 10/10: Saving version..."
 
   cd "$INSTALL_DIR"
   local VERSION
@@ -462,7 +477,7 @@ save_version() {
 }
 
 verify_installation() {
-  log "Step 10/10: Verifying installation..."
+  log "Step 11/11: Verifying installation..."
   sleep 5
 
   cd "$INSTALL_DIR"
@@ -533,6 +548,7 @@ main() {
   build_images
   start_containers
   run_migrations
+  restart_services
   setup_backup
   save_version
   verify_installation
