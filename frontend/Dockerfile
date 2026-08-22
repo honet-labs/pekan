@@ -5,7 +5,8 @@ WORKDIR /app
 RUN npm config set registry https://registry.npmjs.org/
 
 COPY package.json package-lock.json ./
-RUN npm ci
+
+RUN rm -f package-lock.json && npm install
 
 COPY . .
 RUN npm run build
