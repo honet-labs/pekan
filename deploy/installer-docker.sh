@@ -33,6 +33,8 @@ INSTALL_DIR="${INSTALL_DIR:-/opt/pekan}"
 APP_ENV="${APP_ENV:-production}"
 WEB_PORT="${WEB_PORT:-80}"
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-}"
+DB_NAME="${DB_NAME:-pekan}"
+DB_USER="${DB_USER:-postgres}"
 SKIP_BUILD=0
 
 show_help() {
@@ -50,16 +52,18 @@ Options:
                             NOTE: Docker files only exist on 'dev' branch
   --install-dir <path>      Installation directory (default: /opt/pekan)
   --web-port <port>         Web/Nginx port (default: 80)
+  --db-name <name>          Database name (default: pekan)
+  --db-user <user>          Database user (default: postgres)
   --postgres-pass <pass>    PostgreSQL password (auto-generated if empty)
   --skip-build              Skip Docker image build (use existing images)
   --help                    Show this help message
 
 Examples:
-  # Install from dev branch (recommended for Docker)
+  # Install with defaults
   sudo bash installer-docker.sh
 
-  # Install from dev branch explicitly
-  sudo bash installer-docker.sh --branch dev
+  # Install with custom database credentials
+  sudo bash installer-docker.sh --db-name mydb --db-user myuser --postgres-pass mypass
 
   # Install with custom port
   sudo bash installer-docker.sh --web-port 8080
@@ -98,6 +102,14 @@ parse_args() {
         ;;
       --web-port)
         WEB_PORT="$2"
+        shift 2
+        ;;
+      --db-name)
+        DB_NAME="$2"
+        shift 2
+        ;;
+      --db-user)
+        DB_USER="$2"
         shift 2
         ;;
       --postgres-pass)
@@ -221,7 +233,7 @@ write_config() {
   cat <<EOF | as_root tee "$INSTALL_DIR/backend/.env" >/dev/null
 APP_ENV=${APP_ENV}
 HTTP_PORT=8080
-DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD}@pekan-postgres:5432/pekan?sslmode=prefer
+DATABASE_URL=postgres://${DB_USER}:${POSTGRES_PASSWORD}@pekan-postgres:5432/${DB_NAME}?sslmode=prefer
 DB_MAX_OPEN_CONNS=25
 DB_MAX_IDLE_CONNS=25
 DB_CONN_MAX_LIFETIME_MINUTES=30
@@ -247,6 +259,8 @@ EOF
   # Root .env for docker-compose
   cat <<EOF | as_root tee "$INSTALL_DIR/.env" >/dev/null
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+DB_NAME=${DB_NAME}
+DB_USER=${DB_USER}
 EOF
 
   log "  Configuration written"

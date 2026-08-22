@@ -4,8 +4,8 @@ services:
     container_name: pekan-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: pekan
-      POSTGRES_USER: postgres
+      POSTGRES_DB: ${DB_NAME:-pekan}
+      POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     command: postgres -c ssl=off -c max_connections=100
     ports:
@@ -13,7 +13,7 @@ services:
     volumes:
       - pekan_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d pekan"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-pekan}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -48,7 +48,7 @@ services:
       - ./backend/.env
     environment:
       HTTP_PORT: 8080
-      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:-postgres}@pekan-postgres:5432/pekan?sslmode=disable
+      DATABASE_URL: postgres://${DB_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@pekan-postgres:5432/${DB_NAME:-pekan}?sslmode=prefer
       RATE_LIMIT_REDIS_URL: redis://pekan-redis:6379/0
     ports:
       - "8080:8080"
@@ -76,7 +76,7 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:-postgres}@pekan-postgres:5432/pekan?sslmode=disable
+      DATABASE_URL: postgres://${DB_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@pekan-postgres:5432/${DB_NAME:-pekan}?sslmode=prefer
     depends_on:
       pekan-postgres:
         condition: service_healthy
@@ -93,7 +93,7 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:-postgres}@pekan-postgres:5432/pekan?sslmode=disable
+      DATABASE_URL: postgres://${DB_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@pekan-postgres:5432/${DB_NAME:-pekan}?sslmode=prefer
     depends_on:
       pekan-postgres:
         condition: service_healthy
