@@ -28,7 +28,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Default values
-BRANCH="${BRANCH:-main}"
+BRANCH="${BRANCH:-dev}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/pekan}"
 APP_ENV="${APP_ENV:-production}"
 WEB_PORT="${WEB_PORT:-80}"
@@ -45,8 +45,9 @@ Usage:
   sudo bash installer-docker.sh [options]
 
 Options:
-  --branch <name>           Git branch to install (default: main)
+  --branch <name>           Git branch to install (default: dev)
                             Available: main, dev
+                            NOTE: Docker files only exist on 'dev' branch
   --install-dir <path>      Installation directory (default: /opt/pekan)
   --web-port <port>         Web/Nginx port (default: 80)
   --postgres-pass <pass>    PostgreSQL password (auto-generated if empty)
@@ -54,17 +55,14 @@ Options:
   --help                    Show this help message
 
 Examples:
-  # Install from main branch (default)
+  # Install from dev branch (recommended for Docker)
   sudo bash installer-docker.sh
 
-  # Install from dev branch
+  # Install from dev branch explicitly
   sudo bash installer-docker.sh --branch dev
 
   # Install with custom port
   sudo bash installer-docker.sh --web-port 8080
-
-  # Install with pre-set password
-  sudo bash installer-docker.sh --postgres-pass "mypassword"
 
 Steps performed:
   1. Detect OS
@@ -192,6 +190,11 @@ clone_repository() {
   else
     log "  Cloning from $REPO_URL (branch: $BRANCH)..."
     as_root git clone --branch "$BRANCH" --single-branch "$REPO_URL" "$INSTALL_DIR"
+  fi
+
+  # Verify docker-compose.yml exists
+  if [[ ! -f "$INSTALL_DIR/docker-compose.yml" ]]; then
+    die "docker-compose.yml not found in branch '$BRANCH'. Use --branch dev for Docker installation."
   fi
 
   log "  Repository ready at $INSTALL_DIR"
