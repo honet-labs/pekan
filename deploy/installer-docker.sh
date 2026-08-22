@@ -2,6 +2,17 @@
 # =============================================================================
 # PEKAN Docker Installer
 # Install PEKAN with Docker containers (all-in-one)
+#
+# Usage:
+#   sudo bash installer-docker.sh [options]
+#
+# Options:
+#   --branch <name>           Git branch to install (default: main)
+#   --install-dir <path>      Installation directory (default: /opt/pekan)
+#   --web-port <port>         Web/Nginx port (default: 80)
+#   --postgres-pass <pass>    PostgreSQL password (auto-generated if empty)
+#   --skip-build              Skip Docker image build (use existing images)
+#   --help                    Show this help
 # =============================================================================
 if [ -z "${BASH_VERSION:-}" ]; then
   exec /usr/bin/env bash "$0" "$@"
@@ -16,10 +27,99 @@ die()   { error "$*"; exit 1; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# Default values
+BRANCH="${BRANCH:-main}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/pekan}"
 APP_ENV="${APP_ENV:-production}"
 WEB_PORT="${WEB_PORT:-80}"
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-}"
+SKIP_BUILD=0
+
+show_help() {
+  cat <<'EOF'
+PEKAN Docker Installer
+
+Install PEKAN with Docker containers (all-in-one).
+
+Usage:
+  sudo bash installer-docker.sh [options]
+
+Options:
+  --branch <name>           Git branch to install (default: main)
+                            Available: main, dev
+  --install-dir <path>      Installation directory (default: /opt/pekan)
+  --web-port <port>         Web/Nginx port (default: 80)
+  --postgres-pass <pass>    PostgreSQL password (auto-generated if empty)
+  --skip-build              Skip Docker image build (use existing images)
+  --help                    Show this help message
+
+Examples:
+  # Install from main branch (default)
+  sudo bash installer-docker.sh
+
+  # Install from dev branch
+  sudo bash installer-docker.sh --branch dev
+
+  # Install with custom port
+  sudo bash installer-docker.sh --web-port 8080
+
+  # Install with pre-set password
+  sudo bash installer-docker.sh --postgres-pass "mypassword"
+
+Steps performed:
+  1. Detect OS
+  2. Install Docker and Docker Compose
+  3. Clone repository from specified branch
+  4. Generate secrets (JWT, admin, etc.)
+  5. Write configuration files
+  6. Build Docker images
+  7. Start all containers
+  8. Configure automatic daily backups
+  9. Verify installation
+
+Containers created:
+  - pekan-postgres  (PostgreSQL 16)
+  - pekan-redis     (Redis 7)
+  - pekan-api       (API Server)
+  - pekan-worker    (Background Worker)
+  - pekan-ai        (AI Queue Worker)
+  - pekan-web       (Frontend Nginx)
+EOF
+}
+
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --branch)
+        BRANCH="$2"
+        shift 2
+        ;;
+      --install-dir)
+        INSTALL_DIR="$2"
+        shift 2
+        ;;
+      --web-port)
+        WEB_PORT="$2"
+        shift 2
+        ;;
+      --postgres-pass)
+        POSTGRES_PASSWORD="$2"
+        shift 2
+        ;;
+      --skip-build)
+        SKIP_BUILD=1
+        shift
+        ;;
+      --help|-h)
+        show_help
+        exit 0
+        ;;
+      *)
+        die "Unknown option: $1. Use --help for usage."
+        ;;
+    esac
+  done
+}
 
 as_root() {
   if [[ "${EUID}" -eq 0 ]]; then "$@"; else sudo "$@"; fi
@@ -27,7 +127,7 @@ as_root() {
 
 check_root() {
   if [[ "${EUID}" -ne 0 ]]; then
-    die "Script ini harus dijalankan sebagai root. Gunakan: sudo bash $0"
+    die "This script must be run as root. Use: sudo bash $0"
   fi
 }
 
@@ -36,18 +136,18 @@ detect_os() {
     . /etc/os-release
     OS_ID="${ID:-}"
   else
-    die "Tidak bisa mendeteksi OS."
+    die "Cannot detect OS."
   fi
-  log "Terdeteksi OS: $OS_ID"
+  log "Detected OS: $OS_ID"
 }
 
 install_docker() {
+  log "Step 1/9: Installing Docker..."
+
   if command -v docker &>/dev/null; then
-    log "Docker sudah terinstall: $(docker --version)"
+    log "  Docker already installed: $(docker --version)"
     return
   fi
-
-  log "Menginstall Docker..."
 
   if command -v apt &>/dev/null; then
     as_root apt update
@@ -75,36 +175,46 @@ install_docker() {
 
   as_root systemctl enable docker
   as_root systemctl start docker
-  log "Docker berhasil diinstall"
+  log "  Docker installed"
+}
+
+clone_repository() {
+  log "Step 2/9: Cloning repository (branch: $BRANCH)..."
+
+  REPO_URL="https://github.com/honet-labs/pekan.git"
+
+  if [[ -d "$INSTALL_DIR/.git" ]]; then
+    log "  Repository exists, updating..."
+    cd "$INSTALL_DIR"
+    as_root git fetch origin
+    as_root git checkout "$BRANCH"
+    as_root git pull origin "$BRANCH"
+  else
+    log "  Cloning from $REPO_URL (branch: $BRANCH)..."
+    as_root git clone --branch "$BRANCH" --single-branch "$REPO_URL" "$INSTALL_DIR"
+  fi
+
+  log "  Repository ready at $INSTALL_DIR"
 }
 
 generate_secrets() {
+  log "Step 3/9: Generating secrets..."
+
   if [[ -z "$POSTGRES_PASSWORD" ]]; then
     POSTGRES_PASSWORD="$(openssl rand -base64 24 | tr -d '/+=' | head -c 24)"
-    log "Password PostgreSQL di-generate otomatis"
+    log "  PostgreSQL password generated"
   fi
 
   JWT_SECRET="$(openssl rand -base64 48)"
   RECEIPT_SCAN_SECRET="$(openssl rand -base64 32)"
   ADMIN_SECRET="$(openssl rand -base64 32)"
-  log "Secret keys di-generate"
+  log "  All secrets generated"
 }
 
-deploy_application() {
-  log "Mendeploy aplikasi ke $INSTALL_DIR..."
+write_config() {
+  log "Step 4/9: Writing configuration..."
 
-  as_root mkdir -p "$INSTALL_DIR"
-  as_root rsync -av --delete-after \
-    --exclude ".git" \
-    --exclude "frontend/node_modules" \
-    --exclude "backend/.env" \
-    --exclude "*.md" \
-    --exclude "docs" \
-    --exclude "deploy/install_server.sh" \
-    --exclude "deploy/install_server_rocky.sh" \
-    "$REPO_DIR/" "$INSTALL_DIR/"
-
-  # Write .env
+  # Backend .env
   cat <<EOF | as_root tee "$INSTALL_DIR/backend/.env" >/dev/null
 APP_ENV=${APP_ENV}
 HTTP_PORT=8080
@@ -115,6 +225,7 @@ DB_CONN_MAX_LIFETIME_MINUTES=30
 DB_CONN_MAX_IDLE_MINUTES=5
 JWT_SECRET=${JWT_SECRET}
 RECEIPT_SCAN_SECRET=${RECEIPT_SCAN_SECRET}
+ADMIN_SECRET=${ADMIN_SECRET}
 JWT_ISSUER=pekan-api
 JWT_ACCESS_TTL_MINUTES=15
 JWT_REFRESH_TTL_HOURS=720
@@ -128,83 +239,49 @@ RATE_LIMIT_REDIS_URL=redis://pekan-redis:6379/0
 RATE_LIMIT_REDIS_PREFIX=pekan:ratelimit
 STORAGE_PROVIDER=local
 STORAGE_LOCAL_PATH=/app/storage
-ADMIN_SECRET=${ADMIN_SECRET}
 EOF
 
-  # Write root .env for docker-compose
+  # Root .env for docker-compose
   cat <<EOF | as_root tee "$INSTALL_DIR/.env" >/dev/null
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 EOF
 
-  log "Aplikasi berhasil dideploy"
+  log "  Configuration written"
 }
 
-build_and_start() {
-  log "Building dan memulai Docker containers..."
+build_images() {
+  if [[ "$SKIP_BUILD" -eq 1 ]]; then
+    log "Step 5/9: Skipping Docker build (--skip-build)"
+    return
+  fi
+
+  log "Step 5/9: Building Docker images..."
+  cd "$INSTALL_DIR"
+  as_root docker compose build --no-cache
+  log "  Docker images built"
+}
+
+start_containers() {
+  log "Step 6/9: Starting containers..."
 
   cd "$INSTALL_DIR"
 
-  as_root docker compose build --no-cache
-
+  # Start database and cache first
+  log "  Starting PostgreSQL and Redis..."
   as_root docker compose up -d pekan-postgres pekan-redis
 
-  log "Menunggu database siap..."
+  log "  Waiting for database to be ready..."
   sleep 10
 
   # Start all services
+  log "  Starting all services..."
   as_root docker compose up -d
 
-  log "Semua containers berhasil dimulai"
+  log "  All containers started"
 }
 
-verify_installation() {
-  log "Memverifikasi instalasi..."
-  sleep 5
-
-  cd "$INSTALL_DIR"
-  as_root docker compose ps
-
-  local STATUS
-  STATUS=$(curl -sf "http://127.0.0.1:8080/api/v1/healthz" 2>/dev/null || echo "FAILED")
-
-  if [[ "$STATUS" == *"FAILED"* ]]; then
-    warn "Health check belum berhasil. Container mungkin masih starting. Cek: docker compose logs pekan-api"
-  else
-    log "Health check berhasil!"
-  fi
-
-  printf '\n'
-  printf '============================================\n'
-  printf '  PEKAN Berhasil Diinstall (Docker)\n'
-  printf '============================================\n'
-  printf '\n'
-  printf '  Aplikasi : http://localhost:%s\n' "${WEB_PORT}"
-  printf '  API      : http://localhost:8080/api/v1\n'
-  printf '  Health   : http://localhost:8080/api/v1/healthz\n'
-  printf '\n'
-  printf '  Konfigurasi: %s/backend/.env\n' "${INSTALL_DIR}"
-  printf '  Compose:    %s/docker-compose.yml\n' "${INSTALL_DIR}"
-  printf '  Logs:       docker compose -f %s/docker-compose.yml logs -f\n' "${INSTALL_DIR}"
-  printf '\n'
-  printf '  Container Commands:\n'
-  printf '    docker compose ps                    # Status containers\n'
-  printf '    docker compose logs -f pekan-api     # Logs API\n'
-  printf '    docker compose restart pekan-api     # Restart API\n'
-  printf '    docker compose down                  # Stop semua\n'
-  printf '    docker compose up -d                 # Start semua\n'
-  printf '\n'
-  printf '  Services:\n'
-  printf '    pekan-postgres  (PostgreSQL 16)\n'
-  printf '    pekan-redis     (Redis 7)\n'
-  printf '    pekan-api       (API Server - port 8080)\n'
-  printf '    pekan-worker    (Background Worker)\n'
-  printf '    pekan-ai        (AI Queue Worker)\n'
-  printf '    pekan-web       (Frontend Nginx - port %s)\n' "${WEB_PORT}"
-  printf '\n'
-}
-
-setup_backup_cron() {
-  log "Mengkonfigurasi backup otomatis..."
+setup_backup() {
+  log "Step 7/9: Configuring automatic backups..."
 
   BACKUP_SCRIPT="$INSTALL_DIR/scripts/backup-docker.sh"
   as_root mkdir -p "$INSTALL_DIR/scripts"
@@ -232,23 +309,91 @@ BACKUP_EOF
   # Add cron job for daily backup at 2 AM
   (crontab -l 2>/dev/null || true; echo "0 2 * * * $BACKUP_SCRIPT >> $INSTALL_DIR/logs/backup.log 2>&1") | as_root crontab -
 
-  log "Backup otomatis dikonfigurasi (setiap jam 02:00)"
+  log "  Automatic backup configured (daily at 02:00)"
+}
+
+save_version() {
+  log "Step 8/9: Saving version..."
+
+  cd "$INSTALL_DIR"
+  local VERSION
+  VERSION=$(git rev-parse --short HEAD)
+  echo "$VERSION" | as_root tee "$INSTALL_DIR/.version" >/dev/null
+
+  log "  Version: $VERSION"
+}
+
+verify_installation() {
+  log "Step 9/9: Verifying installation..."
+  sleep 5
+
+  cd "$INSTALL_DIR"
+  as_root docker compose ps
+
+  local STATUS
+  STATUS=$(curl -sf "http://127.0.0.1:8080/api/v1/healthz" 2>/dev/null || echo "FAILED")
+
+  if [[ "$STATUS" == *"FAILED"* ]]; then
+    warn "Health check not ready yet. Containers may still be starting."
+    warn "Check logs: docker compose -f $INSTALL_DIR/docker-compose.yml logs -f pekan-api"
+  else
+    log "Health check passed!"
+  fi
+
+  printf '\n'
+  printf '============================================\n'
+  printf '  PEKAN Installation Complete (Docker)\n'
+  printf '============================================\n'
+  printf '\n'
+  printf '  Branch:      %s\n' "${BRANCH}"
+  printf '  Install Dir: %s\n' "${INSTALL_DIR}"
+  printf '  Web URL:     http://localhost:%s\n' "${WEB_PORT}"
+  printf '  API URL:     http://localhost:8080/api/v1\n'
+  printf '  Health:      http://localhost:8080/api/v1/healthz\n'
+  printf '\n'
+  printf '  Config:      %s/backend/.env\n' "${INSTALL_DIR}"
+  printf '  Compose:     %s/docker-compose.yml\n' "${INSTALL_DIR}"
+  printf '  Logs:        docker compose -f %s/docker-compose.yml logs -f\n' "${INSTALL_DIR}"
+  printf '\n'
+  printf '  Containers:\n'
+  printf '    pekan-postgres  (PostgreSQL 16)\n'
+  printf '    pekan-redis     (Redis 7)\n'
+  printf '    pekan-api       (API Server - port 8080)\n'
+  printf '    pekan-worker    (Background Worker)\n'
+  printf '    pekan-ai        (AI Queue Worker)\n'
+  printf '    pekan-web       (Frontend Nginx - port %s)\n' "${WEB_PORT}"
+  printf '\n'
+  printf '  Commands:\n'
+  printf '    docker compose ps                    # Container status\n'
+  printf '    docker compose logs -f pekan-api     # View API logs\n'
+  printf '    docker compose restart pekan-api     # Restart API\n'
+  printf '    docker compose down                  # Stop all\n'
+  printf '    docker compose up -d                 # Start all\n'
+  printf '\n'
+  printf '  Update:\n'
+  printf '    cd %s && git pull && sudo bash deploy/update-versi.sh\n' "${INSTALL_DIR}"
+  printf '\n'
 }
 
 main() {
+  parse_args "$@"
+
   printf '============================================\n'
   printf '  PEKAN Docker Installer\n'
-  printf '  Platform Pencatatan Keuangan\n'
+  printf '  Branch: %s\n' "${BRANCH}"
   printf '============================================\n'
   printf '\n'
 
   check_root
   detect_os
   install_docker
+  clone_repository
   generate_secrets
-  deploy_application
-  build_and_start
-  setup_backup_cron
+  write_config
+  build_images
+  start_containers
+  setup_backup
+  save_version
   verify_installation
 }
 
