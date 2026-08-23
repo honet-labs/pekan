@@ -37,6 +37,20 @@ DB_NAME="${DB_NAME:-pekan}"
 DB_USER="${DB_USER:-postgres}"
 SKIP_BUILD=0
 
+# Resource limits (empty = no limit)
+LIMIT_API_CPU="${LIMIT_API_CPU:-}"
+LIMIT_API_MEM="${LIMIT_API_MEM:-}"
+LIMIT_WORKER_CPU="${LIMIT_WORKER_CPU:-}"
+LIMIT_WORKER_MEM="${LIMIT_WORKER_MEM:-}"
+LIMIT_AI_CPU="${LIMIT_AI_CPU:-}"
+LIMIT_AI_MEM="${LIMIT_AI_MEM:-}"
+LIMIT_DB_CPU="${LIMIT_DB_CPU:-}"
+LIMIT_DB_MEM="${LIMIT_DB_MEM:-}"
+LIMIT_REDIS_CPU="${LIMIT_REDIS_CPU:-}"
+LIMIT_REDIS_MEM="${LIMIT_REDIS_MEM:-}"
+LIMIT_WEB_CPU="${LIMIT_WEB_CPU:-}"
+LIMIT_WEB_MEM="${LIMIT_WEB_MEM:-}"
+
 show_help() {
   cat <<'EOF'
 PEKAN Docker Installer
@@ -182,6 +196,60 @@ prompt_config() {
     POSTGRES_PASSWORD="$input"
   fi
 
+  # Resource limits
+  printf '\n'
+  printf '--- Resource Limits (leave empty for no limit) ---\n'
+  printf 'Format: CPU (e.g., 0.5, 1, 2) | Memory (e.g., 256m, 1g)\n'
+  printf '\n'
+
+  printf 'PostgreSQL - CPU limit [%s]: ' "$(if [[ -n "$LIMIT_DB_CPU" ]]; then echo "$LIMIT_DB_CPU"; else echo "none"; fi)"
+  read -r input
+  if [[ -n "$input" ]]; then LIMIT_DB_CPU="$input"; fi
+
+  printf 'PostgreSQL - Memory limit [%s]: ' "$(if [[ -n "$LIMIT_DB_MEM" ]]; then echo "$LIMIT_DB_MEM"; else echo "none"; fi)"
+  read -r input
+  if [[ -n "$input" ]]; then LIMIT_DB_MEM="$input"; fi
+
+  printf 'Redis - CPU limit [%s]: ' "$(if [[ -n "$LIMIT_REDIS_CPU" ]]; then echo "$LIMIT_REDIS_CPU"; else echo "none"; fi)"
+  read -r input
+  if [[ -n "$input" ]]; then LIMIT_REDIS_CPU="$input"; fi
+
+  printf 'Redis - Memory limit [%s]: ' "$(if [[ -n "$LIMIT_REDIS_MEM" ]]; then echo "$LIMIT_REDIS_MEM"; else echo "none"; fi)"
+  read -r input
+  if [[ -n "$input" ]]; then LIMIT_REDIS_MEM="$input"; fi
+
+  printf 'API Server - CPU limit [%s]: ' "$(if [[ -n "$LIMIT_API_CPU" ]]; then echo "$LIMIT_API_CPU"; else echo "none"; fi)"
+  read -r input
+  if [[ -n "$input" ]]; then LIMIT_API_CPU="$input"; fi
+
+  printf 'API Server - Memory limit [%s]: ' "$(if [[ -n "$LIMIT_API_MEM" ]]; then echo "$LIMIT_API_MEM"; else echo "none"; fi)"
+  read -r input
+  if [[ -n "$input" ]]; then LIMIT_API_MEM="$input"; fi
+
+  printf 'Worker - CPU limit [%s]: ' "$(if [[ -n "$LIMIT_WORKER_CPU" ]]; then echo "$LIMIT_WORKER_CPU"; else echo "none"; fi)"
+  read -r input
+  if [[ -n "$input" ]]; then LIMIT_WORKER_CPU="$input"; fi
+
+  printf 'Worker - Memory limit [%s]: ' "$(if [[ -n "$LIMIT_WORKER_MEM" ]]; then echo "$LIMIT_WORKER_MEM"; else echo "none"; fi)"
+  read -r input
+  if [[ -n "$input" ]]; then LIMIT_WORKER_MEM="$input"; fi
+
+  printf 'AI Worker - CPU limit [%s]: ' "$(if [[ -n "$LIMIT_AI_CPU" ]]; then echo "$LIMIT_AI_CPU"; else echo "none"; fi)"
+  read -r input
+  if [[ -n "$input" ]]; then LIMIT_AI_CPU="$input"; fi
+
+  printf 'AI Worker - Memory limit [%s]: ' "$(if [[ -n "$LIMIT_AI_MEM" ]]; then echo "$LIMIT_AI_MEM"; else echo "none"; fi)"
+  read -r input
+  if [[ -n "$input" ]]; then LIMIT_AI_MEM="$input"; fi
+
+  printf 'Frontend (Nginx) - CPU limit [%s]: ' "$(if [[ -n "$LIMIT_WEB_CPU" ]]; then echo "$LIMIT_WEB_CPU"; else echo "none"; fi)"
+  read -r input
+  if [[ -n "$input" ]]; then LIMIT_WEB_CPU="$input"; fi
+
+  printf 'Frontend (Nginx) - Memory limit [%s]: ' "$(if [[ -n "$LIMIT_WEB_MEM" ]]; then echo "$LIMIT_WEB_MEM"; else echo "none"; fi)"
+  read -r input
+  if [[ -n "$input" ]]; then LIMIT_WEB_MEM="$input"; fi
+
   # Confirm
   printf '\n'
   printf '============================================\n'
@@ -193,6 +261,14 @@ prompt_config() {
   printf '  Database:     %s\n' "$DB_NAME"
   printf '  DB User:      %s\n' "$DB_USER"
   printf '  DB Password:  %s\n' "$(if [[ -n "$POSTGRES_PASSWORD" ]]; then echo '***'; else echo '(auto-generate)'; fi)"
+  printf '\n'
+  printf '  Resource Limits:\n'
+  printf '    PostgreSQL:   CPU=%s MEM=%s\n' "$(if [[ -n "$LIMIT_DB_CPU" ]]; then echo "$LIMIT_DB_CPU"; else echo "unlimited"; fi)" "$(if [[ -n "$LIMIT_DB_MEM" ]]; then echo "$LIMIT_DB_MEM"; else echo "unlimited"; fi)"
+  printf '    Redis:        CPU=%s MEM=%s\n' "$(if [[ -n "$LIMIT_REDIS_CPU" ]]; then echo "$LIMIT_REDIS_CPU"; else echo "unlimited"; fi)" "$(if [[ -n "$LIMIT_REDIS_MEM" ]]; then echo "$LIMIT_REDIS_MEM"; else echo "unlimited"; fi)"
+  printf '    API Server:   CPU=%s MEM=%s\n' "$(if [[ -n "$LIMIT_API_CPU" ]]; then echo "$LIMIT_API_CPU"; else echo "unlimited"; fi)" "$(if [[ -n "$LIMIT_API_MEM" ]]; then echo "$LIMIT_API_MEM"; else echo "unlimited"; fi)"
+  printf '    Worker:       CPU=%s MEM=%s\n' "$(if [[ -n "$LIMIT_WORKER_CPU" ]]; then echo "$LIMIT_WORKER_CPU"; else echo "unlimited"; fi)" "$(if [[ -n "$LIMIT_WORKER_MEM" ]]; then echo "$LIMIT_WORKER_MEM"; else echo "unlimited"; fi)"
+  printf '    AI Worker:    CPU=%s MEM=%s\n' "$(if [[ -n "$LIMIT_AI_CPU" ]]; then echo "$LIMIT_AI_CPU"; else echo "unlimited"; fi)" "$(if [[ -n "$LIMIT_AI_MEM" ]]; then echo "$LIMIT_AI_MEM"; else echo "unlimited"; fi)"
+  printf '    Frontend:     CPU=%s MEM=%s\n' "$(if [[ -n "$LIMIT_WEB_CPU" ]]; then echo "$LIMIT_WEB_CPU"; else echo "unlimited"; fi)" "$(if [[ -n "$LIMIT_WEB_MEM" ]]; then echo "$LIMIT_WEB_MEM"; else echo "unlimited"; fi)"
   printf '============================================\n'
   printf '\n'
 
@@ -336,6 +412,182 @@ DB_USER=${DB_USER}
 EOF
 
   log "  Configuration written"
+}
+
+write_docker_compose() {
+  log "  Writing docker-compose.yml with resource limits..."
+
+  # Helper function to generate deploy section
+  generate_deploy() {
+    local cpu="$1"
+    local mem="$2"
+    if [[ -n "$cpu" || -n "$mem" ]]; then
+      echo "    deploy:"
+      echo "      resources:"
+      echo "        limits:"
+      if [[ -n "$cpu" ]]; then
+        echo "          cpus: \"${cpu}\""
+      fi
+      if [[ -n "$mem" ]]; then
+        echo "          memory: ${mem}"
+      fi
+    fi
+  }
+
+  cat <<EOF | as_root tee "$INSTALL_DIR/docker-compose.yml" >/dev/null
+services:
+  pekan-postgres:
+    image: postgres:16-alpine
+    container_name: pekan-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: \${DB_NAME:-pekan}
+      POSTGRES_USER: \${DB_USER:-postgres}
+      POSTGRES_PASSWORD: \${POSTGRES_PASSWORD:-postgres}
+    command: postgres -c ssl=off -c max_connections=100
+    ports:
+      - "5432:5432"
+    volumes:
+      - pekan_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \${DB_USER:-postgres} -d \${DB_NAME:-pekan}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+$(generate_deploy "$LIMIT_DB_CPU" "$LIMIT_DB_MEM")
+    networks:
+      - pekan-network
+
+  pekan-redis:
+    image: redis:7-alpine
+    container_name: pekan-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - pekan_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+$(generate_deploy "$LIMIT_REDIS_CPU" "$LIMIT_REDIS_MEM")
+    networks:
+      - pekan-network
+
+  pekan-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pekan-api
+    restart: unless-stopped
+    entrypoint: ["/app/pekan-api"]
+    env_file:
+      - ./backend/.env
+    environment:
+      HTTP_PORT: 8080
+      DATABASE_URL: postgres://\${DB_USER:-postgres}:\${POSTGRES_PASSWORD:-postgres}@pekan-postgres:5432/\${DB_NAME:-pekan}?sslmode=prefer
+      RATE_LIMIT_REDIS_URL: redis://pekan-redis:6379/0
+    ports:
+      - "8080:8080"
+    depends_on:
+      pekan-postgres:
+        condition: service_healthy
+      pekan-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/v1/healthz"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+$(generate_deploy "$LIMIT_API_CPU" "$LIMIT_API_MEM")
+    networks:
+      - pekan-network
+
+  pekan-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pekan-worker
+    restart: unless-stopped
+    entrypoint: ["/app/pekan-worker"]
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgres://\${DB_USER:-postgres}:\${POSTGRES_PASSWORD:-postgres}@pekan-postgres:5432/\${DB_NAME:-pekan}?sslmode=prefer
+    depends_on:
+      pekan-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f pekan-worker || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+$(generate_deploy "$LIMIT_WORKER_CPU" "$LIMIT_WORKER_MEM")
+    networks:
+      - pekan-network
+
+  pekan-ai:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pekan-ai
+    restart: unless-stopped
+    entrypoint: ["/app/pekan-ai"]
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgres://\${DB_USER:-postgres}:\${POSTGRES_PASSWORD:-postgres}@pekan-postgres:5432/\${DB_NAME:-pekan}?sslmode=prefer
+    depends_on:
+      pekan-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f pekan-ai || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+$(generate_deploy "$LIMIT_AI_CPU" "$LIMIT_AI_MEM")
+    networks:
+      - pekan-network
+
+  pekan-web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: pekan-web
+    restart: unless-stopped
+    ports:
+      - "\${WEB_PORT:-80}:80"
+    depends_on:
+      pekan-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/healthz"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+$(generate_deploy "$LIMIT_WEB_CPU" "$LIMIT_WEB_MEM")
+    networks:
+      - pekan-network
+
+volumes:
+  pekan_postgres_data:
+    name: pekan_postgres_data
+  pekan_redis_data:
+    name: pekan_redis_data
+
+networks:
+  pekan-network:
+    name: pekan-network
+    driver: bridge
+EOF
+
+  log "  docker-compose.yml written"
 }
 
 build_images() {
@@ -553,6 +805,7 @@ main() {
   clone_repository
   generate_secrets
   write_config
+  write_docker_compose
   build_images
   start_containers
   run_migrations
