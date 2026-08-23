@@ -222,6 +222,87 @@ JWT Auth → Tenant Context → RBAC Check → Handler
 
 ---
 
+## Services dan Fungsi
+
+PEKAN terdiri dari beberapa service yang berjalan terpisah. Berikut penjelasan masing-masing:
+
+### Backend Services (Go Binary)
+
+| Service | Fungsi | Port | Keterangan |
+| :--- | :--- | :--- | :--- |
+| **pekan-api** | REST API Server | 8080 | Menerima semua HTTP request dari frontend dan WhatsApp webhook. Menangani autentikasi, CRUD transaksi, laporan, dan admin panel. |
+| **pekan-worker** | Background Worker | - | Menjalankan 2 worker: (1) File Scan Worker - memindai virus pada file upload, (2) Reminder Worker - mengirim pengingat tagihan yang jatuh tempo. |
+| **pekan-ai** | AI Queue Worker | - | Memproses antrian pesan WhatsApp chatbot secara asynchronous. Menggunakan AI (Gemini/OpenAI/Claude) untuk memahami pesan dan mencatat transaksi. |
+
+### Database & Cache
+
+| Service | Fungsi | Port | Keterangan |
+| :--- | :--- | :--- | :--- |
+| **PostgreSQL 16** | Database Utama | 5432 | Menyimpan semua data: user, tenant, transaksi, anggaran, tabungan, dll. Menggunakan schema-per-tenant untuk isolasi data antar workspace. |
+| **Redis 7** | Cache & Session | 6379 | (Opsional) Digunakan untuk: rate limiting (anti brute-force), session token blacklist, cache dashboard, dan tracking percobaan login gagal. Tanpa Redis, aplikasi fallback ke in-memory. |
+
+### Frontend & Proxy
+
+| Service | Fungsi | Port | Keterangan |
+| :--- | :--- | :--- | :--- |
+| **pekan-web** | Frontend + Reverse Proxy | 80 | Menyajikan aplikasi React (SPA) dan meneruskan request `/api/` ke pekan-api. Juga menangani gzip, caching static files, dan health check. |
+
+### Container Docker
+
+Saat deploy dengan Docker, semua service berjalan sebagai container:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Docker Network                           │
+│                                                                 │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
+│  │  pekan-web   │  │  pekan-api   │  │ pekan-worker │          │
+│  │  (Nginx)     │──│  (REST API)  │  │ (Background) │          │
+│  │  :80         │  │  :8080       │  │              │          │
+│  └──────────────┘  └──────┬───────┘  └──────┬───────┘          │
+│                           │                  │                  │
+│                           ▼                  ▼                  │
+│                    ┌──────────────┐  ┌──────────────┐          │
+│                    │  pekan-ai    │  │   Redis 7    │          │
+│                    │  (AI Queue)  │  │   :6379      │          │
+│                    └──────┬───────┘  └──────────────┘          │
+│                           │                                     │
+│                           ▼                                     │
+│                    ┌──────────────┐                             │
+│                    │ PostgreSQL   │                             │
+│                    │    16        │                             │
+│                    │   :5432      │                             │
+│                    └──────────────┘                             │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Alur Request
+
+```
+1. User buka browser → pekan-web (Nginx port 80)
+2. Nginx serve file React (index.html, JS, CSS)
+3. React app panggil /api/v1/* → Nginx proxy ke pekan-api:8080
+4. pekan-api proses request → query PostgreSQL → return JSON
+5. User kirim WhatsApp → WAHA gateway → pekan-api webhook
+6. Pesan masuk antrian → pekan-ai proses dengan AI → balas via WhatsApp
+7. File upload → pekan-worker scan virus di background
+8. Tagihan jatuh tempo → pekan-worker kirim notifikasi
+```
+
+### Kebutuhan Resource
+
+| Service | CPU | RAM | Keterangan |
+| :--- | :--- | :--- | :--- |
+| pekan-api | 0.5 core | 256MB | Bisa di-scale untuk traffic tinggi |
+| pekan-worker | 0.25 core | 128MB | Ringan, hanya proses background |
+| pekan-ai | 0.5 core | 256MB | Tergantung jumlah worker concurrent |
+| PostgreSQL | 0.5 core | 512MB | Tergantung ukuran database |
+| Redis | 0.1 core | 64MB | Sangat ringan |
+| pekan-web | 0.1 core | 64MB | Hanya serve static files |
+| **Total** | **~2 core** | **~1.3GB** | Minimum untuk production |
+
+---
+
 ## Struktur Proyek
 
 ```
