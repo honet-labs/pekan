@@ -460,10 +460,53 @@ func (s *Service) BootstrapTenantDirect(ctx context.Context, tenantCode, tenantN
 	return nil
 }
 
-func (s *Service) CreateBackup(ctx context.Context, backupType string, tenantID string) error {
+func (s *Service) getDatabaseURL(ctx context.Context) string {
+	// Try to get from global settings first
+	configJSON, err := s.GetGlobalSettingRaw(ctx, "database_config")
+	if err == nil && configJSON != "" {
+		var cfg DatabaseConfig
+		if json.Unmarshal([]byte(configJSON), &cfg) == nil && cfg.Host != "" {
+			sslMode := cfg.SSLMode
+			if sslMode == "" {
+				sslMode = "disable"
+			}
+			return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
+				cfg.User, cfg.Password, cfg.Host, cfg.Port, cfg.DBName, sslMode)
+		}
+	}
+
+	// Fallback to environment variable
 	dbUrl := os.Getenv("DATABASE_URL")
+	if dbUrl != "" {
+		return dbUrl
+	}
+
+	// Build from individual env vars
+	dbUser := os.Getenv("DB_USER")
+	if dbUser == "" {
+		dbUser = "postgres"
+	}
+	dbPass := os.Getenv("DB_PASS")
+	dbHost := os.Getenv("DB_HOST")
+	if dbHost == "" {
+		dbHost = "127.0.0.1"
+	}
+	dbPort := os.Getenv("DB_PORT")
+	if dbPort == "" {
+		dbPort = "5432"
+	}
+	dbName := os.Getenv("DB_NAME")
+	if dbName == "" {
+		dbName = "pekan"
+	}
+
+	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", dbUser, dbPass, dbHost, dbPort, dbName)
+}
+
+func (s *Service) CreateBackup(ctx context.Context, backupType string, tenantID string) error {
+	dbUrl := s.getDatabaseURL(ctx)
 	if dbUrl == "" {
-		return errors.New("DATABASE_URL not set")
+		return errors.New("database configuration not found")
 	}
 
 	backupDir := "data/storage/backups"
@@ -514,23 +557,14 @@ func (s *Service) CreateBackup(ctx context.Context, backupType string, tenantID 
 		args = append(args, "-a")
 	}
 
-	// Get DB connection details for pg_dump inside postgres container
-	dbUser := os.Getenv("DB_USER")
-	if dbUser == "" {
-		dbUser = "postgres"
-	}
-	dbName := os.Getenv("DB_NAME")
-	if dbName == "" {
-		dbName = "pekan"
-	}
+	// Add database URL and output file
+	args = append(args, "-d", dbUrl, "-f", fp)
 
-	// Build the pg_dump command to run inside postgres container
-	pgDumpArgs := append([]string{"compose", "exec", "-T", "pekan-postgres", "pg_dump", "-U", dbUser, "-d", dbName}, args...)
-	cmd := exec.CommandContext(ctx, "docker", pgDumpArgs...)
-	output, err := cmd.Output()
+	// Run pg_dump directly (works for both systemd and docker)
+	cmd := exec.CommandContext(ctx, "pg_dump", args...)
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		errOutput, _ := cmd.CombinedOutput()
-		return fmt.Errorf("pg_dump failed: %v, output: %s", err, string(errOutput))
+		return fmt.Errorf("pg_dump failed: %v, output: %s", err, string(output))
 	}
 
 	// Write output to file
@@ -563,9 +597,9 @@ func (s *Service) CreateBackup(ctx context.Context, backupType string, tenantID 
 }
 
 func (s *Service) RestoreBackup(ctx context.Context, filename string, tenantID string) error {
-	dbUrl := os.Getenv("DATABASE_URL")
+	dbUrl := s.getDatabaseURL(ctx)
 	if dbUrl == "" {
-		return errors.New("DATABASE_URL not set")
+		return errors.New("database configuration not found")
 	}
 
 	backupDir := "data/storage/backups"
@@ -585,44 +619,20 @@ func (s *Service) RestoreBackup(ctx context.Context, filename string, tenantID s
 		return errors.New("backup file not found")
 	}
 
-	// Get DB connection details
-	dbUser := os.Getenv("DB_USER")
-	if dbUser == "" {
-		dbUser = "postgres"
-	}
-	dbName := os.Getenv("DB_NAME")
-	if dbName == "" {
-		dbName = "pekan"
-	}
-
-	// Always use psql inside postgres container (works for .sql and .sql.gz)
+	// Use psql directly with database URL (works for both systemd and docker)
 	var cmd *exec.Cmd
 	if strings.HasSuffix(cleanName, ".gz") {
-		// For .sql.gz files: copy to container, decompress, and restore
-		copyCmd := exec.CommandContext(ctx, "docker", "compose", "cp", fp, "pekan-postgres:/tmp/restore.sql.gz")
-		if output, err := copyCmd.CombinedOutput(); err != nil {
-			return fmt.Errorf("failed to copy backup: %v, output: %s", err, string(output))
-		}
-		cmd = exec.CommandContext(ctx, "docker", "compose", "exec", "-T", "pekan-postgres",
-			"sh", "-c", "gunzip -c /tmp/restore.sql.gz | psql -U "+dbUser+" -d "+dbName+" 2>&1")
+		// For .sql.gz files: decompress and pipe to psql
+		cmd = exec.CommandContext(ctx, "sh", "-c", fmt.Sprintf("gunzip -c %s | psql '%s'", fp, dbUrl))
 	} else {
-		// For .sql files: copy to container and restore
-		copyCmd := exec.CommandContext(ctx, "docker", "compose", "cp", fp, "pekan-postgres:/tmp/restore.sql")
-		if output, err := copyCmd.CombinedOutput(); err != nil {
-			return fmt.Errorf("failed to copy backup: %v, output: %s", err, string(output))
-		}
-		cmd = exec.CommandContext(ctx, "docker", "compose", "exec", "-T", "pekan-postgres",
-			"psql", "-U", dbUser, "-d", dbName, "-f", "/tmp/restore.sql")
+		// For .sql files: use psql directly
+		cmd = exec.CommandContext(ctx, "psql", "-d", dbUrl, "-f", fp)
 	}
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("restore failed: %v, output: %s", err, string(output))
 	}
-
-	// Cleanup temp file
-	cleanupCmd := exec.CommandContext(ctx, "docker", "compose", "exec", "-T", "pekan-postgres", "rm", "-f", "/tmp/restore.sql", "/tmp/restore.sql.gz")
-	cleanupCmd.Run()
 
 	_ = s.audit.Write(ctx, "BACKUP_RESTORED", "tenant", tenantID, nil, map[string]any{"filename": cleanName})
 	return nil
