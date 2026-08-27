@@ -489,7 +489,24 @@ func (s *Service) CreateBackup(ctx context.Context, backupType string, tenantID 
 
 	args := []string{"-d", dbUrl, "-F", "c", "-f", fp}
 	if schemaName != "" {
+		// Backup specific tenant schema
 		args = append(args, "-n", schemaName)
+	} else if backupType == "full" {
+		// For full backup, include all schemas (public + all tenant schemas)
+		// Get all tenant schemas
+		rows, err := s.db.QueryContext(ctx, `SELECT code FROM public.tenants WHERE is_active = true`)
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var code string
+				if err := rows.Scan(&code); err == nil {
+					tenantSchema := tenancy.GetSchemaName(code)
+					args = append(args, "-n", tenantSchema)
+				}
+			}
+		}
+		// Also include public schema
+		args = append(args, "-n", "public")
 	}
 	if backupType == "schema" {
 		args = append(args, "-s")
