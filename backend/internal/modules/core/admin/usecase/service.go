@@ -560,16 +560,34 @@ func (s *Service) CreateBackup(ctx context.Context, backupType string, tenantID 
 	// Add database URL (output to stdout)
 	args = append(args, "-d", dbUrl)
 
-	// Run pg_dump and capture stdout
-	cmd := exec.CommandContext(ctx, "pg_dump", args...)
-	output, err := cmd.Output()
-	if err != nil {
-		errOutput, _ := cmd.CombinedOutput()
-		return fmt.Errorf("pg_dump failed: %v, output: %s", err, string(errOutput))
+	// Check if running in Docker by looking for docker-compose.yml
+	isDocker := false
+	if _, err := os.Stat("docker-compose.yml"); err == nil {
+		isDocker = true
+	}
+
+	var output []byte
+	if isDocker {
+		// Docker mode: run pg_dump inside postgres container
+		dockerArgs := append([]string{"compose", "exec", "-T", "pekan-postgres", "pg_dump", "-U", "postgres", "-d", "pekan"}, args...)
+		cmd := exec.CommandContext(ctx, "docker", dockerArgs...)
+		output, err = cmd.Output()
+		if err != nil {
+			errOutput, _ := cmd.CombinedOutput()
+			return fmt.Errorf("pg_dump failed: %v, output: %s", err, string(errOutput))
+		}
+	} else {
+		// Systemd mode: run pg_dump directly
+		cmd := exec.CommandContext(ctx, "pg_dump", args...)
+		output, err = cmd.Output()
+		if err != nil {
+			errOutput, _ := cmd.CombinedOutput()
+			return fmt.Errorf("pg_dump failed: %v, output: %s", err, string(errOutput))
+		}
 	}
 
 	if len(output) == 0 {
-		return fmt.Errorf("pg_dump produced no output - check if pg_dump is installed and database URL is correct")
+		return fmt.Errorf("pg_dump produced no output - check if database is accessible")
 	}
 
 	// Write output to file
@@ -624,19 +642,50 @@ func (s *Service) RestoreBackup(ctx context.Context, filename string, tenantID s
 		return errors.New("backup file not found")
 	}
 
-	// Use psql directly with database URL (works for both systemd and docker)
+	// Check if running in Docker by looking for docker-compose.yml
+	isDocker := false
+	if _, err := os.Stat("docker-compose.yml"); err == nil {
+		isDocker = true
+	}
+
 	var cmd *exec.Cmd
-	if strings.HasSuffix(cleanName, ".gz") {
-		// For .sql.gz files: decompress and pipe to psql
-		cmd = exec.CommandContext(ctx, "sh", "-c", fmt.Sprintf("gunzip -c %s | psql '%s'", fp, dbUrl))
+	if isDocker {
+		// Docker mode: copy file to postgres container and restore there
+		if strings.HasSuffix(cleanName, ".gz") {
+			// Copy gz file to container
+			copyCmd := exec.CommandContext(ctx, "docker", "compose", "cp", fp, "pekan-postgres:/tmp/restore.sql.gz")
+			if output, err := copyCmd.CombinedOutput(); err != nil {
+				return fmt.Errorf("failed to copy backup: %v, output: %s", err, string(output))
+			}
+			cmd = exec.CommandContext(ctx, "docker", "compose", "exec", "-T", "pekan-postgres",
+				"sh", "-c", "gunzip -c /tmp/restore.sql.gz | psql -U postgres -d pekan 2>&1")
+		} else {
+			// Copy sql file to container
+			copyCmd := exec.CommandContext(ctx, "docker", "compose", "cp", fp, "pekan-postgres:/tmp/restore.sql")
+			if output, err := copyCmd.CombinedOutput(); err != nil {
+				return fmt.Errorf("failed to copy backup: %v, output: %s", err, string(output))
+			}
+			cmd = exec.CommandContext(ctx, "docker", "compose", "exec", "-T", "pekan-postgres",
+				"psql", "-U", "postgres", "-d", "pekan", "-f", "/tmp/restore.sql")
+		}
 	} else {
-		// For .sql files: use psql directly
-		cmd = exec.CommandContext(ctx, "psql", "-d", dbUrl, "-f", fp)
+		// Systemd mode: run psql directly
+		if strings.HasSuffix(cleanName, ".gz") {
+			cmd = exec.CommandContext(ctx, "sh", "-c", fmt.Sprintf("gunzip -c %s | psql '%s'", fp, dbUrl))
+		} else {
+			cmd = exec.CommandContext(ctx, "psql", "-d", dbUrl, "-f", fp)
+		}
 	}
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("restore failed: %v, output: %s", err, string(output))
+	}
+
+	// Cleanup temp file in Docker
+	if isDocker {
+		cleanupCmd := exec.CommandContext(ctx, "docker", "compose", "exec", "-T", "pekan-postgres", "rm", "-f", "/tmp/restore.sql", "/tmp/restore.sql.gz")
+		cleanupCmd.Run()
 	}
 
 	_ = s.audit.Write(ctx, "BACKUP_RESTORED", "tenant", tenantID, nil, map[string]any{"filename": cleanName})
