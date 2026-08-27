@@ -684,7 +684,7 @@ func (s *Service) ListBackups(ctx context.Context, tenantID string) ([]domain.Ba
 
 	var backups []domain.BackupFile
 	for _, e := range entries {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), ".dump") {
+		if !e.IsDir() && (strings.HasSuffix(e.Name(), ".dump") || strings.HasSuffix(e.Name(), ".sql") || strings.HasSuffix(e.Name(), ".sql.gz")) {
 			info, err := e.Info()
 			if err != nil {
 				continue
