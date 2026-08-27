@@ -6,7 +6,7 @@ import {
   updateTenant, deleteTenant,
   getGlobalSetting, saveGlobalSetting as saveAdminGlobalSetting,
   impersonateUser, getServerStatus, testNotification, testAI, testDatabase,
-  listBackups, createBackup, restoreBackup, downloadBackupBlob,
+  listBackups, createBackup, restoreBackup, downloadBackupBlob, uploadBackup,
   executeQuery, getDatabaseStats, getDatabaseGrowth, listTenantUsers,
   adminResetUserPassword, adminUpdateUserEmail, adminUpdateUserPhone,
   listTenantBackups, createTenantBackup, restoreTenantBackup, downloadTenantBackupBlob,
@@ -1208,6 +1208,23 @@ export function AdminDashboardPage(): JSX.Element {
       error("Gagal membuat backup.");
     } finally {
       setIsBackingUp(false);
+    }
+  };
+
+  const handleUploadBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsBackingUp(true);
+    try {
+      await uploadBackup(file);
+      success(`File "${file.name}" berhasil diupload.`);
+      loadBackups();
+    } catch (err) {
+      error("Gagal upload backup: " + (err instanceof Error ? err.message : "Unknown error"));
+    } finally {
+      setIsBackingUp(false);
+      e.target.value = "";
     }
   };
 
@@ -3057,6 +3074,15 @@ export function AdminDashboardPage(): JSX.Element {
                      <button className="btn btn-primary" onClick={handleCreateBackup} disabled={isBackingUp || loading} style={{ whiteSpace: "nowrap" }}>
                        {isBackingUp ? "Membuat Backup..." : "+ Buat Backup"}
                      </button>
+                     <label className="btn btn-ghost" style={{ cursor: "pointer", whiteSpace: "nowrap" }}>
+                       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: "4px", verticalAlign: "middle" }}>
+                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                         <polyline points="17 8 12 3 7 8" />
+                         <line x1="12" y1="3" x2="12" y2="15" />
+                       </svg>
+                       Upload Backup
+                       <input type="file" accept=".sql,.sql.gz,.dump" onChange={handleUploadBackup} style={{ display: "none" }} />
+                     </label>
                    </div>
                  </div>
 

@@ -88,6 +88,7 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 				r.Get("/", h.ListBackups)
 				r.Post("/", h.CreateBackup)
 				r.Post("/restore", h.RestoreBackup)
+				r.Post("/upload", h.UploadBackup)
 				r.Get("/download/{filename}", h.DownloadBackup)
 			})
 
@@ -459,6 +460,35 @@ func (h *Handler) RestoreTenantBackup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true}, middleware.GetRequestID(r.Context()))
+}
+
+func (h *Handler) UploadBackup(w http.ResponseWriter, r *http.Request) {
+	// Parse multipart form (max 500MB)
+	if err := r.ParseMultipartForm(500 << 20); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "INVALID_REQUEST", "failed to parse upload: "+err.Error(), middleware.GetRequestID(r.Context()))
+		return
+	}
+
+	file, header, err := r.FormFile("backup")
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "INVALID_REQUEST", "backup file is required", middleware.GetRequestID(r.Context()))
+		return
+	}
+	defer file.Close()
+
+	// Validate file extension
+	filename := header.Filename
+	if !strings.HasSuffix(filename, ".sql.gz") && !strings.HasSuffix(filename, ".sql") && !strings.HasSuffix(filename, ".dump") {
+		httpx.WriteError(w, http.StatusBadRequest, "INVALID_REQUEST", "only .sql.gz, .sql, or .dump files are allowed", middleware.GetRequestID(r.Context()))
+		return
+	}
+
+	if err := h.service.SaveUploadedBackup(r.Context(), filename, file); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), middleware.GetRequestID(r.Context()))
+		return
+	}
+
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "filename": filename}, middleware.GetRequestID(r.Context()))
 }
 
 func (h *Handler) ListBackups(w http.ResponseWriter, r *http.Request) {

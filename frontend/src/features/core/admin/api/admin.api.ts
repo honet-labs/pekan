@@ -291,6 +291,25 @@ export async function restoreBackup(filename: string): Promise<void> {
   });
 }
 
+export async function uploadBackup(file: File): Promise<{ success: boolean; filename: string }> {
+  const token = getAdminToken();
+  const formData = new FormData();
+  formData.append("backup", file);
+
+  const res = await fetch("/api/v1/admin/backups/upload", {
+    method: "POST",
+    headers: { "X-Admin-Token": token || "" },
+    body: formData
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: { message: "Upload failed" } }));
+    throw new Error(err.error?.message || "Upload failed");
+  }
+
+  return res.json();
+}
+
 export function getBackupDownloadUrl(filename: string): string {
   const token = getAdminToken() || "";
   // In a real scenario, downloading via GET with token in header is preferred, 

@@ -561,6 +561,30 @@ func (s *Service) RestoreBackup(ctx context.Context, filename string, tenantID s
 	return nil
 }
 
+func (s *Service) SaveUploadedBackup(ctx context.Context, filename string, file io.Reader) error {
+	backupDir := "data/storage/backups"
+	if err := os.MkdirAll(backupDir, 0755); err != nil {
+		return fmt.Errorf("failed to create backup directory: %v", err)
+	}
+
+	cleanName := filepath.Base(filename)
+	fp := filepath.Join(backupDir, cleanName)
+
+	dst, err := os.Create(fp)
+	if err != nil {
+		return fmt.Errorf("failed to create file: %v", err)
+	}
+	defer dst.Close()
+
+	if _, err := io.Copy(dst, file); err != nil {
+		os.Remove(fp)
+		return fmt.Errorf("failed to save file: %v", err)
+	}
+
+	_ = s.audit.Write(ctx, "BACKUP_UPLOADED", "system", "", nil, map[string]any{"filename": cleanName})
+	return nil
+}
+
 func (s *Service) ListBackups(ctx context.Context, tenantID string) ([]domain.BackupFile, error) {
 	backupDir := "data/storage/backups"
 	if tenantID != "" {
