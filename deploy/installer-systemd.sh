@@ -404,6 +404,10 @@ setup_database() {
   as_root systemctl enable postgresql
   as_root systemctl start postgresql
 
+  # Wait for PostgreSQL to be ready
+  log "  Waiting for PostgreSQL to be ready..."
+  sleep 3
+
   # Set password for postgres user
   as_root -u postgres psql -c "ALTER USER postgres WITH PASSWORD '${DB_PASS}';" 2>/dev/null || true
 
@@ -415,8 +419,21 @@ setup_database() {
   PG_HBA=$(as_root -u postgres psql -t -c "SHOW hba_file;" | tr -d ' ')
   if ! grep -q "host.*${DB_NAME}.*127.0.0.1/32.*md5" "$PG_HBA" 2>/dev/null; then
     echo "host ${DB_NAME} ${DB_USER} 127.0.0.1/32 md5" | as_root tee -a "$PG_HBA" >/dev/null
-    as_root systemctl restart postgresql
   fi
+  
+  # Also add trust for local connections (for initial setup)
+  if ! grep -q "local.*all.*all.*trust" "$PG_HBA" 2>/dev/null; then
+    echo "local all all trust" | as_root tee -a "$PG_HBA" >/dev/null
+  fi
+
+  # Disable SSL for local connections
+  PG_CONF=$(as_root -u postgres psql -t -c "SHOW config_file;" | tr -d ' ')
+  if ! grep -q "ssl = off" "$PG_CONF" 2>/dev/null; then
+    echo "ssl = off" | as_root tee -a "$PG_CONF" >/dev/null
+  fi
+
+  as_root systemctl restart postgresql
+  sleep 2
 
   log "  PostgreSQL configured"
 }
@@ -508,7 +525,7 @@ build_frontend() {
 write_env_file() {
   log "Step 9/12: Writing configuration..."
 
-  DATABASE_URL="postgres://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=prefer"
+  DATABASE_URL="postgres://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=disable"
 
   cat <<EOF | as_root tee "$INSTALL_DIR/backend/.env" >/dev/null
 APP_ENV=${APP_ENV}
@@ -548,7 +565,7 @@ run_migrations() {
 
   log "Step 10/12: Running database migrations..."
 
-  DATABASE_URL="postgres://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=prefer"
+  DATABASE_URL="postgres://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=disable"
 
   if [[ -f "$INSTALL_DIR/backend/scripts/apply_migrations.sh" ]]; then
     as_root -u "$APP_USER" bash -c "cd '$INSTALL_DIR/backend' && chmod +x ./scripts/apply_migrations.sh && DATABASE_URL='${DATABASE_URL}' ./scripts/apply_migrations.sh"
@@ -567,15 +584,19 @@ setup_systemd() {
 Description=PEKAN API Server
 After=network.target postgresql.service redis.service
 Wants=postgresql.service redis.service
+Requires=postgresql.service
 
 [Service]
 Type=simple
 User=${APP_USER}
 Group=${APP_GROUP}
 WorkingDirectory=${INSTALL_DIR}
+ExecStartPre=/bin/sleep 5
 ExecStart=${INSTALL_DIR}/bin/pekan-api
 Restart=always
-RestartSec=5
+RestartSec=10
+StartLimitIntervalSec=60
+StartLimitBurst=5
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=pekan-api
