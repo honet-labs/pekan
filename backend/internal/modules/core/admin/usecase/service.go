@@ -557,14 +557,19 @@ func (s *Service) CreateBackup(ctx context.Context, backupType string, tenantID 
 		args = append(args, "-a")
 	}
 
-	// Add database URL and output file
-	args = append(args, "-d", dbUrl, "-f", fp)
+	// Add database URL (output to stdout)
+	args = append(args, "-d", dbUrl)
 
-	// Run pg_dump directly (works for both systemd and docker)
+	// Run pg_dump and capture stdout
 	cmd := exec.CommandContext(ctx, "pg_dump", args...)
-	output, err := cmd.CombinedOutput()
+	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("pg_dump failed: %v, output: %s", err, string(output))
+		errOutput, _ := cmd.CombinedOutput()
+		return fmt.Errorf("pg_dump failed: %v, output: %s", err, string(errOutput))
+	}
+
+	if len(output) == 0 {
+		return fmt.Errorf("pg_dump produced no output - check if pg_dump is installed and database URL is correct")
 	}
 
 	// Write output to file
