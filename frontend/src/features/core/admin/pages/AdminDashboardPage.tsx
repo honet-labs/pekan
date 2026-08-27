@@ -4073,6 +4073,8 @@ export function AdminDashboardPage(): JSX.Element {
         title="Peringatan Restore Database!"
         message={`Anda akan me-restore database menggunakan file "${fileToRestore}". Peringatan: Proses ini (Clean Restore) akan MENGHAPUS SEMUA DATA yang ada saat ini dan menggantinya dengan data dari backup. Lanjutkan?`}
         isLoading={isRestoring}
+        confirmText={isRestoring ? "Restoring..." : "Restore"}
+        confirmClassName="btn-warning"
         onConfirm={handleRestoreBackup}
         onCancel={() => setFileToRestore(null)}
       />
