@@ -545,11 +545,6 @@ func (s *Service) CreateBackup(ctx context.Context, backupType string, tenantID 
 }
 
 func (s *Service) RestoreBackup(ctx context.Context, filename string, tenantID string) error {
-	dbUrl := os.Getenv("DATABASE_URL")
-	if dbUrl == "" {
-		return errors.New("DATABASE_URL not set")
-	}
-
 	backupDir := "data/storage/backups"
 	cleanName := filepath.Base(filename)
 	fp := filepath.Join(backupDir, cleanName)
@@ -567,13 +562,46 @@ func (s *Service) RestoreBackup(ctx context.Context, filename string, tenantID s
 		return errors.New("backup file not found")
 	}
 
-	args := []string{"-d", dbUrl, "-1", "-c", fp}
-	cmd := exec.CommandContext(ctx, "pg_restore", args...)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("pg_restore failed: %v, output: %s", err, string(output))
+	// Get database connection details
+	dbUser := os.Getenv("DB_USER")
+	if dbUser == "" {
+		dbUser = "postgres"
 	}
-	
+	dbName := os.Getenv("DB_NAME")
+	if dbName == "" {
+		dbName = "pekan"
+	}
+
+	// Use psql to restore (works with .sql files)
+	// For .dump files, we need pg_restore which runs in the postgres container
+	if strings.HasSuffix(cleanName, ".dump") {
+		// Execute pg_restore inside postgres container via docker exec
+		cmd := exec.CommandContext(ctx, "docker", "compose", "exec", "-T", "pekan-postgres",
+			"pg_restore", "-U", dbUser, "-d", dbName, "-1", "-c", "--if-exists",
+			"-f", "/tmp/backup_restore.dump", fp)
+		
+		// First copy the file to postgres container
+		copyCmd := exec.CommandContext(ctx, "docker", "compose", "cp", fp, "pekan-postgres:/tmp/backup_restore.dump")
+		if output, err := copyCmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("failed to copy backup to postgres: %v, output: %s", err, string(output))
+		}
+		
+		if output, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("pg_restore failed: %v, output: %s", err, string(output))
+		}
+		
+		// Cleanup
+		cleanupCmd := exec.CommandContext(ctx, "docker", "compose", "exec", "-T", "pekan-postgres", "rm", "-f", "/tmp/backup_restore.dump")
+		cleanupCmd.Run()
+	} else {
+		// For .sql files, use psql inside postgres container
+		cmd := exec.CommandContext(ctx, "docker", "compose", "exec", "-T", "pekan-postgres",
+			"psql", "-U", dbUser, "-d", dbName, "-f", fp)
+		if output, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("psql restore failed: %v, output: %s", err, string(output))
+		}
+	}
+
 	_ = s.audit.Write(ctx, "BACKUP_RESTORED", "tenant", tenantID, nil, map[string]any{"filename": cleanName})
 	return nil
 }
