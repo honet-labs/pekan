@@ -490,21 +490,21 @@ setup_database() {
   sleep 3
 
   # Set password for postgres user
-  as_root -u postgres psql -c "ALTER USER postgres WITH PASSWORD '${DB_PASS}';" 2>/dev/null || true
+  as_user postgres "psql -c \"ALTER USER postgres WITH PASSWORD '${DB_PASS}';\"" 2>/dev/null || true
 
   # Create database if not exists
-  as_root -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname = '${DB_NAME}'" | grep -q 1 || \
-    as_root -u postgres psql -c "CREATE DATABASE ${DB_NAME};"
+  as_user postgres "psql -tc \"SELECT 1 FROM pg_database WHERE datname = '${DB_NAME}'\"" | grep -q 1 || \
+    as_user postgres "psql -c \"CREATE DATABASE ${DB_NAME};\""
 
   # Create application user if not exists
-  as_root -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'" | grep -q 1 || \
-    as_root -u postgres psql -c "CREATE USER ${DB_USER} WITH PASSWORD '${DB_PASS}';"
+  as_user postgres "psql -tc \"SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'\"" | grep -q 1 || \
+    as_user postgres "psql -c \"CREATE USER ${DB_USER} WITH PASSWORD '${DB_PASS}';\""
 
   # Grant privileges
-  as_root -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};" 2>/dev/null || true
+  as_user postgres "psql -c \"GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};\"" 2>/dev/null || true
 
   # Configure pg_hba for local password auth
-  PG_HBA=$(as_root -u postgres psql -t -c "SHOW hba_file;" | tr -d ' ')
+  PG_HBA=$(as_user postgres "psql -t -c 'SHOW hba_file;'" | tr -d ' ')
   if ! grep -q "host.*${DB_NAME}.*127.0.0.1/32.*md5" "$PG_HBA" 2>/dev/null; then
     echo "host ${DB_NAME} ${DB_USER} 127.0.0.1/32 md5" | as_root tee -a "$PG_HBA" >/dev/null
   fi
@@ -515,7 +515,7 @@ setup_database() {
   fi
 
   # Disable SSL for local connections
-  PG_CONF=$(as_root -u postgres psql -t -c "SHOW config_file;" | tr -d ' ')
+  PG_CONF=$(as_user postgres "psql -t -c 'SHOW config_file;'" | tr -d ' ')
   if ! grep -q "ssl = off" "$PG_CONF" 2>/dev/null; then
     echo "ssl = off" | as_root tee -a "$PG_CONF" >/dev/null
   fi
