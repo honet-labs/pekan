@@ -567,6 +567,7 @@ func (s *Service) CreateBackup(ctx context.Context, backupType string, tenantID 
 	}
 
 	var output []byte
+	var err error
 	if isDocker {
 		// Docker mode: run pg_dump inside postgres container
 		dockerArgs := append([]string{"compose", "exec", "-T", "pekan-postgres", "pg_dump", "-U", "postgres", "-d", "pekan"}, args...)
