@@ -547,10 +547,16 @@ setup_redis() {
 
   # Find Redis service name
   REDIS_SERVICE=""
-  for svc in redis redis-server; do
+  for svc in redis-server redis; do
     if systemctl list-unit-files "${svc}.service" 2>/dev/null | grep -q "${svc}"; then
-      REDIS_SERVICE="$svc"
-      break
+      # Check if it's an alias (not the real service file)
+      if systemctl show "${svc}.service" --property=Id 2>/dev/null | grep -q "redis-server"; then
+        REDIS_SERVICE="redis-server"
+        break
+      elif [[ "$svc" == "redis-server" ]]; then
+        REDIS_SERVICE="$svc"
+        break
+      fi
     fi
   done
 
