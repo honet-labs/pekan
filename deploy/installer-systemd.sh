@@ -524,6 +524,7 @@ build_backend() {
   export PATH=$PATH:/usr/local/go/bin
 
   as_root mkdir -p "$INSTALL_DIR/bin"
+  as_root chown -R "${APP_USER}:${APP_GROUP}" "$INSTALL_DIR/bin"
 
   log "  Running go mod tidy..."
   as_user "$APP_USER" "cd '$INSTALL_DIR/backend' && /usr/local/go/bin/go mod tidy"
