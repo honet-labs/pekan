@@ -401,6 +401,26 @@ install_go() {
 setup_database() {
   log "Step 3/12: Configuring PostgreSQL..."
 
+  # Check if PostgreSQL is running in Docker
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "postgres"; then
+    log "  PostgreSQL detected in Docker container"
+    
+    # Get the container name
+    PG_CONTAINER=$(docker ps --format '{{.Names}}' | grep postgres | head -1)
+    log "  Using Docker container: $PG_CONTAINER"
+    
+    # Set password for postgres user
+    docker exec "$PG_CONTAINER" psql -U postgres -c "ALTER USER postgres WITH PASSWORD '${DB_PASS}';" 2>/dev/null || true
+    
+    # Create database if not exists
+    docker exec "$PG_CONTAINER" psql -U postgres -tc "SELECT 1 FROM pg_database WHERE datname = '${DB_NAME}'" | grep -q 1 || \
+      docker exec "$PG_CONTAINER" psql -U postgres -c "CREATE DATABASE ${DB_NAME};"
+    
+    log "  PostgreSQL configured (Docker mode)"
+    return
+  fi
+
+  # Native PostgreSQL installation
   as_root systemctl enable postgresql
   as_root systemctl start postgresql
 
@@ -441,6 +461,16 @@ setup_database() {
 setup_redis() {
   log "Step 4/12: Configuring Redis..."
 
+  # Check if Redis is running in Docker
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "redis"; then
+    log "  Redis detected in Docker container"
+    REDIS_CONTAINER=$(docker ps --format '{{.Names}}' | grep redis | head -1)
+    log "  Using Docker container: $REDIS_CONTAINER"
+    log "  Redis configured (Docker mode)"
+    return
+  fi
+
+  # Native Redis installation
   as_root systemctl enable redis-server 2>/dev/null || as_root systemctl enable redis
   as_root systemctl start redis-server 2>/dev/null || as_root systemctl start redis
 
@@ -525,7 +555,23 @@ build_frontend() {
 write_env_file() {
   log "Step 9/12: Writing configuration..."
 
-  DATABASE_URL="postgres://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=disable"
+  # Detect database host (Docker container or localhost)
+  DB_HOST_CONFIG="$DB_HOST"
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "postgres"; then
+    PG_CONTAINER=$(docker ps --format '{{.Names}}' | grep postgres | head -1)
+    DB_HOST_CONFIG="$PG_CONTAINER"
+    log "  Using Docker PostgreSQL container: $PG_CONTAINER"
+  fi
+
+  DATABASE_URL="postgres://${DB_USER}:${DB_PASS}@${DB_HOST_CONFIG}:${DB_PORT}/${DB_NAME}?sslmode=disable"
+
+  # Detect Redis URL
+  REDIS_URL="redis://127.0.0.1:6379/0"
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "redis"; then
+    REDIS_CONTAINER=$(docker ps --format '{{.Names}}' | grep redis | head -1)
+    REDIS_URL="redis://${REDIS_CONTAINER}:6379/0"
+    log "  Using Docker Redis container: $REDIS_CONTAINER"
+  fi
 
   cat <<EOF | as_root tee "$INSTALL_DIR/backend/.env" >/dev/null
 APP_ENV=${APP_ENV}
@@ -547,7 +593,7 @@ API_RATE_LIMIT_PER_MINUTE=1000
 API_RATE_LIMIT_WINDOW_SECONDS=60
 API_REQUEST_TIMEOUT_SECONDS=30
 MAX_HEADER_BYTES=1048576
-RATE_LIMIT_REDIS_URL=redis://127.0.0.1:6379/0
+RATE_LIMIT_REDIS_URL=${REDIS_URL}
 RATE_LIMIT_REDIS_PREFIX=pekan:ratelimit
 STORAGE_PROVIDER=local
 STORAGE_LOCAL_PATH=${INSTALL_DIR}/storage
