@@ -426,9 +426,15 @@ install_go() {
 setup_database() {
   log "Step 3/12: Installing and configuring PostgreSQL..."
 
-  # Install PostgreSQL if not installed
-  if ! command -v psql &>/dev/null; then
-    log "  Installing PostgreSQL..."
+  # Check if PostgreSQL server is installed (not just client)
+  PG_SERVER_INSTALLED=false
+  if command -v pg_isready &>/dev/null || command -v postgres &>/dev/null; then
+    PG_SERVER_INSTALLED=true
+  fi
+
+  # Install PostgreSQL server if not installed
+  if [[ "$PG_SERVER_INSTALLED" == "false" ]]; then
+    log "  Installing PostgreSQL server..."
     if [[ "$PKG_MANAGER" == "apt" ]]; then
       curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | as_root gpg --dearmor -o /usr/share/keyrings/postgresql-keyring.gpg
       echo "deb [signed-by=/usr/share/keyrings/postgresql-keyring.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | as_root tee /etc/apt/sources.list.d/pgdg.list
@@ -440,7 +446,7 @@ setup_database() {
       as_root /usr/pgsql-16/bin/postgresql-16-setup initdb
     fi
   else
-    log "  PostgreSQL already installed"
+    log "  PostgreSQL server already installed"
   fi
 
   # Find PostgreSQL service name
@@ -465,7 +471,7 @@ setup_database() {
   if [[ -z "$PG_SERVICE" ]]; then
     warn "  PostgreSQL service not found. Available services:"
     systemctl list-units --type=service 2>/dev/null | grep -i postgres || echo "  (none)"
-    die "PostgreSQL service not found. Please install PostgreSQL manually."
+    die "PostgreSQL service not found. Please install PostgreSQL manually: sudo apt install postgresql-16"
   fi
 
   log "  Using PostgreSQL service: $PG_SERVICE"
