@@ -251,6 +251,16 @@ as_root() {
   if [[ "${EUID}" -eq 0 ]]; then "$@"; else sudo "$@"; fi
 }
 
+as_user() {
+  local user="$1"
+  shift
+  if [[ "${EUID}" -eq 0 ]]; then
+    runuser -u "$user" -- bash -lc "$*"
+  else
+    sudo -u "$user" -H bash -lc "$*"
+  fi
+}
+
 check_root() {
   if [[ "${EUID}" -ne 0 ]]; then
     die "This script must be run as root. Use: sudo bash $0"
@@ -516,16 +526,16 @@ build_backend() {
   as_root mkdir -p "$INSTALL_DIR/bin"
 
   log "  Running go mod tidy..."
-  as_root -u "$APP_USER" bash -c "cd '$INSTALL_DIR/backend' && /usr/local/go/bin/go mod tidy"
+  as_user "$APP_USER" "cd '$INSTALL_DIR/backend' && /usr/local/go/bin/go mod tidy"
 
   log "  Building pekan-api..."
-  as_root -u "$APP_USER" bash -c "cd '$INSTALL_DIR/backend' && CGO_ENABLED=0 /usr/local/go/bin/go build -ldflags='-s -w' -o '$INSTALL_DIR/bin/pekan-api' ./cmd/api"
+  as_user "$APP_USER" "cd '$INSTALL_DIR/backend' && CGO_ENABLED=0 /usr/local/go/bin/go build -ldflags='-s -w' -o '$INSTALL_DIR/bin/pekan-api' ./cmd/api"
 
   log "  Building pekan-worker..."
-  as_root -u "$APP_USER" bash -c "cd '$INSTALL_DIR/backend' && CGO_ENABLED=0 /usr/local/go/bin/go build -ldflags='-s -w' -o '$INSTALL_DIR/bin/pekan-worker' ./cmd/worker"
+  as_user "$APP_USER" "cd '$INSTALL_DIR/backend' && CGO_ENABLED=0 /usr/local/go/bin/go build -ldflags='-s -w' -o '$INSTALL_DIR/bin/pekan-worker' ./cmd/worker"
 
   log "  Building pekan-ai..."
-  as_root -u "$APP_USER" bash -c "cd '$INSTALL_DIR/backend' && CGO_ENABLED=0 /usr/local/go/bin/go build -ldflags='-s -w' -o '$INSTALL_DIR/bin/pekan-ai' ./cmd/ai"
+  as_user "$APP_USER" "cd '$INSTALL_DIR/backend' && CGO_ENABLED=0 /usr/local/go/bin/go build -ldflags='-s -w' -o '$INSTALL_DIR/bin/pekan-ai' ./cmd/ai"
 
   log "  Backend binaries built"
 }
@@ -614,7 +624,7 @@ run_migrations() {
   DATABASE_URL="postgres://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=disable"
 
   if [[ -f "$INSTALL_DIR/backend/scripts/apply_migrations.sh" ]]; then
-    as_root -u "$APP_USER" bash -c "cd '$INSTALL_DIR/backend' && chmod +x ./scripts/apply_migrations.sh && DATABASE_URL='${DATABASE_URL}' ./scripts/apply_migrations.sh"
+    as_user "$APP_USER" "cd '$INSTALL_DIR/backend' && chmod +x ./scripts/apply_migrations.sh && DATABASE_URL='${DATABASE_URL}' ./scripts/apply_migrations.sh"
     log "  Migrations applied"
   else
     warn "  Migration script not found, skipping"
