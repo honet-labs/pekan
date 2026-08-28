@@ -432,10 +432,28 @@ setup_database() {
     PG_SERVER_INSTALLED=true
   fi
 
+  # Find PostgreSQL service name
+  PG_SERVICE=""
+  for svc in postgresql postgresql-16 postgresql@16-main; do
+    if systemctl list-unit-files "${svc}.service" 2>/dev/null | grep -q "${svc}"; then
+      PG_SERVICE="$svc"
+      break
+    fi
+  done
+
+  # If server is installed but service not found, reinstall
+  if [[ "$PG_SERVER_INSTALLED" == "true" && -z "$PG_SERVICE" ]]; then
+    log "  PostgreSQL server found but service missing. Reinstalling..."
+    PG_SERVER_INSTALLED=false
+  fi
+
   # Install PostgreSQL server if not installed
   if [[ "$PG_SERVER_INSTALLED" == "false" ]]; then
     log "  Installing PostgreSQL server..."
     if [[ "$PKG_MANAGER" == "apt" ]]; then
+      # Remove old installation if exists
+      as_root apt remove -y postgresql* 2>/dev/null || true
+      
       curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | as_root gpg --dearmor -o /usr/share/keyrings/postgresql-keyring.gpg
       echo "deb [signed-by=/usr/share/keyrings/postgresql-keyring.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | as_root tee /etc/apt/sources.list.d/pgdg.list
       as_root apt update
@@ -445,33 +463,20 @@ setup_database() {
       as_root dnf -y install postgresql16-server postgresql16
       as_root /usr/pgsql-16/bin/postgresql-16-setup initdb
     fi
+    
+    # Find service name after installation
+    for svc in postgresql postgresql-16 postgresql@16-main; do
+      if systemctl list-unit-files "${svc}.service" 2>/dev/null | grep -q "${svc}"; then
+        PG_SERVICE="$svc"
+        break
+      fi
+    done
   else
     log "  PostgreSQL server already installed"
   fi
 
-  # Find PostgreSQL service name
-  PG_SERVICE=""
-  log "  Searching for PostgreSQL service..."
-  for svc in postgresql postgresql-16 postgresql@16-main; do
-    if systemctl list-unit-files "${svc}.service" 2>/dev/null | grep -q "${svc}"; then
-      PG_SERVICE="$svc"
-      log "  Found service: $svc"
-      break
-    fi
-  done
-
   if [[ -z "$PG_SERVICE" ]]; then
-    # Try to find any postgresql service
-    PG_SERVICE=$(systemctl list-units --type=service --all 2>/dev/null | grep -o 'postgresql[^ ]*\.service' | head -1 | sed 's/\.service//')
-    if [[ -n "$PG_SERVICE" ]]; then
-      log "  Found service via search: $PG_SERVICE"
-    fi
-  fi
-
-  if [[ -z "$PG_SERVICE" ]]; then
-    warn "  PostgreSQL service not found. Available services:"
-    systemctl list-units --type=service 2>/dev/null | grep -i postgres || echo "  (none)"
-    die "PostgreSQL service not found. Please install PostgreSQL manually: sudo apt install postgresql-16"
+    die "PostgreSQL service not found after installation. Please install manually: sudo apt install postgresql-16"
   fi
 
   log "  Using PostgreSQL service: $PG_SERVICE"
