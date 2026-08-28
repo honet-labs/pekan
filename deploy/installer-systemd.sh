@@ -443,9 +443,29 @@ setup_database() {
     log "  PostgreSQL already installed"
   fi
 
+  # Find PostgreSQL service name
+  PG_SERVICE=""
+  for svc in postgresql postgresql-16 postgresql@16-main; do
+    if systemctl list-unit-files "${svc}.service" 2>/dev/null | grep -q "${svc}"; then
+      PG_SERVICE="$svc"
+      break
+    fi
+  done
+
+  if [[ -z "$PG_SERVICE" ]]; then
+    # Try to find any postgresql service
+    PG_SERVICE=$(systemctl list-units --type=service --all 2>/dev/null | grep -o 'postgresql[^ ]*\.service' | head -1 | sed 's/\.service//')
+  fi
+
+  if [[ -z "$PG_SERVICE" ]]; then
+    die "PostgreSQL service not found. Please install PostgreSQL manually."
+  fi
+
+  log "  Using PostgreSQL service: $PG_SERVICE"
+
   # Start and enable PostgreSQL
-  as_root systemctl enable postgresql
-  as_root systemctl start postgresql
+  as_root systemctl enable "$PG_SERVICE"
+  as_root systemctl start "$PG_SERVICE"
 
   # Wait for PostgreSQL to be ready
   log "  Waiting for PostgreSQL to be ready..."
@@ -482,7 +502,7 @@ setup_database() {
     echo "ssl = off" | as_root tee -a "$PG_CONF" >/dev/null
   fi
 
-  as_root systemctl restart postgresql
+  as_root systemctl restart "$PG_SERVICE"
   sleep 2
 
   log "  PostgreSQL installed and configured"
@@ -507,9 +527,25 @@ setup_redis() {
     log "  Redis already installed"
   fi
 
+  # Find Redis service name
+  REDIS_SERVICE=""
+  for svc in redis redis-server; do
+    if systemctl list-unit-files "${svc}.service" 2>/dev/null | grep -q "${svc}"; then
+      REDIS_SERVICE="$svc"
+      break
+    fi
+  done
+
+  if [[ -z "$REDIS_SERVICE" ]]; then
+    warn "  Redis service not found, skipping"
+    return
+  fi
+
+  log "  Using Redis service: $REDIS_SERVICE"
+
   # Start and enable Redis
-  as_root systemctl enable redis-server 2>/dev/null || as_root systemctl enable redis
-  as_root systemctl start redis-server 2>/dev/null || as_root systemctl start redis
+  as_root systemctl enable "$REDIS_SERVICE"
+  as_root systemctl start "$REDIS_SERVICE"
 
   log "  Redis installed and configured"
 }
