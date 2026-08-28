@@ -694,6 +694,7 @@ func (s *Service) RestoreBackup(ctx context.Context, filename string, tenantID s
 }
 
 func (s *Service) SaveUploadedBackup(ctx context.Context, filename string, file io.Reader) error {
+	// Use absolute path based on working directory
 	backupDir := "data/storage/backups"
 	if err := os.MkdirAll(backupDir, 0755); err != nil {
 		return fmt.Errorf("failed to create backup directory: %v", err)
@@ -701,6 +702,13 @@ func (s *Service) SaveUploadedBackup(ctx context.Context, filename string, file 
 
 	cleanName := filepath.Base(filename)
 	fp := filepath.Join(backupDir, cleanName)
+
+	// Check if file already exists, add timestamp if needed
+	if _, err := os.Stat(fp); err == nil {
+		ext := filepath.Ext(cleanName)
+		nameWithoutExt := strings.TrimSuffix(cleanName, ext)
+		fp = filepath.Join(backupDir, fmt.Sprintf("%s_%s%s", nameWithoutExt, time.Now().Format("20060102_150405"), ext))
+	}
 
 	dst, err := os.Create(fp)
 	if err != nil {
@@ -713,7 +721,8 @@ func (s *Service) SaveUploadedBackup(ctx context.Context, filename string, file 
 		return fmt.Errorf("failed to save file: %v", err)
 	}
 
-	_ = s.audit.Write(ctx, "BACKUP_UPLOADED", "system", "", nil, map[string]any{"filename": cleanName})
+	log.Printf("[Admin] Uploaded backup saved: %s", fp)
+	_ = s.audit.Write(ctx, "BACKUP_UPLOADED", "system", "", nil, map[string]any{"filename": cleanName, "path": fp})
 	return nil
 }
 

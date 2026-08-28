@@ -611,6 +611,12 @@ setup_app_user() {
   else
     log "  User '$APP_USER' already exists"
   fi
+
+  # Create log directory
+  as_root mkdir -p /var/log/pekan
+  as_root chown "${APP_USER}:${APP_GROUP}" /var/log/pekan
+  as_root chmod 755 /var/log/pekan
+  log "  Log directory /var/log/pekan created"
 }
 
 clone_repository() {
@@ -779,8 +785,8 @@ Restart=always
 RestartSec=10
 StartLimitIntervalSec=60
 StartLimitBurst=5
-StandardOutput=journal
-StandardError=journal
+StandardOutput=append:/var/log/pekan/api.log
+StandardError=append:/var/log/pekan/api-error.log
 SyslogIdentifier=pekan-api
 Environment=PATH=/usr/local/go/bin:/usr/bin:/bin
 
@@ -804,8 +810,8 @@ EnvironmentFile=${INSTALL_DIR}/backend/.env
 ExecStart=${INSTALL_DIR}/bin/pekan-worker
 Restart=always
 RestartSec=5
-StandardOutput=journal
-StandardError=journal
+StandardOutput=append:/var/log/pekan/worker.log
+StandardError=append:/var/log/pekan/worker-error.log
 SyslogIdentifier=pekan-worker
 Environment=PATH=/usr/local/go/bin:/usr/bin:/bin
 
@@ -829,6 +835,10 @@ EnvironmentFile=${INSTALL_DIR}/backend/.env
 ExecStart=${INSTALL_DIR}/bin/pekan-ai
 Restart=always
 RestartSec=5
+StandardOutput=append:/var/log/pekan/ai.log
+StandardError=append:/var/log/pekan/ai-error.log
+SyslogIdentifier=pekan-ai
+Environment=PATH=/usr/local/go/bin:/usr/bin:/bin
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=pekan-ai
