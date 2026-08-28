@@ -445,9 +445,11 @@ setup_database() {
 
   # Find PostgreSQL service name
   PG_SERVICE=""
+  log "  Searching for PostgreSQL service..."
   for svc in postgresql postgresql-16 postgresql@16-main; do
     if systemctl list-unit-files "${svc}.service" 2>/dev/null | grep -q "${svc}"; then
       PG_SERVICE="$svc"
+      log "  Found service: $svc"
       break
     fi
   done
@@ -455,9 +457,14 @@ setup_database() {
   if [[ -z "$PG_SERVICE" ]]; then
     # Try to find any postgresql service
     PG_SERVICE=$(systemctl list-units --type=service --all 2>/dev/null | grep -o 'postgresql[^ ]*\.service' | head -1 | sed 's/\.service//')
+    if [[ -n "$PG_SERVICE" ]]; then
+      log "  Found service via search: $PG_SERVICE"
+    fi
   fi
 
   if [[ -z "$PG_SERVICE" ]]; then
+    warn "  PostgreSQL service not found. Available services:"
+    systemctl list-units --type=service 2>/dev/null | grep -i postgres || echo "  (none)"
     die "PostgreSQL service not found. Please install PostgreSQL manually."
   fi
 
