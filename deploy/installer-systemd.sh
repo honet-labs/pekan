@@ -489,29 +489,24 @@ setup_database() {
   log "  Waiting for PostgreSQL to be ready..."
   sleep 3
 
-  # Set password for postgres user
-  as_user postgres "psql -c \"ALTER USER postgres WITH PASSWORD '${DB_PASS}';\"" 2>/dev/null || true
-
-  # Create database if not exists
-  as_user postgres "psql -tc \"SELECT 1 FROM pg_database WHERE datname = '${DB_NAME}'\"" | grep -q 1 || \
-    as_user postgres "psql -c \"CREATE DATABASE ${DB_NAME};\""
-
-  # Create application user if not exists
-  as_user postgres "psql -tc \"SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'\"" | grep -q 1 || \
-    as_user postgres "psql -c \"CREATE USER ${DB_USER} WITH PASSWORD '${DB_PASS}';\""
-
-  # Grant privileges
-  as_user postgres "psql -c \"GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};\"" 2>/dev/null || true
-
-  # Configure pg_hba for local password auth
+  # Configure pg_hba for password auth BEFORE setting password
   PG_HBA=$(as_user postgres "psql -t -c 'SHOW hba_file;'" | tr -d ' ')
-  if ! grep -q "host.*${DB_NAME}.*127.0.0.1/32.*md5" "$PG_HBA" 2>/dev/null; then
-    echo "host ${DB_NAME} ${DB_USER} 127.0.0.1/32 md5" | as_root tee -a "$PG_HBA" >/dev/null
+  
+  # Remove existing conflicting rules and add our own
+  as_root cp "$PG_HBA" "${PG_HBA}.bak"
+  
+  # Add trust for local unix socket connections (for initial setup)
+  if ! grep -q "^local.*all.*all.*trust" "$PG_HBA" 2>/dev/null; then
+    echo "local all all trust" | as_root tee -a "$PG_HBA" >/dev/null
   fi
   
-  # Also add trust for local connections (for initial setup)
-  if ! grep -q "local.*all.*all.*trust" "$PG_HBA" 2>/dev/null; then
-    echo "local all all trust" | as_root tee -a "$PG_HBA" >/dev/null
+  # Add md5 for TCP connections
+  if ! grep -q "^host.*all.*127.0.0.1/32.*md5" "$PG_HBA" 2>/dev/null; then
+    echo "host all all 127.0.0.1/32 md5" | as_root tee -a "$PG_HBA" >/dev/null
+  fi
+  
+  if ! grep -q "^host.*all.*::1/128.*md5" "$PG_HBA" 2>/dev/null; then
+    echo "host all all ::1/128 md5" | as_root tee -a "$PG_HBA" >/dev/null
   fi
 
   # Disable SSL for local connections
@@ -520,8 +515,29 @@ setup_database() {
     echo "ssl = off" | as_root tee -a "$PG_CONF" >/dev/null
   fi
 
+  # Restart PostgreSQL to apply pg_hba changes
   as_root systemctl restart "$PG_SERVICE"
-  sleep 2
+  sleep 3
+
+  # Set password for postgres user (using peer auth via unix socket)
+  log "  Setting PostgreSQL password..."
+  as_user postgres "psql -c \"ALTER USER ${DB_USER} WITH PASSWORD '${DB_PASS}';\"" || \
+    die "Failed to set PostgreSQL password"
+
+  # Create database if not exists
+  as_user postgres "psql -tc \"SELECT 1 FROM pg_database WHERE datname = '${DB_NAME}'\"" | grep -q 1 || \
+    as_user postgres "psql -c \"CREATE DATABASE ${DB_NAME};\""
+
+  # Grant privileges
+  as_user postgres "psql -c \"GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};\"" 2>/dev/null || true
+
+  # Verify password works via TCP
+  log "  Verifying database connection..."
+  if ! PGPASSWORD="$DB_PASS" psql -h 127.0.0.1 -U "$DB_USER" -d "$DB_NAME" -c "SELECT 1;" >/dev/null 2>&1; then
+    warn "  Password verification failed, retrying with ALTER USER..."
+    as_user postgres "psql -c \"ALTER USER ${DB_USER} WITH PASSWORD '${DB_PASS}';\""
+    sleep 2
+  fi
 
   log "  PostgreSQL installed and configured"
 }
