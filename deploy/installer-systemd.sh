@@ -223,6 +223,20 @@ prompt_config() {
     JWT_SECRET="$input"
   fi
 
+  # Check for existing Docker containers and warn
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "pekan-postgres"; then
+    printf '\n'
+    printf '[WARN] Docker container "pekan-postgres" detected!\n'
+    printf '       Systemd installer will install NATIVE PostgreSQL service.\n'
+    printf '       Existing Docker containers will NOT be used.\n'
+    printf '\n'
+    printf 'Do you want to continue with native systemd installation? [Y/n]: '
+    read -r confirm
+    if [[ "$confirm" =~ ^[Nn]$ ]]; then
+      die "Installation cancelled. Use installer-docker.sh for Docker mode."
+    fi
+  fi
+
   # Confirm
   printf '\n'
   printf '============================================\n'
@@ -237,6 +251,7 @@ prompt_config() {
   printf '  DB Host:      %s:%s\n' "$DB_HOST" "$DB_PORT"
   printf '  DB Password:  %s\n' "$(if [[ -n "$DB_PASS" ]]; then echo '***'; else echo '(auto-generate)'; fi)"
   printf '  JWT Secret:   %s\n' "$(if [[ -n "$JWT_SECRET" ]]; then echo '***'; else echo '(auto-generate)'; fi)"
+  printf '  Mode:         Systemd (Native)\n'
   printf '============================================\n'
   printf '\n'
 
@@ -409,28 +424,26 @@ install_go() {
 }
 
 setup_database() {
-  log "Step 3/12: Configuring PostgreSQL..."
+  log "Step 3/12: Installing and configuring PostgreSQL..."
 
-  # Check if PostgreSQL is running in Docker
-  if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "postgres"; then
-    log "  PostgreSQL detected in Docker container"
-    
-    # Get the container name
-    PG_CONTAINER=$(docker ps --format '{{.Names}}' | grep postgres | head -1)
-    log "  Using Docker container: $PG_CONTAINER"
-    
-    # Set password for postgres user
-    docker exec "$PG_CONTAINER" psql -U postgres -c "ALTER USER postgres WITH PASSWORD '${DB_PASS}';" 2>/dev/null || true
-    
-    # Create database if not exists
-    docker exec "$PG_CONTAINER" psql -U postgres -tc "SELECT 1 FROM pg_database WHERE datname = '${DB_NAME}'" | grep -q 1 || \
-      docker exec "$PG_CONTAINER" psql -U postgres -c "CREATE DATABASE ${DB_NAME};"
-    
-    log "  PostgreSQL configured (Docker mode)"
-    return
+  # Install PostgreSQL if not installed
+  if ! command -v psql &>/dev/null; then
+    log "  Installing PostgreSQL..."
+    if [[ "$PKG_MANAGER" == "apt" ]]; then
+      curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | as_root gpg --dearmor -o /usr/share/keyrings/postgresql-keyring.gpg
+      echo "deb [signed-by=/usr/share/keyrings/postgresql-keyring.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | as_root tee /etc/apt/sources.list.d/pgdg.list
+      as_root apt update
+      as_root $PKG_INSTALL -y postgresql-16 postgresql-client-16
+    elif [[ "$PKG_MANAGER" == "dnf" ]]; then
+      as_root dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+      as_root dnf -y install postgresql16-server postgresql16
+      as_root /usr/pgsql-16/bin/postgresql-16-setup initdb
+    fi
+  else
+    log "  PostgreSQL already installed"
   fi
 
-  # Native PostgreSQL installation
+  # Start and enable PostgreSQL
   as_root systemctl enable postgresql
   as_root systemctl start postgresql
 
@@ -444,6 +457,13 @@ setup_database() {
   # Create database if not exists
   as_root -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname = '${DB_NAME}'" | grep -q 1 || \
     as_root -u postgres psql -c "CREATE DATABASE ${DB_NAME};"
+
+  # Create application user if not exists
+  as_root -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'" | grep -q 1 || \
+    as_root -u postgres psql -c "CREATE USER ${DB_USER} WITH PASSWORD '${DB_PASS}';"
+
+  # Grant privileges
+  as_root -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};" 2>/dev/null || true
 
   # Configure pg_hba for local password auth
   PG_HBA=$(as_root -u postgres psql -t -c "SHOW hba_file;" | tr -d ' ')
@@ -465,26 +485,33 @@ setup_database() {
   as_root systemctl restart postgresql
   sleep 2
 
-  log "  PostgreSQL configured"
+  log "  PostgreSQL installed and configured"
 }
 
 setup_redis() {
-  log "Step 4/12: Configuring Redis..."
+  log "Step 4/12: Installing and configuring Redis..."
 
-  # Check if Redis is running in Docker
-  if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "redis"; then
-    log "  Redis detected in Docker container"
-    REDIS_CONTAINER=$(docker ps --format '{{.Names}}' | grep redis | head -1)
-    log "  Using Docker container: $REDIS_CONTAINER"
-    log "  Redis configured (Docker mode)"
-    return
+  # Install Redis if not installed
+  if ! command -v redis-server &>/dev/null; then
+    log "  Installing Redis..."
+    if [[ "$PKG_MANAGER" == "apt" ]]; then
+      curl -fsSL https://packages.redis.io/gpg | as_root gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg
+      echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" | as_root tee /etc/apt/sources.list.d/redis.list
+      as_root apt update
+      as_root $PKG_INSTALL -y redis
+    elif [[ "$PKG_MANAGER" == "dnf" ]]; then
+      as_root dnf install -y epel-release
+      as_root dnf install -y redis
+    fi
+  else
+    log "  Redis already installed"
   fi
 
-  # Native Redis installation
+  # Start and enable Redis
   as_root systemctl enable redis-server 2>/dev/null || as_root systemctl enable redis
   as_root systemctl start redis-server 2>/dev/null || as_root systemctl start redis
 
-  log "  Redis configured"
+  log "  Redis installed and configured"
 }
 
 setup_app_user() {
