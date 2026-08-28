@@ -519,7 +519,12 @@ setup_database() {
   as_root systemctl restart "$PG_SERVICE"
   sleep 3
 
-  # Set password for postgres user (using peer auth via unix socket)
+  # Create user if not exists (before setting password)
+  log "  Creating database user if needed..."
+  as_user postgres "psql -tc \"SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'\"" | grep -q 1 || \
+    as_user postgres "psql -c \"CREATE USER ${DB_USER} WITH PASSWORD '${DB_PASS}';\""
+
+  # Set password for user
   log "  Setting PostgreSQL password..."
   as_user postgres "psql -c \"ALTER USER ${DB_USER} WITH PASSWORD '${DB_PASS}';\"" || \
     die "Failed to set PostgreSQL password"
