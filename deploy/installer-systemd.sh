@@ -737,10 +737,9 @@ run_migrations() {
 
   log "Step 10/12: Running database migrations..."
 
-  DATABASE_URL="postgres://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=disable"
-
+  # Run migrations as postgres user (superuser) for proper permissions
   if [[ -f "$INSTALL_DIR/backend/scripts/apply_migrations.sh" ]]; then
-    as_user "$APP_USER" "cd '$INSTALL_DIR/backend' && chmod +x ./scripts/apply_migrations.sh && DATABASE_URL='${DATABASE_URL}' ./scripts/apply_migrations.sh"
+    as_user postgres "cd '$INSTALL_DIR/backend' && chmod +x ./scripts/apply_migrations.sh && DATABASE_URL='postgres://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=disable' ./scripts/apply_migrations.sh"
     log "  Migrations applied"
   else
     warn "  Migration script not found, skipping"
