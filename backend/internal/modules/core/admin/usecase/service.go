@@ -560,17 +560,26 @@ func (s *Service) CreateBackup(ctx context.Context, backupType string, tenantID 
 	// Add database URL (output to stdout)
 	args = append(args, "-d", dbUrl)
 
-	// Check if running in Docker by looking for docker-compose.yml
+	// Check if PostgreSQL is running in Docker container
 	isDocker := false
-	if _, err := os.Stat("docker-compose.yml"); err == nil {
-		isDocker = true
+	if output, err := exec.CommandContext(ctx, "docker", "ps", "--format", "{{.Names}}").Output(); err == nil {
+		if strings.Contains(string(output), "pekan-postgres") || strings.Contains(string(output), "postgres") {
+			isDocker = true
+		}
 	}
 
 	var output []byte
 	var err error
 	if isDocker {
 		// Docker mode: run pg_dump inside postgres container
-		dockerArgs := append([]string{"compose", "exec", "-T", "pekan-postgres", "pg_dump", "-U", "postgres", "-d", "pekan"}, args...)
+		pgContainer := "pekan-postgres"
+		if out, err := exec.CommandContext(ctx, "docker", "ps", "--format", "{{.Names}}", "--filter", "name=postgres").Output(); err == nil {
+			containers := strings.TrimSpace(string(out))
+			if containers != "" {
+				pgContainer = strings.Split(containers, "\n")[0]
+			}
+		}
+		dockerArgs := append([]string{"exec", "-i", pgContainer, "pg_dump", "-U", "postgres", "-d", "pekan"}, args...)
 		cmd := exec.CommandContext(ctx, "docker", dockerArgs...)
 		output, err = cmd.Output()
 		if err != nil {
@@ -643,30 +652,38 @@ func (s *Service) RestoreBackup(ctx context.Context, filename string, tenantID s
 		return errors.New("backup file not found")
 	}
 
-	// Check if running in Docker by looking for docker-compose.yml
+	// Check if PostgreSQL is running in Docker container
 	isDocker := false
-	if _, err := os.Stat("docker-compose.yml"); err == nil {
-		isDocker = true
+	if output, err := exec.CommandContext(ctx, "docker", "ps", "--format", "{{.Names}}").Output(); err == nil {
+		if strings.Contains(string(output), "pekan-postgres") || strings.Contains(string(output), "postgres") {
+			isDocker = true
+		}
 	}
 
 	var cmd *exec.Cmd
 	if isDocker {
 		// Docker mode: copy file to postgres container and restore there
+		pgContainer := "pekan-postgres"
+		if output, err := exec.CommandContext(ctx, "docker", "ps", "--format", "{{.Names}}", "--filter", "name=postgres").Output(); err == nil {
+			containers := strings.TrimSpace(string(output))
+			if containers != "" {
+				pgContainer = strings.Split(containers, "\n")[0]
+			}
+		}
+
 		if strings.HasSuffix(cleanName, ".gz") {
-			// Copy gz file to container
-			copyCmd := exec.CommandContext(ctx, "docker", "compose", "cp", fp, "pekan-postgres:/tmp/restore.sql.gz")
+			copyCmd := exec.CommandContext(ctx, "docker", "cp", fp, pgContainer+":/tmp/restore.sql.gz")
 			if output, err := copyCmd.CombinedOutput(); err != nil {
 				return fmt.Errorf("failed to copy backup: %v, output: %s", err, string(output))
 			}
-			cmd = exec.CommandContext(ctx, "docker", "compose", "exec", "-T", "pekan-postgres",
+			cmd = exec.CommandContext(ctx, "docker", "exec", "-i", pgContainer,
 				"sh", "-c", "gunzip -c /tmp/restore.sql.gz | psql -U postgres -d pekan 2>&1")
 		} else {
-			// Copy sql file to container
-			copyCmd := exec.CommandContext(ctx, "docker", "compose", "cp", fp, "pekan-postgres:/tmp/restore.sql")
+			copyCmd := exec.CommandContext(ctx, "docker", "cp", fp, pgContainer+":/tmp/restore.sql")
 			if output, err := copyCmd.CombinedOutput(); err != nil {
 				return fmt.Errorf("failed to copy backup: %v, output: %s", err, string(output))
 			}
-			cmd = exec.CommandContext(ctx, "docker", "compose", "exec", "-T", "pekan-postgres",
+			cmd = exec.CommandContext(ctx, "docker", "exec", "-i", pgContainer,
 				"psql", "-U", "postgres", "-d", "pekan", "-f", "/tmp/restore.sql")
 		}
 	} else {
