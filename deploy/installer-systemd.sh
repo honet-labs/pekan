@@ -634,13 +634,22 @@ run_migrations() {
 setup_systemd() {
   log "Step 11/12: Configuring systemd services..."
 
+  # Detect if PostgreSQL/Redis are in Docker
+  PG_DEPS=""
+  REDIS_DEPS=""
+  if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -q "postgres"; then
+    PG_DEPS="postgresql.service"
+  fi
+  if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -q "redis"; then
+    REDIS_DEPS="redis.service"
+  fi
+
   # pekan-api.service
   cat <<EOF | as_root tee /etc/systemd/system/pekan-api.service >/dev/null
 [Unit]
 Description=PEKAN API Server
-After=network.target postgresql.service redis.service
-Wants=postgresql.service redis.service
-Requires=postgresql.service
+After=network.target ${PG_DEPS} ${REDIS_DEPS}
+Wants=${PG_DEPS} ${REDIS_DEPS}
 
 [Service]
 Type=simple
@@ -666,8 +675,8 @@ EOF
   cat <<EOF | as_root tee /etc/systemd/system/pekan-worker.service >/dev/null
 [Unit]
 Description=PEKAN Background Worker
-After=network.target postgresql.service redis.service
-Wants=postgresql.service redis.service
+After=network.target ${PG_DEPS} ${REDIS_DEPS}
+Wants=${PG_DEPS} ${REDIS_DEPS}
 
 [Service]
 Type=simple
@@ -690,8 +699,8 @@ EOF
   cat <<EOF | as_root tee /etc/systemd/system/pekan-ai.service >/dev/null
 [Unit]
 Description=PEKAN AI Queue Worker
-After=network.target postgresql.service redis.service
-Wants=postgresql.service redis.service
+After=network.target ${PG_DEPS} ${REDIS_DEPS}
+Wants=${PG_DEPS} ${REDIS_DEPS}
 
 [Service]
 Type=simple
