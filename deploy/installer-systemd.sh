@@ -865,9 +865,14 @@ server {
     root ${INSTALL_DIR}/frontend/dist;
     index index.html;
 
+    access_log /var/log/pekan/nginx-access.log;
+    error_log /var/log/pekan/nginx-error.log;
+
     gzip on;
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml image/svg+xml;
     gzip_min_length 256;
+
+    client_max_body_size 500m;
 
     location / {
         try_files \$uri \$uri/ /index.html;
@@ -910,6 +915,23 @@ EOF
   as_root nginx -t
   as_root systemctl enable nginx
   as_root systemctl restart nginx
+
+  # Configure logrotate for PEKAN logs
+  cat <<EOF | as_root tee /etc/logrotate.d/pekan >/dev/null
+/var/log/pekan/*.log {
+    daily
+    missingok
+    rotate 14
+    compress
+    delaycompress
+    notifempty
+    create 0640 ${APP_USER} ${APP_GROUP}
+    sharedscripts
+    postrotate
+        systemctl reload nginx > /dev/null 2>&1 || true
+    endscript
+}
+EOF
 
   log "  Nginx configured"
 }
