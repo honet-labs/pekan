@@ -246,6 +246,7 @@ update_systemd() {
   # Ensure Go cache directory exists with proper permissions
   as_root mkdir -p "$INSTALL_DIR/go/cache"
   as_root chown -R "${APP_USER}:${APP_USER}" "$INSTALL_DIR/go"
+  as_root chown -R "${APP_USER}:${APP_USER}" "$INSTALL_DIR/backend"
 
   log "  Running go mod tidy..."
   as_user "$APP_USER" "cd '$INSTALL_DIR/backend' && GOPATH='$INSTALL_DIR/go' GOCACHE='$INSTALL_DIR/go/cache' /usr/local/go/bin/go mod tidy"
