@@ -536,8 +536,9 @@ func (s *Service) CreateBackup(ctx context.Context, backupType string, tenantID 
 		// Backup specific tenant schema
 		args = append(args, "-n", schemaName)
 	} else if backupType == "full" {
-		// For full backup, include all schemas (public + all tenant schemas)
-		rows, err := s.db.QueryContext(ctx, `SELECT code FROM public.tenants WHERE is_active = true`)
+		// For full backup, include ALL schemas
+		// First, get all tenant schemas
+		rows, err := s.db.QueryContext(ctx, `SELECT code FROM public.tenants`)
 		if err == nil {
 			defer rows.Close()
 			for rows.Next() {
@@ -550,6 +551,9 @@ func (s *Service) CreateBackup(ctx context.Context, backupType string, tenantID 
 		}
 		// Also include public schema
 		args = append(args, "-n", "public")
+		
+		// Log schemas being backed up
+		log.Printf("[Admin] Full backup including schemas: %v", args)
 	}
 	if backupType == "schema" {
 		args = append(args, "-s")
@@ -605,7 +609,21 @@ func (s *Service) CreateBackup(ctx context.Context, backupType string, tenantID 
 		return fmt.Errorf("failed to write backup file: %v", err)
 	}
 
-	log.Printf("[Admin] Backup created at %s (size: %d bytes)", fp, len(output))
+	log.Printf("[Admin] Database backup created at %s (size: %d bytes)", fp, len(output))
+
+	// Also backup storage files (images/attachments) for full backups
+	if backupType == "full" && tenantID == "" {
+		storageDir := "data/storage"
+		if _, err := os.Stat(storageDir); err == nil {
+			storageBackupFile := filepath.Join(backupDir, fmt.Sprintf("backup_storage_%s.tar.gz", time.Now().Format("20060102_150405")))
+			tarCmd := exec.CommandContext(ctx, "tar", "-czf", storageBackupFile, "-C", "data", "storage")
+			if err := tarCmd.Run(); err != nil {
+				log.Printf("[Admin] Warning: failed to backup storage: %v", err)
+			} else {
+				log.Printf("[Admin] Storage backup created at %s", storageBackupFile)
+			}
+		}
+	}
 
 	// Cloud Backup Integration
 	if s.storage != nil {
@@ -704,6 +722,21 @@ func (s *Service) RestoreBackup(ctx context.Context, filename string, tenantID s
 	if isDocker {
 		cleanupCmd := exec.CommandContext(ctx, "docker", "compose", "exec", "-T", "pekan-postgres", "rm", "-f", "/tmp/restore.sql", "/tmp/restore.sql.gz")
 		cleanupCmd.Run()
+	}
+
+	// Also restore storage files if backup exists
+	storageBackupPattern := filepath.Join(backupDir, "backup_storage_*.tar.gz")
+	storageBackups, _ := filepath.Glob(storageBackupPattern)
+	if len(storageBackups) > 0 {
+		// Get the latest storage backup
+		latestStorageBackup := storageBackups[len(storageBackups)-1]
+		log.Printf("[Admin] Restoring storage from %s", latestStorageBackup)
+		restoreCmd := exec.CommandContext(ctx, "tar", "-xzf", latestStorageBackup, "-C", "data")
+		if err := restoreCmd.Run(); err != nil {
+			log.Printf("[Admin] Warning: failed to restore storage: %v", err)
+		} else {
+			log.Printf("[Admin] Storage restored successfully")
+		}
 	}
 
 	_ = s.audit.Write(ctx, "BACKUP_RESTORED", "tenant", tenantID, nil, map[string]any{"filename": cleanName})
