@@ -672,23 +672,23 @@ func (s *Service) RestoreBackup(ctx context.Context, filename string, tenantID s
 
 	// Check if PostgreSQL is running in Docker container
 	isDocker := false
+	pgContainer := "pekan-postgres"
 	if output, err := exec.CommandContext(ctx, "docker", "ps", "--format", "{{.Names}}").Output(); err == nil {
 		if strings.Contains(string(output), "pekan-postgres") || strings.Contains(string(output), "postgres") {
 			isDocker = true
+			// Find the actual container name
+			if out, err := exec.CommandContext(ctx, "docker", "ps", "--format", "{{.Names}}", "--filter", "name=postgres").Output(); err == nil {
+				containers := strings.TrimSpace(string(out))
+				if containers != "" {
+					pgContainer = strings.Split(containers, "\n")[0]
+				}
+			}
 		}
 	}
 
 	var cmd *exec.Cmd
 	if isDocker {
 		// Docker mode: copy file to postgres container and restore there
-		pgContainer := "pekan-postgres"
-		if output, err := exec.CommandContext(ctx, "docker", "ps", "--format", "{{.Names}}", "--filter", "name=postgres").Output(); err == nil {
-			containers := strings.TrimSpace(string(output))
-			if containers != "" {
-				pgContainer = strings.Split(containers, "\n")[0]
-			}
-		}
-
 		if strings.HasSuffix(cleanName, ".gz") {
 			copyCmd := exec.CommandContext(ctx, "docker", "cp", fp, pgContainer+":/tmp/restore.sql.gz")
 			if output, err := copyCmd.CombinedOutput(); err != nil {
