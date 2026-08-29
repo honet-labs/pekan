@@ -13,3 +13,5 @@ require (
 	golang.org/x/crypto v0.36.0
 	google.golang.org/api v0.214.0
 )
+
+replace google.golang.org/api => google.golang.org/api v0.214.0
