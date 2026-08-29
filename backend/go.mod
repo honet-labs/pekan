@@ -12,6 +12,6 @@ require (
 	github.com/redis/go-redis/v9 v9.5.1
 	golang.org/x/crypto v0.36.0
 	google.golang.org/api v0.214.0
-	google.golang.org/api/drive/v3 v3.0.0
-	google.golang.org/api/option v0.214.0
 )
+
+replace google.golang.org/api => google.golang.org/api v0.214.0
