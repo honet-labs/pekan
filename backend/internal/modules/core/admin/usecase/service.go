@@ -724,11 +724,59 @@ func (s *Service) RestoreBackup(ctx context.Context, filename string, tenantID s
 		cleanupCmd.Run()
 	}
 
+	// Re-seed tenant modules and features after restore
+	log.Printf("[Admin] Re-seeding tenant modules and features...")
+	reseedSQL := `
+DO $$
+DECLARE
+    tenant_rec RECORD;
+    module_codes TEXT[] := ARRAY['transactions', 'savings', 'budgets', 'reminders', 'reports', 'receipts', 'attachments', 'dashboard', 'master', 'notifications', 'settings', 'whatsapp'];
+    feature_codes TEXT[] := ARRAY['transactions.create', 'transactions.read', 'transactions.update', 'transactions.delete', 
+                                  'savings.create', 'savings.read', 'savings.update', 'savings.delete',
+                                  'budgets.create', 'budgets.read', 'budgets.update', 'budgets.delete',
+                                  'reminders.create', 'reminders.read', 'reminders.update', 'reminders.delete',
+                                  'reports.create', 'reports.read', 'reports.export',
+                                  'receipts.create', 'receipts.read',
+                                  'attachments.create', 'attachments.read', 'attachments.delete',
+                                  'dashboard.read',
+                                  'master.create', 'master.read', 'master.update', 'master.delete',
+                                  'notifications.read', 'notifications.update',
+                                  'settings.read', 'settings.update',
+                                  'whatsapp.read', 'whatsapp.update'];
+    mc TEXT;
+    fc TEXT;
+BEGIN
+    FOR tenant_rec IN SELECT id, code FROM public.tenants LOOP
+        FOREACH mc IN ARRAY module_codes LOOP
+            INSERT INTO public.tenant_modules (id, tenant_id, module_code, is_enabled, source, created_at, updated_at)
+            VALUES (gen_random_uuid(), tenant_rec.id, mc, true, 'system', now(), now())
+            ON CONFLICT (tenant_id, module_code) DO NOTHING;
+        END LOOP;
+        FOREACH fc IN ARRAY feature_codes LOOP
+            INSERT INTO public.tenant_features (id, tenant_id, feature_code, is_enabled, source, created_at, updated_at)
+            VALUES (gen_random_uuid(), tenant_rec.id, fc, true, 'system', now(), now())
+            ON CONFLICT (tenant_id, feature_code) DO NOTHING;
+        END LOOP;
+    END LOOP;
+END $$;`
+
+	// Execute re-seed SQL
+	if isDocker {
+		reseedCmd := exec.CommandContext(ctx, "docker", "exec", "-i", pgContainer, "psql", "-U", "postgres", "-d", "pekan", "-c", reseedSQL)
+		if output, err := reseedCmd.CombinedOutput(); err != nil {
+			log.Printf("[Admin] Warning: re-seed failed: %v, output: %s", err, string(output))
+		}
+	} else {
+		reseedCmd := exec.CommandContext(ctx, "psql", "-d", dbUrl, "-c", reseedSQL)
+		if output, err := reseedCmd.CombinedOutput(); err != nil {
+			log.Printf("[Admin] Warning: re-seed failed: %v, output: %s", err, string(output))
+		}
+	}
+
 	// Also restore storage files if backup exists
 	storageBackupPattern := filepath.Join(backupDir, "backup_storage_*.tar.gz")
 	storageBackups, _ := filepath.Glob(storageBackupPattern)
 	if len(storageBackups) > 0 {
-		// Get the latest storage backup
 		latestStorageBackup := storageBackups[len(storageBackups)-1]
 		log.Printf("[Admin] Restoring storage from %s", latestStorageBackup)
 		restoreCmd := exec.CommandContext(ctx, "tar", "-xzf", latestStorageBackup, "-C", "data")
