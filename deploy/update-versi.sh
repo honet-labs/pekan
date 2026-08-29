@@ -252,13 +252,13 @@ update_systemd() {
   as_user "$APP_USER" "cd '$INSTALL_DIR/backend' && GOPATH='$INSTALL_DIR/go' GOCACHE='$INSTALL_DIR/go/cache' /usr/local/go/bin/go mod tidy"
 
   log "  Building pekan-api..."
-  as_user "$APP_USER" "cd '$INSTALL_DIR/backend' && GOPATH='$INSTALL_DIR/go' GOCACHE='$INSTALL_DIR/go/cache' CGO_ENABLED=0 /usr/local/go/bin/go build -ldflags='-s -w' -o '$INSTALL_DIR/bin/pekan-api' ./cmd/api"
+  as_user "$APP_USER" "cd '$INSTALL_DIR/backend' && GOPATH='$INSTALL_DIR/go' GOCACHE='$INSTALL_DIR/go/cache' CGO_ENABLED=0 /usr/local/go/bin/go build -buildvcs=false -ldflags='-s -w' -o '$INSTALL_DIR/bin/pekan-api' ./cmd/api"
 
   log "  Building pekan-worker..."
-  as_user "$APP_USER" "cd '$INSTALL_DIR/backend' && GOPATH='$INSTALL_DIR/go' GOCACHE='$INSTALL_DIR/go/cache' CGO_ENABLED=0 /usr/local/go/bin/go build -ldflags='-s -w' -o '$INSTALL_DIR/bin/pekan-worker' ./cmd/worker"
+  as_user "$APP_USER" "cd '$INSTALL_DIR/backend' && GOPATH='$INSTALL_DIR/go' GOCACHE='$INSTALL_DIR/go/cache' CGO_ENABLED=0 /usr/local/go/bin/go build -buildvcs=false -ldflags='-s -w' -o '$INSTALL_DIR/bin/pekan-worker' ./cmd/worker"
 
   log "  Building pekan-ai..."
-  as_user "$APP_USER" "cd '$INSTALL_DIR/backend' && GOPATH='$INSTALL_DIR/go' GOCACHE='$INSTALL_DIR/go/cache' CGO_ENABLED=0 /usr/local/go/bin/go build -ldflags='-s -w' -o '$INSTALL_DIR/bin/pekan-ai' ./cmd/ai"
+  as_user "$APP_USER" "cd '$INSTALL_DIR/backend' && GOPATH='$INSTALL_DIR/go' GOCACHE='$INSTALL_DIR/go/cache' CGO_ENABLED=0 /usr/local/go/bin/go build -buildvcs=false -ldflags='-s -w' -o '$INSTALL_DIR/bin/pekan-ai' ./cmd/ai"
 
   log "Step 6/10: Building frontend..."
   as_root bash -c "cd '$INSTALL_DIR/frontend' && npm ci && npm run build"
