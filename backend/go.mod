@@ -11,7 +11,7 @@ require (
 	github.com/phpdave11/gofpdf v1.4.3
 	github.com/redis/go-redis/v9 v9.5.1
 	golang.org/x/crypto v0.36.0
-	google.golang.org/api v0.214.0
+	google.golang.org/api v0.150.0
 )
 
-replace google.golang.org/api => google.golang.org/api v0.214.0
+replace google.golang.org/api => google.golang.org/api v0.150.0
