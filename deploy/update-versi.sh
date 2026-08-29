@@ -238,20 +238,26 @@ update_systemd() {
 
   log "Step 5/10: Building backend binaries..."
   export PATH=$PATH:/usr/local/go/bin
+  export GOPATH="$INSTALL_DIR/go"
+  export GOCACHE="$INSTALL_DIR/go/cache"
   local APP_USER
   APP_USER=$(stat -c '%U' "$INSTALL_DIR/bin/pekan-api" 2>/dev/null || echo "pekan")
 
+  # Ensure Go cache directory exists with proper permissions
+  as_root mkdir -p "$INSTALL_DIR/go/cache"
+  as_root chown -R "${APP_USER}:${APP_USER}" "$INSTALL_DIR/go"
+
   log "  Running go mod tidy..."
-  as_user "$APP_USER" "cd '$INSTALL_DIR/backend' && /usr/local/go/bin/go mod tidy"
+  as_user "$APP_USER" "cd '$INSTALL_DIR/backend' && GOPATH='$INSTALL_DIR/go' GOCACHE='$INSTALL_DIR/go/cache' /usr/local/go/bin/go mod tidy"
 
   log "  Building pekan-api..."
-  as_user "$APP_USER" "cd '$INSTALL_DIR/backend' && CGO_ENABLED=0 /usr/local/go/bin/go build -ldflags='-s -w' -o '$INSTALL_DIR/bin/pekan-api' ./cmd/api"
+  as_user "$APP_USER" "cd '$INSTALL_DIR/backend' && GOPATH='$INSTALL_DIR/go' GOCACHE='$INSTALL_DIR/go/cache' CGO_ENABLED=0 /usr/local/go/bin/go build -ldflags='-s -w' -o '$INSTALL_DIR/bin/pekan-api' ./cmd/api"
 
   log "  Building pekan-worker..."
-  as_user "$APP_USER" "cd '$INSTALL_DIR/backend' && CGO_ENABLED=0 /usr/local/go/bin/go build -ldflags='-s -w' -o '$INSTALL_DIR/bin/pekan-worker' ./cmd/worker"
+  as_user "$APP_USER" "cd '$INSTALL_DIR/backend' && GOPATH='$INSTALL_DIR/go' GOCACHE='$INSTALL_DIR/go/cache' CGO_ENABLED=0 /usr/local/go/bin/go build -ldflags='-s -w' -o '$INSTALL_DIR/bin/pekan-worker' ./cmd/worker"
 
   log "  Building pekan-ai..."
-  as_user "$APP_USER" "cd '$INSTALL_DIR/backend' && CGO_ENABLED=0 /usr/local/go/bin/go build -ldflags='-s -w' -o '$INSTALL_DIR/bin/pekan-ai' ./cmd/ai"
+  as_user "$APP_USER" "cd '$INSTALL_DIR/backend' && GOPATH='$INSTALL_DIR/go' GOCACHE='$INSTALL_DIR/go/cache' CGO_ENABLED=0 /usr/local/go/bin/go build -ldflags='-s -w' -o '$INSTALL_DIR/bin/pekan-ai' ./cmd/ai"
 
   log "Step 6/10: Building frontend..."
   as_root bash -c "cd '$INSTALL_DIR/frontend' && npm ci && npm run build"
