@@ -243,9 +243,11 @@ update_systemd() {
   local APP_USER
   APP_USER=$(stat -c '%U' "$INSTALL_DIR/bin/pekan-api" 2>/dev/null || echo "pekan")
 
-  # Ensure Go cache directory exists with proper permissions
+  # Ensure Go cache and bin directories exist with proper permissions
   as_root mkdir -p "$INSTALL_DIR/go/cache"
+  as_root mkdir -p "$INSTALL_DIR/bin"
   as_root chown -R "${APP_USER}:${APP_USER}" "$INSTALL_DIR/go"
+  as_root chown -R "${APP_USER}:${APP_USER}" "$INSTALL_DIR/bin"
   as_root chown -R "${APP_USER}:${APP_USER}" "$INSTALL_DIR/backend"
 
   log "  Running go mod tidy..."
