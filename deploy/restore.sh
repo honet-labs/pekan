@@ -53,7 +53,11 @@ main() {
 
   # 1. Stop Services
   log "Stopping services..."
-  as_root systemctl stop pekan-api pekan-worker || true
+  if command -v systemctl &>/dev/null && systemctl is-system-running &>/dev/null; then
+    as_root systemctl stop pekan-api pekan-worker pekan-ai 2>/dev/null || true
+  elif [[ -f "${INSTALL_DIR}/docker-compose.yml" ]] && command -v docker &>/dev/null; then
+    cd "${INSTALL_DIR}" && (as_root docker compose stop 2>/dev/null || as_root docker-compose stop 2>/dev/null || true)
+  fi
 
   # 2. Restore Config
   log "Restoring configuration (.env)..."
@@ -67,8 +71,8 @@ main() {
   if [[ -d "${data_dir}/storage" ]]; then
     log "Restoring storage files to ${STORAGE_LOCAL_PATH}..."
     as_root mkdir -p "$STORAGE_LOCAL_PATH"
-    as_root cp -r "${data_dir}/storage/"* "$STORAGE_LOCAL_PATH/"
-    as_root chown -R pekan:pekan "$STORAGE_LOCAL_PATH"
+    as_root cp -r "${data_dir}/storage/"* "$STORAGE_LOCAL_PATH/" 2>/dev/null || true
+    as_root chown -R pekan:pekan "$STORAGE_LOCAL_PATH" 2>/dev/null || true
   fi
 
   # 4. Restore Database
@@ -76,10 +80,10 @@ main() {
   if [[ -f "${data_dir}/database.sql" ]]; then
     if [[ "$DATABASE_URL" == *"127.0.0.1"* ]] || [[ "$DATABASE_URL" == *"localhost"* ]]; then
       # Local DB
-      if as_root docker ps | grep -q pekan-postgres; then
-         as_root docker exec -i pekan-postgres psql -U postgres pekan < "${data_dir}/database.sql"
+      if as_root docker ps 2>/dev/null | grep -q pekan-postgres; then
+         as_root docker exec -i pekan-postgres psql -U postgres -d pekan < "${data_dir}/database.sql"
       else
-         as_root -u postgres psql pekan < "${data_dir}/database.sql"
+         as_root -u postgres psql -d pekan < "${data_dir}/database.sql"
       fi
     else
       # External DB
@@ -89,7 +93,11 @@ main() {
 
   # 5. Start Services
   log "Restarting services..."
-  as_root systemctl start pekan-api pekan-worker
+  if command -v systemctl &>/dev/null && systemctl is-system-running &>/dev/null; then
+    as_root systemctl start pekan-api pekan-worker pekan-ai 2>/dev/null || true
+  elif [[ -f "${INSTALL_DIR}/docker-compose.yml" ]] && command -v docker &>/dev/null; then
+    cd "${INSTALL_DIR}" && (as_root docker compose start 2>/dev/null || as_root docker-compose start 2>/dev/null || true)
+  fi
   
   # Cleanup
   rm -rf "$temp_extract"

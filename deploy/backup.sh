@@ -52,13 +52,13 @@ main() {
     # Local DB (Docker or Standalone)
     # Check if Docker compose is used
     if as_root docker ps | grep -q pekan-postgres; then
-       as_root docker exec pekan-postgres pg_dump -U postgres pekan > "${TEMP_DIR}/database.sql"
+       as_root docker exec pekan-postgres pg_dump -U postgres --clean --if-exists --no-owner --no-privileges pekan > "${TEMP_DIR}/database.sql"
     else
-       as_root -u postgres pg_dump pekan > "${TEMP_DIR}/database.sql"
+       as_root -u postgres pg_dump --clean --if-exists --no-owner --no-privileges pekan > "${TEMP_DIR}/database.sql"
     fi
   else
     # External DB
-    pg_dump "$DATABASE_URL" > "${TEMP_DIR}/database.sql"
+    pg_dump --clean --if-exists --no-owner --no-privileges "$DATABASE_URL" > "${TEMP_DIR}/database.sql"
   fi
 
   # 2. Backup Config
