@@ -264,6 +264,11 @@ update_systemd() {
 
   log "Step 6/10: Building frontend..."
   as_root bash -c "cd '$INSTALL_DIR/frontend' && npm ci && npm run build"
+  local WEB_ROOT="/var/www/pekan-web"
+  as_root mkdir -p "$WEB_ROOT"
+  as_root rm -rf "${WEB_ROOT:?}/"* 2>/dev/null || true
+  as_root cp -r "$INSTALL_DIR/frontend/dist/." "$WEB_ROOT/"
+  as_root chown -R www-data:www-data "$WEB_ROOT" 2>/dev/null || as_root chown -R nginx:nginx "$WEB_ROOT" 2>/dev/null || true
 
   log "Step 7/10: Running migrations..."
   local DATABASE_URL
