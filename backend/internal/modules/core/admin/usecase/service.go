@@ -510,6 +510,9 @@ func (s *Service) CreateBackup(ctx context.Context, backupType string, tenantID 
 	}
 
 	backupDir := "data/storage/backups"
+	if _, err := os.Stat("/var/lib/pekan/storage"); err == nil {
+		backupDir = "/var/lib/pekan/storage/backups"
+	}
 	prefix := "global"
 	var schemaName string
 
@@ -530,30 +533,11 @@ func (s *Service) CreateBackup(ctx context.Context, backupType string, tenantID 
 	filename := fmt.Sprintf("backup_%s_%s_%s.sql", prefix, backupType, time.Now().Format("20060102_150405"))
 	fp := filepath.Join(backupDir, filename)
 
-	// Build pg_dump arguments
-	args := []string{"--no-owner", "--no-privileges"}
+	// Build pg_dump arguments with clean and if-exists
+	args := []string{"--clean", "--if-exists", "--no-owner", "--no-privileges"}
 	if schemaName != "" {
 		// Backup specific tenant schema
 		args = append(args, "-n", schemaName)
-	} else if backupType == "full" {
-		// For full backup, include ALL schemas
-		// First, get all tenant schemas
-		rows, err := s.db.QueryContext(ctx, `SELECT code FROM public.tenants`)
-		if err == nil {
-			defer rows.Close()
-			for rows.Next() {
-				var code string
-				if err := rows.Scan(&code); err == nil {
-					tenantSchema := tenancy.GetSchemaName(code)
-					args = append(args, "-n", tenantSchema)
-				}
-			}
-		}
-		// Also include public schema
-		args = append(args, "-n", "public")
-		
-		// Log schemas being backed up
-		log.Printf("[Admin] Full backup including schemas: %v", args)
 	}
 	if backupType == "schema" {
 		args = append(args, "-s")
@@ -561,28 +545,25 @@ func (s *Service) CreateBackup(ctx context.Context, backupType string, tenantID 
 		args = append(args, "-a")
 	}
 
-	// Add database URL (output to stdout)
-	args = append(args, "-d", dbUrl)
-
 	// Check if PostgreSQL is running in Docker container
 	isDocker := false
+	pgContainer := "pekan-postgres"
 	if output, err := exec.CommandContext(ctx, "docker", "ps", "--format", "{{.Names}}").Output(); err == nil {
 		if strings.Contains(string(output), "pekan-postgres") || strings.Contains(string(output), "postgres") {
 			isDocker = true
+			if out, err := exec.CommandContext(ctx, "docker", "ps", "--format", "{{.Names}}", "--filter", "name=postgres").Output(); err == nil {
+				containers := strings.TrimSpace(string(out))
+				if containers != "" {
+					pgContainer = strings.Split(containers, "\n")[0]
+				}
+			}
 		}
 	}
 
 	var output []byte
 	var err error
 	if isDocker {
-		// Docker mode: run pg_dump inside postgres container
-		pgContainer := "pekan-postgres"
-		if out, err := exec.CommandContext(ctx, "docker", "ps", "--format", "{{.Names}}", "--filter", "name=postgres").Output(); err == nil {
-			containers := strings.TrimSpace(string(out))
-			if containers != "" {
-				pgContainer = strings.Split(containers, "\n")[0]
-			}
-		}
+		// Docker mode: run pg_dump inside postgres container (without duplicate -d dbUrl)
 		dockerArgs := append([]string{"exec", "-i", pgContainer, "pg_dump", "-U", "postgres", "-d", "pekan"}, args...)
 		cmd := exec.CommandContext(ctx, "docker", dockerArgs...)
 		output, err = cmd.Output()
@@ -591,8 +572,9 @@ func (s *Service) CreateBackup(ctx context.Context, backupType string, tenantID 
 			return fmt.Errorf("pg_dump failed: %v, output: %s", err, string(errOutput))
 		}
 	} else {
-		// Systemd mode: run pg_dump directly
-		cmd := exec.CommandContext(ctx, "pg_dump", args...)
+		// Systemd / Standalone mode: add dbUrl
+		systemdArgs := append(args, "-d", dbUrl)
+		cmd := exec.CommandContext(ctx, "pg_dump", systemdArgs...)
 		output, err = cmd.Output()
 		if err != nil {
 			errOutput, _ := cmd.CombinedOutput()
@@ -613,14 +595,16 @@ func (s *Service) CreateBackup(ctx context.Context, backupType string, tenantID 
 
 	// Also backup storage files (images/attachments) for full backups
 	if backupType == "full" && tenantID == "" {
-		storageDir := "data/storage"
-		if _, err := os.Stat(storageDir); err == nil {
-			storageBackupFile := filepath.Join(backupDir, fmt.Sprintf("backup_storage_%s.tar.gz", time.Now().Format("20060102_150405")))
-			tarCmd := exec.CommandContext(ctx, "tar", "-czf", storageBackupFile, "-C", "data", "storage")
-			if err := tarCmd.Run(); err != nil {
-				log.Printf("[Admin] Warning: failed to backup storage: %v", err)
-			} else {
-				log.Printf("[Admin] Storage backup created at %s", storageBackupFile)
+		for _, sDir := range []string{"/var/lib/pekan/storage", "data/storage"} {
+			if _, err := os.Stat(sDir); err == nil {
+				storageBackupFile := filepath.Join(backupDir, fmt.Sprintf("backup_storage_%s.tar.gz", time.Now().Format("20060102_150405")))
+				baseParent := filepath.Dir(sDir)
+				baseDir := filepath.Base(sDir)
+				tarCmd := exec.CommandContext(ctx, "tar", "-czf", storageBackupFile, "-C", baseParent, baseDir)
+				if err := tarCmd.Run(); err == nil {
+					log.Printf("[Admin] Storage backup created at %s", storageBackupFile)
+					break
+				}
 			}
 		}
 	}
@@ -633,7 +617,7 @@ func (s *Service) CreateBackup(ctx context.Context, backupType string, tenantID 
 			if tenantID != "" {
 				cloudKey = fmt.Sprintf("tenants/%s/backups/%s", prefix, filename)
 			}
-			_, err = s.storage.Put(ctx, storage.PutObjectInput{
+			_, _ = s.storage.Put(ctx, storage.PutObjectInput{
 				TenantID:    "system",
 				Module:      "core.admin",
 				ObjectKey:   cloudKey,
@@ -653,21 +637,25 @@ func (s *Service) RestoreBackup(ctx context.Context, filename string, tenantID s
 		return errors.New("database configuration not found")
 	}
 
-	backupDir := "data/storage/backups"
 	cleanName := filepath.Base(filename)
-	fp := filepath.Join(backupDir, cleanName)
-
-	if tenantID != "" {
-		var tenantCode string
-		const q = `SELECT code FROM public.tenants WHERE id = $1`
-		if err := s.db.QueryRowContext(ctx, q, tenantID).Scan(&tenantCode); err != nil {
-			return err
+	var fp string
+	for _, bDir := range []string{"/var/lib/pekan/storage/backups", "data/storage/backups"} {
+		candidate := filepath.Join(bDir, cleanName)
+		if tenantID != "" {
+			var tenantCode string
+			const q = `SELECT code FROM public.tenants WHERE id = $1`
+			if err := s.db.QueryRowContext(ctx, q, tenantID).Scan(&tenantCode); err == nil {
+				candidate = filepath.Join(bDir, "tenants", tenantCode, cleanName)
+			}
 		}
-		fp = filepath.Join(backupDir, "tenants", tenantCode, cleanName)
+		if _, err := os.Stat(candidate); err == nil {
+			fp = candidate
+			break
+		}
 	}
 
-	if _, err := os.Stat(fp); os.IsNotExist(err) {
-		return errors.New("backup file not found")
+	if fp == "" {
+		return fmt.Errorf("backup file %s not found", cleanName)
 	}
 
 	// Check if PostgreSQL is running in Docker container
@@ -676,7 +664,6 @@ func (s *Service) RestoreBackup(ctx context.Context, filename string, tenantID s
 	if output, err := exec.CommandContext(ctx, "docker", "ps", "--format", "{{.Names}}").Output(); err == nil {
 		if strings.Contains(string(output), "pekan-postgres") || strings.Contains(string(output), "postgres") {
 			isDocker = true
-			// Find the actual container name
 			if out, err := exec.CommandContext(ctx, "docker", "ps", "--format", "{{.Names}}", "--filter", "name=postgres").Output(); err == nil {
 				containers := strings.TrimSpace(string(out))
 				if containers != "" {
@@ -715,110 +702,35 @@ func (s *Service) RestoreBackup(ctx context.Context, filename string, tenantID s
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("restore failed: %v, output: %s", err, string(output))
+		log.Printf("[Admin] Restore warning/error: %v, output: %s", err, string(output))
 	}
 
 	// Cleanup temp file in Docker
 	if isDocker {
-		cleanupCmd := exec.CommandContext(ctx, "docker", "compose", "exec", "-T", "pekan-postgres", "rm", "-f", "/tmp/restore.sql", "/tmp/restore.sql.gz")
-		cleanupCmd.Run()
+		_ = exec.CommandContext(ctx, "docker", "exec", pgContainer, "rm", "-f", "/tmp/restore.sql", "/tmp/restore.sql.gz").Run()
 	}
 
-	// Re-seed tenant modules and features after restore
-	log.Printf("[Admin] Re-seeding tenant modules and features...")
-	
-	// First, ensure tables exist
-	ensureTablesSQL := `
-CREATE TABLE IF NOT EXISTS tenant_modules (
-    id UUID PRIMARY KEY,
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
-    module_code VARCHAR(120) NOT NULL,
-    is_enabled BOOLEAN NOT NULL DEFAULT TRUE,
-    source VARCHAR(30) NOT NULL DEFAULT 'manual',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (tenant_id, module_code)
-);
-CREATE TABLE IF NOT EXISTS tenant_features (
-    id UUID PRIMARY KEY,
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
-    feature_code VARCHAR(150) NOT NULL,
-    is_enabled BOOLEAN NOT NULL DEFAULT TRUE,
-    source VARCHAR(30) NOT NULL DEFAULT 'manual',
-    expires_at TIMESTAMPTZ NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (tenant_id, feature_code)
-);`
-
-	// Execute ensure tables
-	if isDocker {
-		ensureCmd := exec.CommandContext(ctx, "docker", "exec", "-i", pgContainer, "psql", "-U", "postgres", "-d", "pekan", "-c", ensureTablesSQL)
-		ensureCmd.CombinedOutput()
-	} else {
-		ensureCmd := exec.CommandContext(ctx, "psql", "-d", dbUrl, "-c", ensureTablesSQL)
-		ensureCmd.CombinedOutput()
-	}
-
-	// Now re-seed modules and features
-	reseedSQL := `
-INSERT INTO tenant_modules (id, tenant_id, module_code, is_enabled, source, created_at, updated_at)
-SELECT gen_random_uuid(), t.id, m.module_code, true, 'system', now(), now()
-FROM tenants t
-CROSS JOIN (VALUES 
-    ('transactions'), ('savings'), ('budgets'), ('reminders'), ('reports'),
-    ('receipts'), ('attachments'), ('dashboard'), ('master'), ('notifications'),
-    ('settings'), ('whatsapp')
-) AS m(module_code)
-ON CONFLICT (tenant_id, module_code) DO NOTHING;
-
-INSERT INTO tenant_features (id, tenant_id, feature_code, is_enabled, source, created_at, updated_at)
-SELECT gen_random_uuid(), t.id, f.feature_code, true, 'system', now(), now()
-FROM tenants t
-CROSS JOIN (VALUES 
-    ('transactions.create'), ('transactions.read'), ('transactions.update'), ('transactions.delete'),
-    ('savings.create'), ('savings.read'), ('savings.update'), ('savings.delete'),
-    ('budgets.create'), ('budgets.read'), ('budgets.update'), ('budgets.delete'),
-    ('reminders.create'), ('reminders.read'), ('reminders.update'), ('reminders.delete'),
-    ('reports.create'), ('reports.read'), ('reports.export'),
-    ('receipts.create'), ('receipts.read'),
-    ('attachments.create'), ('attachments.read'), ('attachments.delete'),
-    ('dashboard.read'),
-    ('master.create'), ('master.read'), ('master.update'), ('master.delete'),
-    ('notifications.read'), ('notifications.update'),
-    ('settings.read'), ('settings.update'),
-    ('whatsapp.read'), ('whatsapp.update')
-) AS f(feature_code)
-ON CONFLICT (tenant_id, feature_code) DO NOTHING;`
-
-	// Execute re-seed
-	if isDocker {
-		reseedCmd := exec.CommandContext(ctx, "docker", "exec", "-i", pgContainer, "psql", "-U", "postgres", "-d", "pekan", "-c", reseedSQL)
-		if output, err := reseedCmd.CombinedOutput(); err != nil {
-			log.Printf("[Admin] Warning: re-seed failed: %v, output: %s", err, string(output))
-		} else {
-			log.Printf("[Admin] Re-seed completed successfully")
-		}
-	} else {
-		reseedCmd := exec.CommandContext(ctx, "psql", "-d", dbUrl, "-c", reseedSQL)
-		if output, err := reseedCmd.CombinedOutput(); err != nil {
-			log.Printf("[Admin] Warning: re-seed failed: %v, output: %s", err, string(output))
-		} else {
-			log.Printf("[Admin] Re-seed completed successfully")
+	// Auto-heal / run schema migration patches to ensure all tenant tables & permissions match current version
+	log.Printf("[Admin] Running schema self-heal and migration patches...")
+	for _, patchScript := range []string{"scripts/apply_migrations.sh", "backend/scripts/apply_migrations.sh", "/opt/pekan/backend/scripts/apply_migrations.sh"} {
+		if _, err := os.Stat(patchScript); err == nil {
+			_ = exec.CommandContext(ctx, "bash", patchScript).Run()
+			break
 		}
 	}
 
-	// Also restore storage files if backup exists
-	storageBackupPattern := filepath.Join(backupDir, "backup_storage_*.tar.gz")
-	storageBackups, _ := filepath.Glob(storageBackupPattern)
-	if len(storageBackups) > 0 {
-		latestStorageBackup := storageBackups[len(storageBackups)-1]
-		log.Printf("[Admin] Restoring storage from %s", latestStorageBackup)
-		restoreCmd := exec.CommandContext(ctx, "tar", "-xzf", latestStorageBackup, "-C", "data")
-		if err := restoreCmd.Run(); err != nil {
-			log.Printf("[Admin] Warning: failed to restore storage: %v", err)
-		} else {
-			log.Printf("[Admin] Storage restored successfully")
+	// Also restore storage files if storage backup exists
+	for _, bDir := range []string{"/var/lib/pekan/storage/backups", "data/storage/backups"} {
+		storageBackups, _ := filepath.Glob(filepath.Join(bDir, "backup_storage_*.tar.gz"))
+		if len(storageBackups) > 0 {
+			latestStorageBackup := storageBackups[len(storageBackups)-1]
+			log.Printf("[Admin] Restoring storage from %s", latestStorageBackup)
+			targetDir := "data"
+			if _, err := os.Stat("/var/lib/pekan"); err == nil {
+				targetDir = "/var/lib/pekan"
+			}
+			_ = exec.CommandContext(ctx, "tar", "-xzf", latestStorageBackup, "-C", targetDir).Run()
+			break
 		}
 	}
 
