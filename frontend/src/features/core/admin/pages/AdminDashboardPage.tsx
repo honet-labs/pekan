@@ -4119,8 +4119,8 @@ export function AdminDashboardPage(): JSX.Element {
               )}
             </div>
             <p className="spacing-mb-md opacity-70">
-              Update {userToReset.action === 'password' ? 'password' : userToReset.action} untuk user: <strong>{userToReset.user.full_name}</strong>
-              {userToReset.action === 'password' && <><br/><span className="text-xs text-primary">User akan diwajibkan ganti password saat login pertama kali.</span></>}
+              Update {userToReset.action === 'password' ? 'password' : userToReset.action} untuk user: <strong>{userToReset.user.full_name}</strong> (<code>{userToReset.user.email}</code>)
+              {userToReset.action === 'password' && <><br/><span className="text-xs text-success">User dapat langsung login menggunakan password baru ini.</span></>}
             </p>
             <form onSubmit={(e) => { 
               e.preventDefault(); 
