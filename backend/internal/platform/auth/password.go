@@ -70,37 +70,32 @@ func generateSalt(length int) ([]byte, error) {
 	return salt, nil
 }
 
-// HashPassword applies complexity validation and then hashes using Argon2id.
+// HashPassword applies complexity validation and then hashes using Bcrypt.
 func HashPassword(raw string) (string, error) {
 	if err := ValidatePasswordComplexity(raw); err != nil {
 		return "", err
 	}
-	salt, err := generateSalt(argonSaltLength)
+	bytes, err := bcrypt.GenerateFromPassword([]byte(raw), bcrypt.DefaultCost)
 	if err != nil {
 		return "", err
 	}
-
-	hash := argon2.IDKey([]byte(raw), salt, argonIterations, argonMemory, argonParallelism, argonKeyLength)
-	
-	// Format: $argon2id$v=19$m=65536,t=3,p=2$<salt>$<hash>
-	encodedSalt := base64.RawStdEncoding.EncodeToString(salt)
-	encodedHash := base64.RawStdEncoding.EncodeToString(hash)
-	
-	return fmt.Sprintf("$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s",
-		argon2.Version, argonMemory, argonIterations, argonParallelism, encodedSalt, encodedHash), nil
+	return string(bytes), nil
 }
 
 // VerifyPassword dynamically verifies either an Argon2id or a legacy bcrypt hash.
 func VerifyPassword(hash, raw string) error {
+	hash = strings.TrimSpace(hash)
+	raw = strings.TrimSpace(raw)
 	if strings.HasPrefix(hash, "$argon2id$") {
 		return verifyArgon2id(hash, raw)
 	}
 	
-	// Fallback to bcrypt for existing users
+	// Fallback to bcrypt for existing and new users
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(raw))
 }
 
 func verifyArgon2id(encodedHash, raw string) error {
+	encodedHash = strings.TrimSpace(encodedHash)
 	parts := strings.Split(encodedHash, "$")
 	if len(parts) != 6 {
 		return errors.New("invalid argon2id hash format")
@@ -117,11 +112,9 @@ func verifyArgon2id(encodedHash, raw string) error {
 	}
 
 	decodeB64 := func(s string) ([]byte, error) {
-		// Try RawStdEncoding first (standard for PHC format)
 		if b, err := base64.RawStdEncoding.DecodeString(s); err == nil {
 			return b, nil
 		}
-		// Fallback to StdEncoding for padded strings
 		return base64.StdEncoding.DecodeString(s)
 	}
 

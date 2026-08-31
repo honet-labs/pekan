@@ -623,6 +623,11 @@ func (s *Service) ResetPassword(ctx context.Context, email, tenantID, newPasswor
 	// Optional: Revoke all sessions for security
 	_ = s.repo.RevokeAllSessionsByUser(ctx, user.ID)
 
+	// Clear any failed login lock in sessionStore
+	if s.sessionStore != nil {
+		_ = s.sessionStore.ClearFailedLogin(ctx, email, actualTenantID)
+	}
+
 	return nil
 }
 
