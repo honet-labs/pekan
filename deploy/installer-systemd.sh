@@ -839,23 +839,36 @@ EnvironmentFile=${INSTALL_DIR}/backend/.env
 ExecStart=${INSTALL_DIR}/bin/pekan-ai
 Restart=always
 RestartSec=5
-StandardOutput=append:/var/log/pekan/ai.log
-StandardError=append:/var/log/pekan/ai-error.log
-SyslogIdentifier=pekan-ai
-Environment=PATH=/usr/local/go/bin:/usr/bin:/bin
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=pekan-ai
-Environment=PATH=/usr/local/go/bin:/usr/bin:/bin
+    StandardOutput=append:/var/log/pekan/ai.log
+    StandardError=append:/var/log/pekan/ai-error.log
+    SyslogIdentifier=pekan-ai
+    Environment=PATH=/usr/local/go/bin:/usr/bin:/bin
 
-[Install]
-WantedBy=multi-user.target
+    [Install]
+    WantedBy=multi-user.target
+EOF
+
+  as_root mkdir -p /var/log/pekan
+  as_root chown -R "${APP_USER}:${APP_GROUP}" /var/log/pekan
+  as_root chmod 755 /var/log/pekan
+
+  cat <<EOF | as_root tee /etc/logrotate.d/pekan >/dev/null
+/var/log/pekan/*.log {
+    daily
+    missingok
+    rotate 14
+    compress
+    delaycompress
+    notifempty
+    copytruncate
+    create 0640 ${APP_USER} ${APP_GROUP}
+}
 EOF
 
   as_root systemctl daemon-reload
   as_root systemctl enable pekan-api pekan-worker pekan-ai
 
-  log "  Systemd services configured"
+  log "  Systemd services and logrotate configured"
 }
 
 setup_nginx() {
