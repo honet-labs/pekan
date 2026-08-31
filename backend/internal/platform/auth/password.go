@@ -90,6 +90,11 @@ func VerifyPassword(hash, raw string) error {
 		return verifyArgon2id(hash, raw)
 	}
 	
+	// Normalize $2y$ (PHP/Postgres crypt) to $2a$ for Go bcrypt compatibility
+	if strings.HasPrefix(hash, "$2y$") {
+		hash = "$2a$" + hash[4:]
+	}
+	
 	// Fallback to bcrypt for existing and new users
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(raw))
 }
@@ -115,7 +120,13 @@ func verifyArgon2id(encodedHash, raw string) error {
 		if b, err := base64.RawStdEncoding.DecodeString(s); err == nil {
 			return b, nil
 		}
-		return base64.StdEncoding.DecodeString(s)
+		if b, err := base64.RawURLEncoding.DecodeString(s); err == nil {
+			return b, nil
+		}
+		if b, err := base64.StdEncoding.DecodeString(s); err == nil {
+			return b, nil
+		}
+		return base64.URLEncoding.DecodeString(s)
 	}
 
 	salt, err := decodeB64(parts[4])
