@@ -99,7 +99,8 @@ main() {
     log "Configuring service log directory /var/log/pekan..."
     as_root mkdir -p /var/log/pekan
     as_root chown -R "${APP_USER}:${APP_GROUP}" /var/log/pekan
-    as_root chmod 755 /var/log/pekan
+    as_root chmod 775 /var/log/pekan
+    as_root chmod 664 /var/log/pekan/*.log 2>/dev/null || true
 
     if [[ -f "${INSTALL_DIR}/deploy/systemd/pekan.logrotate" ]]; then
       as_root cp "${INSTALL_DIR}/deploy/systemd/pekan.logrotate" /etc/logrotate.d/pekan
