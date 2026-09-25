@@ -634,60 +634,15 @@ start_containers() {
 }
 
 run_migrations() {
-  log "Step 7/11: Running database migrations..."
+  log "Step 7/11: Running database migrations and initializing default tenant..."
 
   cd "$INSTALL_DIR"
 
-  # Wait for PostgreSQL to be fully ready
-  log "  Waiting for PostgreSQL to be ready..."
-  sleep 5
-
-  # Check if migrations directory exists
-  if [[ ! -d "$INSTALL_DIR/backend/migrations" ]]; then
-    warn "  Migrations directory not found, skipping"
-    return
+  if [[ -f "$INSTALL_DIR/deploy/migrate.sh" ]]; then
+    INSTALL_DIR="$INSTALL_DIR" DB_USER="$DB_USER" DB_NAME="$DB_NAME" POSTGRES_PASSWORD="$POSTGRES_PASSWORD" bash "$INSTALL_DIR/deploy/migrate.sh"
+  else
+    warn "deploy/migrate.sh not found, skipping migration"
   fi
-
-  # Count migration files
-  MIGRATION_COUNT=$(ls "$INSTALL_DIR/backend/migrations/"*.sql 2>/dev/null | wc -l)
-  log "  Found $MIGRATION_COUNT migration files"
-
-  # Run migrations one by one from host
-  log "  Applying migrations..."
-  
-  SUCCESS=0
-  FAILED=0
-  
-  for sql_file in $(ls "$INSTALL_DIR/backend/migrations/"*.sql 2>/dev/null | sort); do
-    filename=$(basename "$sql_file")
-    printf "    -> %s" "$filename"
-    
-    # Copy file to container and execute
-    as_root docker compose cp "$sql_file" pekan-postgres:/tmp/current_migration.sql
-    if as_root docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" pekan-postgres psql -U "$DB_USER" -d "$DB_NAME" -f /tmp/current_migration.sql > /dev/null 2>&1; then
-      printf " [OK]\n"
-      SUCCESS=$((SUCCESS + 1))
-    else
-      printf " [SKIP]\n"
-      FAILED=$((FAILED + 1))
-    fi
-  done
-
-  # Cleanup
-  as_root docker compose exec -T pekan-postgres rm -f /tmp/current_migration.sql
-
-  log "  Migration results: $SUCCESS succeeded, $FAILED skipped"
-
-  # Verify key tables exist
-  log "  Verifying tables..."
-  TABLES=$(as_root docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" pekan-postgres psql -U "$DB_USER" -d "$DB_NAME" -t -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | tr -d ' ')
-  log "  Found $TABLES tables in database"
-
-  # List key tables
-  log "  Key tables:"
-  as_root docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" pekan-postgres psql -U "$DB_USER" -d "$DB_NAME" -c "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('tenants', 'users', 'file_scan_jobs', 'finance_reminders') ORDER BY table_name;" 2>/dev/null
-
-  log "  Migrations completed"
 }
 
 restart_services() {
