@@ -604,18 +604,6 @@ start_containers() {
   # Stop any conflicting containers first
   as_root docker compose down 2>/dev/null || true
 
-  # Check if postgres volume already exists with conflicting credentials
-  if as_root docker volume inspect pekan_postgres_data &>/dev/null; then
-    log "  Checking existing database volume..."
-    as_root docker compose up -d pekan-postgres pekan-redis
-    sleep 3
-    if ! as_root docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" pekan-postgres psql -U "$DB_USER" -d "$DB_NAME" -c "SELECT 1;" &>/dev/null; then
-      warn "  Existing database volume has mismatched credentials or database is uninitialized."
-      log "  Resetting database volume for clean fresh installation..."
-      as_root docker compose down -v
-    fi
-  fi
-
   # Start database and cache first
   log "  Starting PostgreSQL and Redis..."
   as_root docker compose up -d pekan-postgres pekan-redis
@@ -624,12 +612,19 @@ start_containers() {
   local attempts=0
   local max_attempts=30
   while [ $attempts -lt $max_attempts ]; do
-    if as_root docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" pekan-postgres pg_isready -U "$DB_USER" -d "$DB_NAME" &>/dev/null; then
+    if as_root docker compose exec -T pekan-postgres pg_isready &>/dev/null; then
       break
     fi
     attempts=$((attempts + 1))
     sleep 1
   done
+
+  # Synchronize credentials and ensure database exists via local socket
+  log "  Synchronizing database credentials..."
+  as_root docker compose exec -T pekan-postgres psql -U postgres -c "DO \$\$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '$DB_USER') THEN CREATE USER \"$DB_USER\" WITH SUPERUSER; END IF; END \$\$;" 2>/dev/null || true
+  as_root docker compose exec -T pekan-postgres psql -U postgres -c "ALTER USER \"$DB_USER\" WITH PASSWORD '$POSTGRES_PASSWORD';" 2>/dev/null || true
+  as_root docker compose exec -T pekan-postgres psql -U postgres -c "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" 2>/dev/null | grep -q 1 || as_root docker compose exec -T pekan-postgres psql -U postgres -c "CREATE DATABASE \"$DB_NAME\" OWNER \"$DB_USER\";" 2>/dev/null || true
+  as_root docker compose exec -T pekan-postgres psql -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE \"$DB_NAME\" TO \"$DB_USER\";" 2>/dev/null || true
 
   # Start all services
   log "  Starting all services..."
