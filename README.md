@@ -16,7 +16,7 @@
 
 <p align="center">
   <a href="#fitur">Fitur</a> •
-  <a href="#instalasi-cepat">Instalasi</a> •
+  <a href="#instalasi">Instalasi</a> •
   <a href="#arsitektur">Arsitektur</a> •
   <a href="#tech-stack">Tech Stack</a> •
   <a href="#kontribusi">Kontribusi</a> •
