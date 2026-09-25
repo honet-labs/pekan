@@ -486,7 +486,6 @@ $(generate_deploy "$LIMIT_REDIS_CPU" "$LIMIT_REDIS_MEM")
       - ./backend/.env
     environment:
       HTTP_PORT: 8080
-      DATABASE_URL: postgres://\${DB_USER:-postgres}:\${POSTGRES_PASSWORD:-postgres}@pekan-postgres:5432/\${DB_NAME:-pekan}?sslmode=prefer
       RATE_LIMIT_REDIS_URL: redis://pekan-redis:6379/0
     ports:
       - "8080:8080"
@@ -514,8 +513,6 @@ $(generate_deploy "$LIMIT_API_CPU" "$LIMIT_API_MEM")
     entrypoint: ["/app/pekan-worker"]
     env_file:
       - ./backend/.env
-    environment:
-      DATABASE_URL: postgres://\${DB_USER:-postgres}:\${POSTGRES_PASSWORD:-postgres}@pekan-postgres:5432/\${DB_NAME:-pekan}?sslmode=prefer
     depends_on:
       pekan-postgres:
         condition: service_healthy
@@ -538,8 +535,6 @@ $(generate_deploy "$LIMIT_WORKER_CPU" "$LIMIT_WORKER_MEM")
     entrypoint: ["/app/pekan-ai"]
     env_file:
       - ./backend/.env
-    environment:
-      DATABASE_URL: postgres://\${DB_USER:-postgres}:\${POSTGRES_PASSWORD:-postgres}@pekan-postgres:5432/\${DB_NAME:-pekan}?sslmode=prefer
     depends_on:
       pekan-postgres:
         condition: service_healthy
@@ -606,12 +601,35 @@ start_containers() {
 
   cd "$INSTALL_DIR"
 
+  # Stop any conflicting containers first
+  as_root docker compose down 2>/dev/null || true
+
+  # Check if postgres volume already exists with conflicting credentials
+  if as_root docker volume inspect pekan_postgres_data &>/dev/null; then
+    log "  Checking existing database volume..."
+    as_root docker compose up -d pekan-postgres pekan-redis
+    sleep 3
+    if ! as_root docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" pekan-postgres psql -U "$DB_USER" -d "$DB_NAME" -c "SELECT 1;" &>/dev/null; then
+      warn "  Existing database volume has mismatched credentials or database is uninitialized."
+      log "  Resetting database volume for clean fresh installation..."
+      as_root docker compose down -v
+    fi
+  fi
+
   # Start database and cache first
   log "  Starting PostgreSQL and Redis..."
   as_root docker compose up -d pekan-postgres pekan-redis
 
   log "  Waiting for database to be ready..."
-  sleep 10
+  local attempts=0
+  local max_attempts=30
+  while [ $attempts -lt $max_attempts ]; do
+    if as_root docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" pekan-postgres pg_isready -U "$DB_USER" -d "$DB_NAME" &>/dev/null; then
+      break
+    fi
+    attempts=$((attempts + 1))
+    sleep 1
+  done
 
   # Start all services
   log "  Starting all services..."
@@ -651,7 +669,7 @@ run_migrations() {
     
     # Copy file to container and execute
     as_root docker compose cp "$sql_file" pekan-postgres:/tmp/current_migration.sql
-    if as_root docker compose exec -T pekan-postgres psql -U "$DB_USER" -d "$DB_NAME" -f /tmp/current_migration.sql > /dev/null 2>&1; then
+    if as_root docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" pekan-postgres psql -U "$DB_USER" -d "$DB_NAME" -f /tmp/current_migration.sql > /dev/null 2>&1; then
       printf " [OK]\n"
       SUCCESS=$((SUCCESS + 1))
     else
@@ -667,12 +685,12 @@ run_migrations() {
 
   # Verify key tables exist
   log "  Verifying tables..."
-  TABLES=$(as_root docker compose exec -T pekan-postgres psql -U "$DB_USER" -d "$DB_NAME" -t -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | tr -d ' ')
+  TABLES=$(as_root docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" pekan-postgres psql -U "$DB_USER" -d "$DB_NAME" -t -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | tr -d ' ')
   log "  Found $TABLES tables in database"
 
   # List key tables
   log "  Key tables:"
-  as_root docker compose exec -T pekan-postgres psql -U "$DB_USER" -d "$DB_NAME" -c "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('tenants', 'users', 'file_scan_jobs', 'finance_reminders') ORDER BY table_name;" 2>/dev/null
+  as_root docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" pekan-postgres psql -U "$DB_USER" -d "$DB_NAME" -c "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('tenants', 'users', 'file_scan_jobs', 'finance_reminders') ORDER BY table_name;" 2>/dev/null
 
   log "  Migrations completed"
 }

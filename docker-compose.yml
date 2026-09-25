@@ -48,7 +48,6 @@ services:
       - ./backend/.env
     environment:
       HTTP_PORT: 8080
-      DATABASE_URL: postgres://${DB_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@pekan-postgres:5432/${DB_NAME:-pekan}?sslmode=prefer
       RATE_LIMIT_REDIS_URL: redis://pekan-redis:6379/0
     ports:
       - "8080:8080"
@@ -75,8 +74,6 @@ services:
     entrypoint: ["/app/pekan-worker"]
     env_file:
       - ./backend/.env
-    environment:
-      DATABASE_URL: postgres://${DB_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@pekan-postgres:5432/${DB_NAME:-pekan}?sslmode=prefer
     depends_on:
       pekan-postgres:
         condition: service_healthy
@@ -98,8 +95,6 @@ services:
     entrypoint: ["/app/pekan-ai"]
     env_file:
       - ./backend/.env
-    environment:
-      DATABASE_URL: postgres://${DB_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@pekan-postgres:5432/${DB_NAME:-pekan}?sslmode=prefer
     depends_on:
       pekan-postgres:
         condition: service_healthy
