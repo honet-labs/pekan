@@ -977,19 +977,32 @@ verify_installation() {
   fi
 
   printf '\n'
+  local server_ip
+  server_ip=$(ip route get 1 2>/dev/null | awk '{print $7; exit}' || hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
+
   printf '============================================\n'
   printf '  PEKAN Installation Complete (Systemd)\n'
   printf '============================================\n'
   printf '\n'
   printf '  Branch:      %s\n' "${BRANCH}"
   printf '  Install Dir: %s\n' "${INSTALL_DIR}"
-  printf '  Web URL:     http://localhost:%s\n' "${WEB_PORT}"
-  printf '  API URL:     http://localhost:%s/api/v1\n' "${HTTP_PORT}"
-  printf '  Health:      http://localhost:%s/api/v1/healthz\n' "${HTTP_PORT}"
+  printf '  Web URL:     http://%s:%s (atau http://localhost:%s)\n' "${server_ip}" "${WEB_PORT}" "${WEB_PORT}"
+  printf '  API URL:     http://%s:%s/api/v1\n' "${server_ip}" "${HTTP_PORT}"
+  printf '  Health:      http://%s:%s/api/v1/healthz\n' "${server_ip}" "${HTTP_PORT}"
   printf '\n'
-  printf '  Config:      %s/backend/.env\n' "${INSTALL_DIR}"
-  printf '  Logs:        journalctl -u pekan-api -f\n'
-  printf '  Storage:     %s/storage\n' "${INSTALL_DIR}"
+  printf '  Default / Demo Credentials:\n'
+  printf '    • Tenant Code: default\n'
+  printf '    • Email:       owner@pekan.local\n'
+  printf '    • Password:    password\n'
+  printf '\n'
+  printf '  Admin Dashboard (System Admin):\n'
+  printf '    • URL:         http://%s:%s/admin\n' "${server_ip}" "${WEB_PORT}"
+  printf '    • JWT Secret:  %s\n' "${JWT_SECRET}"
+  printf '\n'
+  printf '  Configuration:\n'
+  printf '    • Config:      %s/backend/.env\n' "${INSTALL_DIR}"
+  printf '    • Logs:        journalctl -u pekan-api -f\n'
+  printf '    • Storage:     %s/storage\n' "${INSTALL_DIR}"
   printf '\n'
   printf '  Services:\n'
   printf '    systemctl status pekan-api\n'
@@ -998,6 +1011,7 @@ verify_installation() {
   printf '\n'
   printf '  Update:\n'
   printf '    cd %s && git pull && sudo bash deploy/update-versi.sh\n' "${INSTALL_DIR}"
+  printf '============================================\n'
   printf '\n'
 }
 
