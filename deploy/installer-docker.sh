@@ -196,9 +196,8 @@ prompt_config() {
     POSTGRES_PASSWORD="$input"
   fi
 
-  # Resource limits
   printf '\n'
-  printf '--- Resource Limits (leave empty for no limit) ---\n'
+  printf '%s\n' '--- Resource Limits (leave empty for no limit) ---'
   printf 'Format: CPU (e.g., 0.5, 1, 2) | Memory (e.g., 256m, 1g)\n'
   printf '\n'
 

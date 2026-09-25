@@ -100,8 +100,24 @@ EOF
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -m|--mode)
-      MODE="$2"
+      case "$2" in
+        docker|systemd|dev|development|local)
+          MODE="$2"
+          ;;
+        main|dev|staging|Staging)
+          warn "Argumen '$2' terdeteksi sebagai nama branch. Branch diset ke: $2"
+          BRANCH="$2"
+          ;;
+        *)
+          error "Mode '$2' tidak valid. Pilihan yang valid: docker, systemd, atau dev."
+          exit 1
+          ;;
+      esac
       shift 2
+      ;;
+    docker|systemd|dev)
+      MODE="$1"
+      shift
       ;;
     --docker)
       MODE="docker"
