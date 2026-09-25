@@ -16,6 +16,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -336,14 +337,37 @@ func (s *Service) GetServerStatus(ctx context.Context) domain.ServerStatus {
 
 	hostname, _ := os.Hostname()
 
-	// Helper to check if a port is open
-	checkTCP := func(addr string) string {
-		conn, err := net.DialTimeout("tcp", addr, 1*time.Second)
-		if err != nil {
-			return "Down"
+	redisStatus := "Down"
+	if s.redis != nil {
+		pingCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
+		defer cancel()
+		if err := s.redis.Ping(pingCtx).Err(); err == nil {
+			redisStatus = "Healthy"
 		}
-		conn.Close()
-		return "Running"
+	}
+
+	if redisStatus == "Down" {
+		redisAddrs := []string{}
+		if envURL := os.Getenv("RATE_LIMIT_REDIS_URL"); envURL != "" {
+			if u, err := url.Parse(envURL); err == nil && u.Host != "" {
+				redisAddrs = append(redisAddrs, u.Host)
+			}
+		}
+		if envURL := os.Getenv("REDIS_URL"); envURL != "" {
+			if u, err := url.Parse(envURL); err == nil && u.Host != "" {
+				redisAddrs = append(redisAddrs, u.Host)
+			}
+		}
+		redisAddrs = append(redisAddrs, "pekan-redis:6379", "127.0.0.1:6379", "localhost:6379")
+
+		for _, addr := range redisAddrs {
+			conn, err := net.DialTimeout("tcp", addr, 1*time.Second)
+			if err == nil {
+				conn.Close()
+				redisStatus = "Healthy"
+				break
+			}
+		}
 	}
 
 	pgStatus := "Running"
@@ -352,16 +376,16 @@ func (s *Service) GetServerStatus(ctx context.Context) domain.ServerStatus {
 	}
 
 	return domain.ServerStatus{
-		OS:        runtime.GOOS + " " + runtime.GOARCH,
-		Uptime:    time.Since(s.startTime).String(),
-		IPAddress: hostname,
-		Port:      "8080",
-		DBStatus:  dbStatus,
-		RedisStatus: checkTCP("localhost:6379"),
+		OS:          runtime.GOOS + " " + runtime.GOARCH,
+		Uptime:      time.Since(s.startTime).String(),
+		IPAddress:   hostname,
+		Port:        "8080",
+		DBStatus:    dbStatus,
+		RedisStatus: redisStatus,
 		Services: []domain.ServiceStatus{
 			{Name: "API Server", Status: "Running", Port: 8080},
 			{Name: "PostgreSQL", Status: pgStatus, Port: 5432},
-			{Name: "Redis", Status: checkTCP("localhost:6379"), Port: 6379},
+			{Name: "Redis", Status: redisStatus, Port: 6379},
 		},
 	}
 }
