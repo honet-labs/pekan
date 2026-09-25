@@ -512,47 +512,127 @@ DATABASE_URL="postgres://..." go run ./scripts/migrate_tenants.go
 
 ## Instalasi
 
-### Instalasi Cepat (~5 menit)
+PEKAN menyediakan script installer universal [installer.sh](installer.sh) yang secara otomatis mendeteksi kebutuhan dan memandu proses instalasi baik untuk **Produksi (Server)** maupun **Development (Lokal)**.
 
-Butuh Docker, Go, dan Node.js sudah terinstall.
+---
+
+### 🚀 Cara Cepat: Universal One-Click Installer (Direkomendasikan)
+
+#### Opsi 1: Dari Server Baru (Tanpa Perlu Clone Manual)
+Jalankan satu perintah ini di terminal server Linux Anda:
+```bash
+curl -sSL https://raw.githubusercontent.com/honet-labs/pekan/main/installer.sh | sudo bash
+```
+
+#### Opsi 2: Dari Repositori Lokal
+```bash
+# 1. Clone repository
+git clone https://github.com/honet-labs/pekan.git
+cd pekan
+
+# 2. Jalankan installer interaktif
+sudo bash installer.sh
+```
+
+Menu interaktif akan muncul untuk memilih mode:
+```text
+  ____  _____ _  __    _    _   _ 
+ |  _ \| ____| |/ /   / \  | \ | |
+ | |_) |  _| | ' /   / _ \ |  \| |
+ |  __/| |___| . \  / ___ \| |\  |
+ |_|   |_____|_|\_\/_/   \_\_| \_|
+
+Pilih mode instalasi yang Anda inginkan:
+  1) Produksi - Docker Containers (Direkomendasikan)
+  2) Produksi - Systemd Native (Performa Tinggi)
+  3) Development - Lingkungan Lokal
+  4) Batalkan / Keluar
+```
+
+#### Parameter Command Line (Otomatisasi / Non-Interaktif)
+Anda juga dapat langsung menentukan mode instalasi dan port menggunakan flag:
+
+```bash
+# Produksi dengan Docker pada port 80
+sudo bash installer.sh --mode docker
+
+# Produksi dengan Docker pada port kustom (misal: port 8080)
+sudo bash installer.sh --mode docker --port 8080
+
+# Produksi native Systemd
+sudo bash installer.sh --mode systemd
+
+# Setup lingkungan development lokal
+bash installer.sh --mode dev
+```
+
+---
+
+### 💻 Instalasi Development (Lokal)
+
+Untuk kontributor dan pengembang yang ingin menjalankan PEKAN di komputer lokal:
+
+#### Cara A: Otomatis via Installer Script
+```bash
+git clone https://github.com/honet-labs/pekan.git
+cd pekan
+bash installer.sh --mode dev
+```
+*Script ini otomatis memeriksa dependensi (`docker`, `go`, `node`, `npm`), menjalankan database PostgreSQL 16 & Redis di Docker, membuat `backend/.env` dengan `JWT_SECRET` yang aman, menjalankan migrasi database, dan memasang paket frontend.*
+
+#### Cara B: Manual Step-by-Step
+Jika Anda ingin menyiapkan lingkungan lokal secara manual:
 
 ```bash
 # 1. Clone repository
 git clone https://github.com/honet-labs/pekan.git
 cd pekan
 
-# 2. Jalankan PostgreSQL & Redis via Docker
+# 2. Jalankan PostgreSQL 16 & Redis 7 via Docker
 docker compose -f deploy/docker-compose.server-test.yml up -d
 
 # 3. Setup backend
 cd backend
 cp .env.example .env
-# Edit .env — isi JWT_SECRET dengan random string yang kuat:
-#   openssl rand -base64 48
+# Buat JWT_SECRET acak: openssl rand -base64 48 dan tempelkan ke .env
 
 # 4. Jalankan migrasi database
 DATABASE_URL="postgres://postgres:postgres@localhost:5432/pekan?sslmode=disable" \
   ./scripts/apply_migrations.sh
 
-# 5. Jalankan backend (terminal 1)
+# 5. Jalankan backend REST API (Terminal 1)
 go run cmd/api/main.go
 
-# 6. Setup & jalankan frontend (terminal 2)
+# 6. (Opsional) Jalankan worker & AI queue (Terminal 2 & 3)
+go run cmd/worker/main.go
+go run cmd/ai/main.go
+
+# 7. Setup & jalankan frontend (Terminal 4)
 cd ../frontend
 npm install
 npm run dev
 ```
 
-Buka `http://localhost:5173` → login dengan:
-- **Tenant**: `default`
-- **Email**: `owner@pekan.local`
-- **Password**: `password`
+---
 
-### Panduan Lengkap
+### 🔑 Akses & Kredensial Default
 
-Untuk panduan instalasi **step-by-step** yang lebih detail (termasuk install prasyarat, troubleshooting, production deployment), lihat:
+Setelah instalasi selesai, buka browser Anda:
 
-> **[INSTALL.md](INSTALL.md)** — Panduan lengkap instalasi PEKAN
+| Lingkungan | URL Akses | Tenant | Email | Password |
+| :--- | :--- | :--- | :--- | :--- |
+| **Produksi (Docker/Systemd)** | `http://<IP-SERVER>` (port 80) | `default` | `owner@pekan.local` | `password` |
+| **Development (Lokal)** | `http://localhost:5173` | `default` | `owner@pekan.local` | `password` |
+
+> ⚠️ **PENTING UNTUK PRODUKSI**: Segera ganti password akun pemilik (*owner*) melalui menu Profil / Pengaturan setelah berhasil login pertama kali.
+
+---
+
+### 📖 Panduan Lengkap & Troubleshooting
+
+Untuk panduan instalasi mendalam termasuk instalasi dependensi OS, troubleshooting, dan panduan konfigurasi SSL/HTTPS:
+
+> 📘 Lihat **[INSTALL.md](INSTALL.md)** — Panduan lengkap instalasi & pemecahan masalah PEKAN
 
 ---
 
@@ -562,11 +642,13 @@ PEKAN menyediakan **2 opsi deployment** produksi:
 
 ### Opsi A: Docker (Recommended)
 
-Semua komponen berjalan di container. Mudah diinstall, diupdate, dan di-backup.
+Semua komponen berjalan di container terisolasi. Sangat mudah diinstall, diupdate, dan di-backup.
 
 ```bash
-git clone https://github.com/honet-labs/pekan.git
-cd pekan
+# Menggunakan installer utama
+sudo bash installer.sh --mode docker
+
+# Atau langsung menggunakan script deploy docker
 sudo bash deploy/installer-docker.sh
 ```
 
@@ -580,11 +662,13 @@ sudo bash deploy/installer-docker.sh
 
 ### Opsi B: Systemd (Native)
 
-Binary Go native dengan systemd services. Performa lebih baik untuk traffic tinggi.
+Binary Go native dengan systemd services. Performa lebih baik untuk traffic tinggi dan konsumsi memori minimal.
 
 ```bash
-git clone https://github.com/honet-labs/pekan.git
-cd pekan
+# Menggunakan installer utama
+sudo bash installer.sh --mode systemd
+
+# Atau langsung menggunakan script deploy systemd
 sudo bash deploy/installer-systemd.sh
 ```
 

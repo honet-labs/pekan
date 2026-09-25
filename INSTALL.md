@@ -54,6 +54,22 @@ Panduan lengkap instalasi PEKAN dari nol, baik untuk **development** (lokal) mau
 
 ## Instalasi Development (Lokal)
 
+### Cara Cepat (Otomatis via installer.sh)
+
+```bash
+# 1. Clone repository
+git clone https://github.com/honet-labs/pekan.git
+cd pekan
+
+# 2. Jalankan setup otomatis
+bash installer.sh --mode dev
+```
+*Script ini otomatis memastikan docker, go, dan node tersedia, menyalakan DB PostgreSQL 16 & Redis, membuat file backend/.env dengan JWT_SECRET baru, mengeksekusi migrasi, dan menjalankan npm install.*
+
+---
+
+### Cara Manual (Step-by-Step)
+
 ```bash
 # 1. Clone repository
 git clone https://github.com/honet-labs/pekan.git
@@ -92,7 +108,16 @@ Login:
 
 ## Instalasi Produksi
 
-### Opsi A: Docker
+PEKAN menyediakan installer universal `installer.sh` yang dapat dijalankan secara interaktif ataupun langsung:
+
+### Metode Cepat: One-Liner (Server Baru)
+```bash
+curl -sSL https://raw.githubusercontent.com/honet-labs/pekan/main/installer.sh | sudo bash
+```
+
+---
+
+### Opsi A: Docker (Direkomendasikan)
 
 Semua komponen berjalan di container Docker.
 
@@ -106,11 +131,11 @@ cd pekan
 **Langkah 2: Jalankan installer**
 
 ```bash
-# Install dari branch main (default, stabil)
-sudo bash deploy/installer-docker.sh
+# Menggunakan installer utama
+sudo bash installer.sh --mode docker
 
-# Atau install dari branch dev (fitur terbaru)
-sudo bash deploy/installer-docker.sh --branch dev
+# Atau langsung menggunakan script deploy docker
+sudo bash deploy/installer-docker.sh
 ```
 
 **Langkah 3: Verifikasi**
