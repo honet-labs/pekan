@@ -6,7 +6,7 @@ import {
   updateTenant, deleteTenant,
   getGlobalSetting, saveGlobalSetting as saveAdminGlobalSetting,
   impersonateUser, getServerStatus, testNotification, testAI, testDatabase,
-  listBackups, createBackup, restoreBackup, downloadBackupBlob,
+  listBackups, createBackup, restoreBackup, downloadBackupBlob, uploadBackup,
   executeQuery, getDatabaseStats, getDatabaseGrowth, listTenantUsers,
   adminResetUserPassword, adminUpdateUserEmail, adminUpdateUserPhone,
   listTenantBackups, createTenantBackup, restoreTenantBackup, downloadTenantBackupBlob,
@@ -32,14 +32,19 @@ type Tab = "dashboard" | "tenants" | "add_tenant" | "stats" | "server" | "logs" 
 const DEFAULT_WA_BOT_SYSTEM_PROMPT = `Anda adalah Asisten AI PEKAN, perencana keuangan pribadi yang profesional, ringkas, dan sangat membantu.
 Tugas Anda adalah membalas pesan pengguna WhatsApp secara interaktif. Pengguna sudah login/terverifikasi.
 
+--- BATASAN KUASA (WAJIB DIPATUHI) ---
+1. Anda HANYA boleh membahas topik yang berkaitan dengan data keuangan pribadi pengguna di aplikasi PEKAN: mencatat transaksi (pemasukan/pengeluaran), membaca laporan, mengecek anggaran, dan memberikan saran finansial berdasarkan data tersebut.
+2. JANGAN menjawab pertanyaan di luar cakupan keuangan PEKAN seperti: coding/program, politik, berita, resep masakan, cerita fiksi, atau topik umum lainnya. Jika ditanya hal di luar cakupan, tolak dengan sopan dan arahkan kembali ke fitur keuangan.
+3. Contoh penolakan yang sopan: "Maaf, saya hanya bisa membantu mengenai data keuangan Anda di PEKAN. Silakan tanyakan tentang transaksi, anggaran, atau laporan keuangan Anda."
+
 --- ATURAN BERKOMUNIKASI ---
-1. Jawablah menggunakan bahasa Indonesia yang natural, profesional, sopan, dan langsung pada intinya (to the point).
-2. HINDARI mengulang-ulang sapaan formal pembuka yang sama (seperti "Halo! Selamat siang/sore/malam. Senang sekali bisa membantu..." atau "Sebagai Asisten AI PEKAN...") di setiap pesan. Langsung jawab pertanyaan pengguna secara spesifik.
-3. Jika pengguna menyapa singkat (seperti 'halo' atau 'hai'), sapa balik secara singkat, bersahabat, dan ingatkan secara ringkas bahwa Anda dapat membantu mencatat transaksi (misal: 'catat pengeluaran bensin 20rb') atau membacakan laporan keuangan.
-4. Jika pengguna menanyakan sisa anggaran, pengeluaran, pemasukan, atau laporan transaksi, bacakan data rill di bawah ini secara akurat. Tampilkan data dengan rapi menggunakan poin-poin terstruktur agar mudah dibaca.
-5. Berikan saran atau rekomendasi finansial secara cerdas, realistis, dan memotivasi tanpa menggurui.
-6. Gunakan format tebal (bold) WhatsApp dengan tanda bintang (*) untuk hal-hal penting seperti kategori, nominal rupiah, atau sisa anggaran agar nyaman dibaca di layar HP.
-7. Jangan menyebutkan bahwa Anda adalah model bahasa besar. Berperanlah 100% sebagai Asisten AI PEKAN.`;
+4. Jawablah menggunakan bahasa Indonesia yang natural, profesional, sopan, dan langsung pada intinya (to the point).
+5. HINDARI mengulang-ulang sapaan formal pembuka yang sama (seperti "Halo! Selamat siang/sore/malam. Senang sekali bisa membantu..." atau "Sebagai Asisten AI PEKAN...") di setiap pesan. Langsung jawab pertanyaan pengguna secara spesifik.
+6. Jika pengguna menyapa singkat (seperti 'halo' atau 'hai'), sapa balik secara singkat, bersahabat, dan ingatkan secara ringkas bahwa Anda dapat membantu mencatat transaksi (misal: 'catat pengeluaran bensin 20rb') atau membacakan laporan keuangan.
+7. Jika pengguna menanyakan sisa anggaran, pengeluaran, pemasukan, atau laporan transaksi, bacakan data rill di bawah ini secara akurat. Tampilkan data dengan rapi menggunakan poin-poin terstruktur agar mudah dibaca.
+8. Berikan saran atau rekomendasi finansial secara cerdas, realistis, dan memotivasi tanpa menggurui.
+9. Gunakan format tebal (bold) WhatsApp dengan tanda bintang (*) untuk hal-hal penting seperti kategori, nominal rupiah, atau sisa anggaran agar nyaman dibaca di layar HP.
+10. Jangan menyebutkan bahwa Anda adalah model bahasa besar. Berperanlah 100% sebagai Asisten AI PEKAN.`;
 
 export function AdminDashboardPage(): JSX.Element {
   const { t, locale, setLocale } = useI18n();
@@ -1203,6 +1208,23 @@ export function AdminDashboardPage(): JSX.Element {
       error("Gagal membuat backup.");
     } finally {
       setIsBackingUp(false);
+    }
+  };
+
+  const handleUploadBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsBackingUp(true);
+    try {
+      await uploadBackup(file);
+      success(`File "${file.name}" berhasil diupload.`);
+      loadBackups();
+    } catch (err) {
+      error("Gagal upload backup: " + (err instanceof Error ? err.message : "Unknown error"));
+    } finally {
+      setIsBackingUp(false);
+      e.target.value = "";
     }
   };
 
@@ -3052,6 +3074,15 @@ export function AdminDashboardPage(): JSX.Element {
                      <button className="btn btn-primary" onClick={handleCreateBackup} disabled={isBackingUp || loading} style={{ whiteSpace: "nowrap" }}>
                        {isBackingUp ? "Membuat Backup..." : "+ Buat Backup"}
                      </button>
+                     <label className="btn btn-ghost" style={{ cursor: "pointer", whiteSpace: "nowrap", marginLeft: "8px", padding: "8px 16px" }}>
+                       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: "6px", verticalAlign: "middle" }}>
+                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                         <polyline points="17 8 12 3 7 8" />
+                         <line x1="12" y1="3" x2="12" y2="15" />
+                       </svg>
+                       Restore
+                       <input type="file" accept=".sql,.sql.gz,.dump" onChange={handleUploadBackup} style={{ display: "none" }} />
+                     </label>
                    </div>
                  </div>
 
@@ -4042,6 +4073,8 @@ export function AdminDashboardPage(): JSX.Element {
         title="Peringatan Restore Database!"
         message={`Anda akan me-restore database menggunakan file "${fileToRestore}". Peringatan: Proses ini (Clean Restore) akan MENGHAPUS SEMUA DATA yang ada saat ini dan menggantinya dengan data dari backup. Lanjutkan?`}
         isLoading={isRestoring}
+        confirmText={isRestoring ? "Restoring..." : "Restore"}
+        confirmClassName="btn-warning"
         onConfirm={handleRestoreBackup}
         onCancel={() => setFileToRestore(null)}
       />
@@ -4086,8 +4119,8 @@ export function AdminDashboardPage(): JSX.Element {
               )}
             </div>
             <p className="spacing-mb-md opacity-70">
-              Update {userToReset.action === 'password' ? 'password' : userToReset.action} untuk user: <strong>{userToReset.user.full_name}</strong>
-              {userToReset.action === 'password' && <><br/><span className="text-xs text-primary">User akan diwajibkan ganti password saat login pertama kali.</span></>}
+              Update {userToReset.action === 'password' ? 'password' : userToReset.action} untuk user: <strong>{userToReset.user.full_name}</strong> (<code>{userToReset.user.email}</code>)
+              {userToReset.action === 'password' && <><br/><span className="text-xs text-success">User dapat langsung login menggunakan password baru ini.</span></>}
             </p>
             <form onSubmit={(e) => { 
               e.preventDefault(); 

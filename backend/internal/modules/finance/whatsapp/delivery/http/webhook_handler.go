@@ -368,10 +368,10 @@ func (h *WebhookHandler) HandleIncomingMessage(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Generate fallback messageID if empty to prevent fast-retry duplicates
+	// Generate fallback messageID if empty — use stable hash (no time component)
+	// so webhook retries always produce the same ID and deduplication works.
 	if messageID == "" && sender != "" && message != "" {
-		timeBucket := time.Now().Unix() / 15
-		hashInput := fmt.Sprintf("%s_%s_%d", sender, message, timeBucket)
+		hashInput := fmt.Sprintf("%s_%s", sender, message)
 		messageID = fmt.Sprintf("fb_%x", md5.Sum([]byte(hashInput)))
 	}
 

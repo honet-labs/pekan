@@ -609,9 +609,13 @@ func (r *RepositoryPG) ListTenantUsers(ctx context.Context, tenantID string) ([]
 }
 
 func (r *RepositoryPG) UpdateUserPassword(ctx context.Context, userID, hashedPassword string) error {
-	const q = `UPDATE public.users SET password_hash = $1, must_change_password = true, updated_at = now() WHERE id = $2`
-	_, err := r.conn.ExecContext(ctx, q, hashedPassword, userID)
-	return err
+	const q = `UPDATE public.users SET password_hash = $1, is_active = true, must_change_password = false, updated_at = now() WHERE id = $2`
+	if _, err := r.conn.ExecContext(ctx, q, hashedPassword, userID); err != nil {
+		return err
+	}
+	const qMember = `UPDATE public.tenant_memberships SET status = 'active' WHERE user_id = $1`
+	_, _ = r.conn.ExecContext(ctx, qMember, userID)
+	return nil
 }
 
 func (r *RepositoryPG) UpdateUserEmail(ctx context.Context, userID, newEmail string) error {

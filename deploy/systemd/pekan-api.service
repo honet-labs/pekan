@@ -11,6 +11,8 @@ Restart=always
 RestartSec=5
 User=pekan
 Group=pekan
+StandardOutput=append:/var/log/pekan/api.log
+StandardError=append:/var/log/pekan/api-error.log
 
 [Install]
 WantedBy=multi-user.target

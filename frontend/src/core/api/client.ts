@@ -1,4 +1,16 @@
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api/v1";
+function resolveApiBaseUrl(): string {
+  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  if (typeof window !== "undefined") {
+    // In browser production environment, always prefer relative path /api/v1
+    // to avoid hardcoded domain / CORS / 502 tunnel issues
+    if (!envUrl || envUrl.includes("localhost") || envUrl.startsWith("http")) {
+      return "/api/v1";
+    }
+  }
+  return envUrl ?? "/api/v1";
+}
+
+export const API_BASE_URL = resolveApiBaseUrl();
 let refreshInFlight: Promise<boolean> | null = null;
 
 type ApiFetchOptions = RequestInit & {

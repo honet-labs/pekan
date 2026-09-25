@@ -5,6 +5,8 @@ export interface DeleteConfirmModalProps {
   title: string;
   message: string;
   isLoading?: boolean;
+  confirmText?: string;
+  confirmClassName?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -13,13 +15,17 @@ export function DeleteConfirmModal({
   isOpen, 
   title, 
   message, 
-  isLoading = false, 
+  isLoading = false,
+  confirmText,
+  confirmClassName = "btn-danger",
   onConfirm, 
   onCancel 
 }: DeleteConfirmModalProps): JSX.Element | null {
   const { t } = useI18n();
 
   if (!isOpen) return null;
+
+  const buttonText = confirmText || (isLoading ? t("common.loading") : t("common.delete"));
 
   return (
     <div className="modal-overlay" onClick={onCancel}>
@@ -51,11 +57,11 @@ export function DeleteConfirmModal({
           </button>
           <button
             type="button"
-            className="btn btn-danger"
+            className={`btn ${confirmClassName}`}
             onClick={onConfirm}
             disabled={isLoading}
           >
-            {isLoading ? t("common.loading") : t("common.delete")}
+            {buttonText}
           </button>
         </div>
       </div>

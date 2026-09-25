@@ -1,0 +1,9 @@
+**/*.md
+**/*.patch
+**/brain/
+**/tests/
+**/scripts/
+**/openapi/
+**/.env*
+**/.git
+**/.gitignore
