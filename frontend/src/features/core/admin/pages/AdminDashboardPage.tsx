@@ -1752,8 +1752,8 @@ export function AdminDashboardPage(): JSX.Element {
     if (!stats) return null;
     
     // Dynamic health status
-    const isDbHealthy = server?.db_status?.toLowerCase().includes("healthy") || server?.db_status?.toLowerCase().includes("online");
-    const isRedisHealthy = server?.redis_status?.toLowerCase().includes("healthy") || server?.redis_status?.toLowerCase().includes("running");
+    const isDbHealthy = ["healthy", "online", "running"].some(s => (server?.db_status || "").toLowerCase().includes(s));
+    const isRedisHealthy = ["healthy", "online", "running"].some(s => (server?.redis_status || "").toLowerCase().includes(s));
     
     let healthLabel = "Normal";
     let healthColor = "#22c55e"; // Green
@@ -2012,13 +2012,13 @@ export function AdminDashboardPage(): JSX.Element {
                       </div>
                       <div className="info-item">
                         <span className="info-label">Database {t("settings.roles.status")}</span>
-                        <span className={`info-value ${server?.db_status === "Online" ? "status-online" : "status-offline"}`}>
+                        <span className={`info-value ${["online", "healthy", "running"].some(s => (server?.db_status || "").toLowerCase().includes(s)) ? "status-online" : "status-offline"}`}>
                           ● {server?.db_status || "Checking..."}
                         </span>
                       </div>
                       <div className="info-item">
                         <span className="info-label">Redis Status</span>
-                        <span className={`info-value ${server?.redis_status === "Online" ? "status-online" : "status-offline"}`}>
+                        <span className={`info-value ${["online", "healthy", "running"].some(s => (server?.redis_status || "").toLowerCase().includes(s)) ? "status-online" : "status-offline"}`}>
                           ● {server?.redis_status || "Checking..."}
                         </span>
                       </div>
@@ -2460,8 +2460,8 @@ export function AdminDashboardPage(): JSX.Element {
                    <div className="info-section">
                       <h4 className="info-section-title">Basis Data & Cache</h4>
                       <div className="info-list">
-                        <div className="info-list-item"><strong>PostgreSQL:</strong> <span className={`badge-status ${server.db_status.includes("Healthy") ? "running" : "error"}`}>{server.db_status}</span></div>
-                        <div className="info-list-item"><strong>Redis:</strong> <span className="badge-status running">{server.redis_status}</span></div>
+                        <div className="info-list-item"><strong>PostgreSQL:</strong> <span className={`badge-status ${["healthy", "online", "running"].some(s => (server?.db_status || "").toLowerCase().includes(s)) ? "running" : "error"}`}>{server.db_status}</span></div>
+                        <div className="info-list-item"><strong>Redis:</strong> <span className={`badge-status ${["healthy", "online", "running"].some(s => (server?.redis_status || "").toLowerCase().includes(s)) ? "running" : "error"}`}>{server.redis_status}</span></div>
                       </div>
                    </div>
                 </div>
