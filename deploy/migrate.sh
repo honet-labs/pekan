@@ -94,8 +94,7 @@ docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" pekan-postgres sh -c '
 
 # Run tenant schema initialization and seed default tenant
 log "Bootstrapping default tenant and owner credentials..."
-docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" pekan-postgres sh -c '
-  psql -U "'"$DB_USER"'" -d "'"$DB_NAME"'" <<'"'EOSQL'"'
+docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" pekan-postgres psql -U "$DB_USER" -d "$DB_NAME" <<'EOSQL'
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- 1. Default Tenant in public schema
@@ -164,7 +163,6 @@ ON CONFLICT (tenant_id, feature_code) DO NOTHING;
 -- 6. Create isolated schema for default tenant
 CREATE SCHEMA IF NOT EXISTS wkspid_pekan_default;
 EOSQL
-'
 
 # Apply tenant migrations to wkspid_pekan_default
 log "Applying isolated tenant schema tables for default tenant..."
@@ -172,9 +170,10 @@ docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" pekan-postgres sh -c '
   if [ -f /tmp/tenant_migrations/0001_init.sql ]; then
     psql -U "'"$DB_USER"'" -d "'"$DB_NAME"'" -c "SET search_path TO wkspid_pekan_default, public;" -f /tmp/tenant_migrations/0001_init.sql >/dev/null 2>&1 || true
   fi
+'
 
-  # Seed roles and default accounts in wkspid_pekan_default
-  psql -U "'"$DB_USER"'" -d "'"$DB_NAME"'" <<'"'EOSQL'"'
+# Seed roles and default accounts in wkspid_pekan_default
+docker compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" pekan-postgres psql -U "$DB_USER" -d "$DB_NAME" <<'EOSQL'
 SET search_path TO wkspid_pekan_default, public;
 
 -- Local membership in schema
@@ -217,7 +216,6 @@ VALUES
   (gen_random_uuid(), 'Belanja Kebutuhan', 'expense', TRUE, '22222222-2222-2222-2222-222222222222', now(), now())
 ON CONFLICT DO NOTHING;
 EOSQL
-'
 
 # Run patch_all_tenants and fix_all_tenants to ensure schema sync
 log "Running tenant repair / synchronization..."
