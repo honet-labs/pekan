@@ -196,7 +196,7 @@ ON CONFLICT (membership_id, role_id) DO NOTHING;
 
 -- Role permissions in schema
 INSERT INTO wkspid_pekan_default.role_permissions (role_id, permission_id, created_at)
-SELECT r.id, p.id 
+SELECT r.id, p.id, now()
 FROM wkspid_pekan_default.roles r, public.permissions p 
 WHERE r.code = 'owner'
 ON CONFLICT (role_id, permission_id) DO NOTHING;

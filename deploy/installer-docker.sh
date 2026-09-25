@@ -408,6 +408,7 @@ EOF
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 DB_NAME=${DB_NAME}
 DB_USER=${DB_USER}
+WEB_PORT=${WEB_PORT}
 EOF
 
   log "  Configuration written"
@@ -720,6 +721,9 @@ verify_installation() {
     log "Health check passed!"
   fi
 
+  local server_ip
+  server_ip=$(ip route get 1 2>/dev/null | awk '{print $7; exit}' || hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
+
   printf '\n'
   printf '============================================\n'
   printf '  PEKAN Installation Complete (Docker)\n'
@@ -727,13 +731,24 @@ verify_installation() {
   printf '\n'
   printf '  Branch:      %s\n' "${BRANCH}"
   printf '  Install Dir: %s\n' "${INSTALL_DIR}"
-  printf '  Web URL:     http://localhost:%s\n' "${WEB_PORT}"
-  printf '  API URL:     http://localhost:8080/api/v1\n'
-  printf '  Health:      http://localhost:8080/api/v1/healthz\n'
+  printf '  Web URL:     http://%s:%s (atau http://localhost:%s)\n' "${server_ip}" "${WEB_PORT}" "${WEB_PORT}"
+  printf '  API URL:     http://%s:8080/api/v1\n' "${server_ip}"
+  printf '  Health:      http://%s:8080/api/v1/healthz\n' "${server_ip}"
   printf '\n'
-  printf '  Config:      %s/backend/.env\n' "${INSTALL_DIR}"
-  printf '  Compose:     %s/docker-compose.yml\n' "${INSTALL_DIR}"
-  printf '  Logs:        docker compose -f %s/docker-compose.yml logs -f\n' "${INSTALL_DIR}"
+  printf '  Default / Demo Credentials:\n'
+  printf '    • Tenant Code: default\n'
+  printf '    • Email:       owner@pekan.local\n'
+  printf '    • Password:    password\n'
+  printf '\n'
+  printf '  Admin Dashboard (System Admin):\n'
+  printf '    • URL:         http://%s:%s/admin\n' "${server_ip}" "${WEB_PORT}"
+  printf '    • JWT Secret:  %s\n' "${JWT_SECRET}"
+  printf '\n'
+  printf '  Configuration:\n'
+  printf '    • Config:      %s/backend/.env\n' "${INSTALL_DIR}"
+  printf '    • Compose:     %s/docker-compose.yml\n' "${INSTALL_DIR}"
+  printf '    • Database:    %s (User: %s)\n' "${DB_NAME}" "${DB_USER}"
+  printf '    • Logs:        docker compose -f %s/docker-compose.yml logs -f\n' "${INSTALL_DIR}"
   printf '\n'
   printf '  Containers:\n'
   printf '    pekan-postgres  (PostgreSQL 16)\n'
@@ -743,7 +758,7 @@ verify_installation() {
   printf '    pekan-ai        (AI Queue Worker)\n'
   printf '    pekan-web       (Frontend Nginx - port %s)\n' "${WEB_PORT}"
   printf '\n'
-  printf '  Commands:\n'
+  printf '  Useful Commands:\n'
   printf '    docker compose ps                    # Container status\n'
   printf '    docker compose logs -f pekan-api     # View API logs\n'
   printf '    docker compose restart pekan-api     # Restart API\n'
@@ -752,6 +767,7 @@ verify_installation() {
   printf '\n'
   printf '  Update:\n'
   printf '    cd %s && git pull && sudo bash deploy/update-versi.sh\n' "${INSTALL_DIR}"
+  printf '============================================\n'
   printf '\n'
 }
 
