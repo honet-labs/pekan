@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
 	"errors"
@@ -51,23 +50,6 @@ func ValidatePasswordComplexity(pwd string) error {
 		return ErrPasswordNoSymbol
 	}
 	return nil
-}
-
-// Argon2id parameters
-const (
-	argonMemory      = 64 * 1024
-	argonIterations  = 3
-	argonParallelism = 2
-	argonSaltLength  = 16
-	argonKeyLength   = 32
-)
-
-func generateSalt(length int) ([]byte, error) {
-	salt := make([]byte, length)
-	if _, err := rand.Read(salt); err != nil {
-		return nil, err
-	}
-	return salt, nil
 }
 
 // HashPassword applies complexity validation and then hashes using Bcrypt.
