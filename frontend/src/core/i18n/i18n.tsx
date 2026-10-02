@@ -15,6 +15,9 @@ function resolveInitialLocale(): Locale {
     return stored;
   }
   const browserLang = (navigator.language || "").toLowerCase();
+  if (browserLang.startsWith("en")) {
+    return "en";
+  }
   if (browserLang.startsWith("id")) {
     return "id";
   }
@@ -27,6 +30,27 @@ export function I18nProvider({ children }: { children: ReactNode }): JSX.Element
   const setLocale = useCallback((next: Locale) => {
     setLocaleState(next);
     window.localStorage.setItem("pekan_locale", next);
+    window.dispatchEvent(new CustomEvent("pekan:locale:changed", { detail: next }));
+  }, []);
+
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "pekan_locale" && (e.newValue === "en" || e.newValue === "id")) {
+        setLocaleState(e.newValue as Locale);
+      }
+    };
+    const handleCustom = (e: Event) => {
+      const custom = e as CustomEvent<Locale>;
+      if (custom.detail === "en" || custom.detail === "id") {
+        setLocaleState(custom.detail);
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("pekan:locale:changed", handleCustom);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("pekan:locale:changed", handleCustom);
+    };
   }, []);
 
   const t = useCallback(

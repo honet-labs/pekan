@@ -107,9 +107,22 @@ function getFallbackMessageByStatus(status: number): string {
   return messages[status as keyof typeof messages] ?? (locale === "id" ? `Permintaan API gagal (HTTP ${status})` : `API request failed (HTTP ${status})`);
 }
 
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+    Object.setPrototypeOf(this, ApiError.prototype);
+  }
+}
+
 type ParsedPayload = {
   data?: unknown;
-  error?: { message?: string };
+  error?: { message?: string; code?: string };
   rawText?: string;
 };
 
@@ -120,7 +133,7 @@ async function parseResponse<T>(response: Response): Promise<T> {
     const raw = payload.rawText ? compactText(payload.rawText) : "";
     const message = payload.error?.message ?? (raw || fallback);
     console.error(`[API Error] Request to ${response.url} failed with status ${response.status}:`, message);
-    throw new Error(message);
+    throw new ApiError(message, response.status, payload.error?.code);
   }
   if (typeof payload.data === "undefined") {
     return {} as T;
