@@ -11,7 +11,7 @@ import {
   adminResetUserPassword, adminUpdateUserEmail, adminUpdateUserPhone,
   listTenantBackups, createTenantBackup, restoreTenantBackup, downloadTenantBackupBlob,
   getWhatsAppQueueStats, getWhatsAppQueueHistory, retryWhatsAppQueueMessage,
-  checkUpdate, applyUpdate, getUpdateStatus, getSystemLogs,
+  checkUpdate, applyUpdate, getUpdateStatus, getSystemLogs, isUnauthorizedError,
   TenantListItem, AuditLog, GrowthStats, TenantModule, ServerStatus, BackupFile, DatabaseTable, DatabaseGrowthPoint, QueryResult, TenantUser,
   WhatsAppQueueStats, WhatsAppQueueItem, UpdateStatusInfo, UpdateProgress
 } from "../api/admin.api";
@@ -26,6 +26,7 @@ import { PasswordStrength } from "../../../../core/components/PasswordStrength";
 import { BackToTop } from "../../../../core/components/BackToTop";
 import { PasswordInput } from "../../../../core/components/PasswordInput";
 import { PageHeader } from "../../../../core/components/PageHeader";
+import { LanguageSwitcher } from "../../../../core/components/LanguageSwitcher";
 
 type Tab = "dashboard" | "tenants" | "add_tenant" | "stats" | "server" | "logs" | "system_logs" | "notifications" | "ai" | "database" | "backups" | "storage" | "optimization" | "dbtool" | "whatsapp" | "updates" | "branding";
 
@@ -54,6 +55,18 @@ export function AdminDashboardPage(): JSX.Element {
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem("pekan_admin_token"));
   const [secret, setSecret] = useState("");
   const [activeTab, setActiveTab] = useState<Tab>((localStorage.getItem("admin_active_tab") as Tab) || "dashboard");
+
+  useEffect(() => {
+    const handleUnauthorizedEvent = () => {
+      adminLogout();
+      setIsLoggedIn(false);
+      error(t("admin.session_expired"));
+    };
+    window.addEventListener("pekan:admin:unauthorized", handleUnauthorizedEvent);
+    return () => {
+      window.removeEventListener("pekan:admin:unauthorized", handleUnauthorizedEvent);
+    };
+  }, [t]);
   
   const [loading, setLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -252,7 +265,9 @@ export function AdminDashboardPage(): JSX.Element {
       try {
         const data = await getGlobalSetting(key);
         return data;
-      } catch (e) { /* ignore */ }
+      } catch (e) {
+        if (handleAuthError(e)) return null;
+      }
       return null;
     };
 
@@ -1001,13 +1016,23 @@ export function AdminDashboardPage(): JSX.Element {
     }
   };
 
+  const handleAuthError = (err: unknown): boolean => {
+    if (isUnauthorizedError(err)) {
+      handleLogout();
+      error(t("admin.session_expired"));
+      return true;
+    }
+    return false;
+  };
+
   const loadTenants = async () => {
     setLoading(true);
     try {
       const data = await listTenants();
       setTenants(data);
     } catch (err) {
-      error(`Gagal memuat tenant: ${err instanceof Error ? err.message : "Database Error"}`);
+      if (handleAuthError(err)) return;
+      error(`${t("admin.tenants.load_failed")}: ${err instanceof Error ? err.message : "Database Error"}`);
     } finally {
       setLoading(false);
     }
@@ -1019,7 +1044,8 @@ export function AdminDashboardPage(): JSX.Element {
       const data = await listLogs();
       setLogs(data);
     } catch (err) {
-      error(`Gagal memuat log: ${err instanceof Error ? err.message : "Database Error"}`);
+      if (handleAuthError(err)) return;
+      error(`${t("admin.logs.load_failed")}: ${err instanceof Error ? err.message : "Database Error"}`);
     } finally {
       setLoading(false);
     }
@@ -1031,7 +1057,8 @@ export function AdminDashboardPage(): JSX.Element {
       const data = await getSystemLogs(service, lines);
       setSystemLogs(data.logs);
     } catch (err) {
-      error(`Gagal memuat log sistem: ${err instanceof Error ? err.message : "Network Error"}`);
+      if (handleAuthError(err)) return;
+      error(`${t("admin.system_logs.load_failed")}: ${err instanceof Error ? err.message : "Network Error"}`);
     } finally {
       setLoadingSystemLogs(false);
     }
@@ -1043,7 +1070,8 @@ export function AdminDashboardPage(): JSX.Element {
       const data = await listBackups();
       setBackups(data);
     } catch (err) {
-      error(`Gagal memuat list backup: ${err instanceof Error ? err.message : "Network Error"}`);
+      if (handleAuthError(err)) return;
+      error(`${t("admin.backups.load_failed")}: ${err instanceof Error ? err.message : "Network Error"}`);
     } finally {
       setLoading(false);
     }
@@ -1054,11 +1082,8 @@ export function AdminDashboardPage(): JSX.Element {
       const data = await getGrowthStats(fromVal || dateFrom, toVal || dateTo);
       setStats(data);
     } catch (err) {
-      if (err instanceof Error && (err.message.includes("401") || err.message.includes("Unauthorized"))) {
-        handleLogout();
-        return;
-      }
-      error(`Gagal memuat statistik: ${err instanceof Error ? err.message : "Unknown error"}`);
+      if (handleAuthError(err)) return;
+      error(`${t("admin.stats.load_failed")}: ${err instanceof Error ? err.message : "Unknown error"}`);
     }
   };
 
@@ -1067,6 +1092,7 @@ export function AdminDashboardPage(): JSX.Element {
       const data = await getServerStatus();
       setServer(data);
     } catch (err) {
+      if (handleAuthError(err)) return;
       // Silent refresh
     }
   };
@@ -1083,9 +1109,9 @@ export function AdminDashboardPage(): JSX.Element {
     try {
       await adminLogin(secret);
       setIsLoggedIn(true);
-      success("Autentikasi Berhasil");
+      success(t("admin.auth_success"));
     } catch (err) {
-      error("Login gagal: " + (err instanceof Error ? err.message : "Secret salah"));
+      error(`${t("admin.login_failed")}: ${err instanceof Error ? err.message : "Secret salah"}`);
     } finally {
       setLoading(false);
     }
@@ -1716,34 +1742,37 @@ export function AdminDashboardPage(): JSX.Element {
   if (!isLoggedIn) {
     return (
       <section className="auth-wrap">
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: "1.25rem" }}>
+          <LanguageSwitcher />
+        </div>
         <div className="auth-card">
-          <p className="auth-kicker">Platform Admin</p>
-          <h1 className="auth-title">Admin Central</h1>
-          <p className="page-subtitle">Akses Manajemen Infrastruktur</p>
+          <p className="auth-kicker">{t("admin.login.kicker")}</p>
+          <h1 className="auth-title">{t("admin.login.title")}</h1>
+          <p className="page-subtitle">{t("admin.login.subtitle")}</p>
           <form className="form-grid spacing-mt-lg" onSubmit={handleLogin}>
             <div className="form-field">
               <input type="text" name="username" value="admin" style={{ display: "none" }} autoComplete="username" readOnly />
-              <label>Admin Secret Key</label>
+              <label>{t("admin.login.secret_label")}</label>
               <input 
                 className="input-control" 
                 type="password" 
                 value={secret} 
                 onChange={(e) => setSecret(e.target.value)} 
-                placeholder="Masukkan secret"
+                placeholder={t("admin.login.secret_placeholder")}
                 required 
                 autoComplete="current-password"
               />
             </div>
             <button className="btn btn-primary" type="submit" disabled={loading} style={{ width: "100%", height: "46px" }}>
-              {loading ? "Memverifikasi..." : "Akses Dashboard"}
+              {loading ? t("admin.login.verifying") : t("admin.login.submit")}
             </button>
           </form>
           <p style={{ marginTop: "2rem", fontSize: "0.8rem", color: "var(--muted)", textAlign: "center" }}>
-            Periksa <code>JWT_SECRET</code> pada environment server.
+            {t("admin.login.hint")}
           </p>
         </div>
         <ToastContainer toasts={toasts} onRemove={remove} />
-      <BackToTop />
+        <BackToTop />
       </section>
     );
   }
@@ -1846,7 +1875,7 @@ export function AdminDashboardPage(): JSX.Element {
           {tenantsExpanded && (
             <div className="sidebar-sub-nav">
               <button className={`app-nav-link sub-link ${activeTab === "tenants" ? "is-active" : ""}`} onClick={() => { setActiveTab("tenants"); setSidebarOpen(false); }}>{t("admin.nav_tenants")}</button>
-              <button className={`app-nav-link sub-link ${activeTab === "add_tenant" ? "is-active" : ""}`} onClick={() => { setActiveTab("add_tenant"); setSidebarOpen(false); }}>Tambah Workspace</button>
+              <button className={`app-nav-link sub-link ${activeTab === "add_tenant" ? "is-active" : ""}`} onClick={() => { setActiveTab("add_tenant"); setSidebarOpen(false); }}>{t("admin.nav_add_tenant")}</button>
             </div>
           )}
 
@@ -1856,7 +1885,7 @@ export function AdminDashboardPage(): JSX.Element {
             onClick={() => setStatsExpanded(!statsExpanded)}
             style={{ width: "100%", textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between" }}
           >
-            <span>Statistik</span>
+            <span>{t("admin.nav_stats")}</span>
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style={{ transform: statsExpanded ? "rotate(180deg)" : "none", transition: "transform 0.2s", opacity: 0.7 }}>
               <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z" />
             </svg>
@@ -1864,8 +1893,8 @@ export function AdminDashboardPage(): JSX.Element {
           
           {statsExpanded && (
             <div className="sidebar-sub-nav">
-              <button className={`app-nav-link sub-link ${activeTab === "stats" ? "is-active" : ""}`} onClick={() => { setActiveTab("stats"); setSidebarOpen(false); }}>Growth Workspace and User</button>
-              <button className={`app-nav-link sub-link ${activeTab === "whatsapp" ? "is-active" : ""}`} onClick={() => { setActiveTab("whatsapp"); setSidebarOpen(false); }}>Chat AI Queue</button>
+              <button className={`app-nav-link sub-link ${activeTab === "stats" ? "is-active" : ""}`} onClick={() => { setActiveTab("stats"); setSidebarOpen(false); }}>{t("admin.nav_growth_stats")}</button>
+              <button className={`app-nav-link sub-link ${activeTab === "whatsapp" ? "is-active" : ""}`} onClick={() => { setActiveTab("whatsapp"); setSidebarOpen(false); }}>{t("admin.nav_whatsapp_queue")}</button>
             </div>
           )}
           
@@ -1887,15 +1916,15 @@ export function AdminDashboardPage(): JSX.Element {
               <button className={`app-nav-link sub-link ${activeTab === "server" ? "is-active" : ""}`} onClick={() => { setActiveTab("server"); setSidebarOpen(false); }}>{t("admin.nav_server")}</button>
               <button className={`app-nav-link sub-link ${activeTab === "logs" ? "is-active" : ""}`} onClick={() => { setActiveTab("logs"); setSidebarOpen(false); }}>{t("admin.nav_logs")}</button>
               <button className={`app-nav-link sub-link ${activeTab === "system_logs" ? "is-active" : ""}`} onClick={() => { setActiveTab("system_logs"); setSidebarOpen(false); }}>{t("admin.nav_system_logs")}</button>
-              <button className={`app-nav-link sub-link ${activeTab === "backups" ? "is-active" : ""}`} onClick={() => { setActiveTab("backups"); setSidebarOpen(false); }}>Backup & Restore</button>
-              <button className={`app-nav-link sub-link ${activeTab === "updates" ? "is-active" : ""}`} onClick={() => { setActiveTab("updates"); setSidebarOpen(false); }}>System Update</button>
-              <button className={`app-nav-link sub-link ${activeTab === "ai" ? "is-active" : ""}`} onClick={() => { setActiveTab("ai"); setSidebarOpen(false); }}>AI Settings</button>
-              <button className={`app-nav-link sub-link ${activeTab === "notifications" ? "is-active" : ""}`} onClick={() => { setActiveTab("notifications"); setSidebarOpen(false); }}>Notification Providers</button>
-              <button className={`app-nav-link sub-link ${activeTab === "database" ? "is-active" : ""}`} onClick={() => { setActiveTab("database"); setSidebarOpen(false); }}>Database Config</button>
-              <button className={`app-nav-link sub-link ${activeTab === "storage" ? "is-active" : ""}`} onClick={() => { setActiveTab("storage"); setSidebarOpen(false); }}>Storage & Cloud</button>
-              <button className={`app-nav-link sub-link ${activeTab === "optimization" ? "is-active" : ""}`} onClick={() => { setActiveTab("optimization"); setSidebarOpen(false); }}>{t("admin.nav_optimization") || "Optimasi & Performa"}</button>
-              <button className={`app-nav-link sub-link ${activeTab === "branding" ? "is-active" : ""}`} onClick={() => { setActiveTab("branding"); setSidebarOpen(false); }}>Platform Branding</button>
-              <button className={`app-nav-link sub-link ${activeTab === "dbtool" ? "is-active" : ""}`} onClick={() => { setActiveTab("dbtool"); setSidebarOpen(false); }}>Database Size & Growth</button>
+              <button className={`app-nav-link sub-link ${activeTab === "backups" ? "is-active" : ""}`} onClick={() => { setActiveTab("backups"); setSidebarOpen(false); }}>{t("admin.nav_backups")}</button>
+              <button className={`app-nav-link sub-link ${activeTab === "updates" ? "is-active" : ""}`} onClick={() => { setActiveTab("updates"); setSidebarOpen(false); }}>{t("admin.nav_updates")}</button>
+              <button className={`app-nav-link sub-link ${activeTab === "ai" ? "is-active" : ""}`} onClick={() => { setActiveTab("ai"); setSidebarOpen(false); }}>{t("admin.nav_ai")}</button>
+              <button className={`app-nav-link sub-link ${activeTab === "notifications" ? "is-active" : ""}`} onClick={() => { setActiveTab("notifications"); setSidebarOpen(false); }}>{t("admin.nav_notifications")}</button>
+              <button className={`app-nav-link sub-link ${activeTab === "database" ? "is-active" : ""}`} onClick={() => { setActiveTab("database"); setSidebarOpen(false); }}>{t("admin.nav_database")}</button>
+              <button className={`app-nav-link sub-link ${activeTab === "storage" ? "is-active" : ""}`} onClick={() => { setActiveTab("storage"); setSidebarOpen(false); }}>{t("admin.nav_storage")}</button>
+              <button className={`app-nav-link sub-link ${activeTab === "optimization" ? "is-active" : ""}`} onClick={() => { setActiveTab("optimization"); setSidebarOpen(false); }}>{t("admin.nav_optimization")}</button>
+              <button className={`app-nav-link sub-link ${activeTab === "branding" ? "is-active" : ""}`} onClick={() => { setActiveTab("branding"); setSidebarOpen(false); }}>{t("admin.nav_branding")}</button>
+              <button className={`app-nav-link sub-link ${activeTab === "dbtool" ? "is-active" : ""}`} onClick={() => { setActiveTab("dbtool"); setSidebarOpen(false); }}>{t("admin.nav_dbtool")}</button>
             </div>
           )}
         </nav>
@@ -1908,7 +1937,7 @@ export function AdminDashboardPage(): JSX.Element {
             </div>
             <div className="sidebar-user-info">
               <span className="sidebar-user-name">Administrator</span>
-              <span className="sidebar-user-role">System Root</span>
+              <span className="sidebar-user-role">{t("admin.role_root")}</span>
             </div>
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style={{ transform: profileMenuOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
               <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z" />
@@ -1932,7 +1961,6 @@ export function AdminDashboardPage(): JSX.Element {
               </svg>
               {locale.toUpperCase()}
             </button>
-          </div>
         </div>
       </aside>
 
@@ -1956,37 +1984,41 @@ export function AdminDashboardPage(): JSX.Element {
               activeTab === "add_tenant" ? t("admin.tenants.add") : 
               activeTab === "logs" ? t("admin.logs.title") : 
               activeTab === "system_logs" ? t("admin.system_logs.title") : 
-              activeTab === "stats" ? "Growth Workspace and User" : 
-              activeTab === "server" ? t("admin.nav_server") : 
+              activeTab === "stats" ? t("admin.stats.title") : 
+              activeTab === "server" ? t("admin.server.title") : 
               activeTab === "notifications" ? t("admin.notifications.title") :
-              activeTab === "database" ? "Database Configuration" :
-              activeTab === "backups" ? "Backup & Restore" :
-              activeTab === "whatsapp" ? "Chat AI Queue & Statistics" :
-              activeTab === "updates" ? "System Auto-Updater" :
-              activeTab === "branding" ? "Platform Identity & Branding" :
-              activeTab === "ai" ? "AI Settings & Provider Configuration" :
-              activeTab === "optimization" ? (t("admin.nav_optimization") || "Optimasi & Performa") :
-              t("admin.nav_dashboard")
+              activeTab === "database" ? t("admin.database.title") :
+              activeTab === "backups" ? t("admin.backups.title") :
+              activeTab === "whatsapp" ? t("admin.whatsapp.title") :
+              activeTab === "updates" ? t("admin.updates.title") :
+              activeTab === "branding" ? t("admin.branding.title") :
+              activeTab === "ai" ? t("admin.ai.title") :
+              activeTab === "optimization" ? t("admin.optimization.title") :
+              activeTab === "dbtool" ? t("admin.dbtool.title") :
+              t("admin.dashboard.title")
             }
             description={
               activeTab === "tenants" ? t("admin.tenants.subtitle") :
-              activeTab === "add_tenant" ? "Tambahkan workspace baru dengan kuota yang disesuaikan." :
-              activeTab === "logs" ? "Pantau log aktivitas audit di seluruh platform." :
-              activeTab === "system_logs" ? "Pantau log konsol real-time dari layanan backend untuk debugging dan troubleshooting." :
-              activeTab === "stats" ? "Analisis pertumbuhan workspace dan penggunaan sistem." :
-              activeTab === "server" ? "Informasi status dan kesehatan server infrastruktur." :
+              activeTab === "add_tenant" ? t("admin.tenants.add_subtitle") :
+              activeTab === "logs" ? t("admin.logs.subtitle") :
+              activeTab === "system_logs" ? t("admin.system_logs.subtitle") :
+              activeTab === "stats" ? t("admin.stats.subtitle") :
+              activeTab === "server" ? t("admin.server.subtitle") :
               activeTab === "notifications" ? t("admin.notifications.subtitle") :
-              activeTab === "database" ? "Kelola pengaturan koneksi PostgreSQL database Anda." :
-              activeTab === "backups" ? "Kelola file dump database untuk keamanan data dan migrasi." :
-              activeTab === "whatsapp" ? "Pantau statistik antrean pesan real-time, status pemrosesan AI, log error, dan retry manual." :
-              activeTab === "updates" ? "Periksa, unduh, dan pasang pembaruan kode aplikasi Pekan langsung dari GitHub secara aman." :
-              activeTab === "branding" ? "Kustomisasi nama platform, favicon, logo, dan URL akses publik eksternal." :
-              activeTab === "ai" ? "Kelola konfigurasi provider AI, system prompt, dan pengaturan worker antrean AI." :
-              activeTab === "optimization" ? "Kelola limitasi rate limiting, batas waktu (timeout) koneksi API, dan konfigurasi performa sistem." :
-              "Pusat kendali dan infrastruktur Pekan"
+              activeTab === "database" ? t("admin.database.subtitle") :
+              activeTab === "backups" ? t("admin.backups.subtitle") :
+              activeTab === "whatsapp" ? t("admin.whatsapp.subtitle") :
+              activeTab === "updates" ? t("admin.updates.subtitle") :
+              activeTab === "branding" ? t("admin.branding.subtitle") :
+              activeTab === "ai" ? t("admin.ai.subtitle") :
+              activeTab === "optimization" ? t("admin.optimization.subtitle") :
+              activeTab === "dbtool" ? t("admin.dbtool.subtitle") :
+              t("admin.dashboard.subtitle")
             }
             hideInfo={true}
-          />
+          >
+            <LanguageSwitcher />
+          </PageHeader>
 
 
           {activeTab === "dashboard" && (
@@ -2150,9 +2182,9 @@ export function AdminDashboardPage(): JSX.Element {
                                     setTenantModalTab('backups');
                                   }}
                                 >
-                                  Backups
+                                  {t("admin.tenants.action_backups")}
                                 </button>
-                                <button className="btn btn-ghost-inline btn-sm" onClick={() => handleImpersonate(tenant.id, tenant.code)}>Impersonate</button>
+                                <button className="btn btn-ghost-inline btn-sm" onClick={() => handleImpersonate(tenant.id, tenant.code)}>{t("admin.tenants.action_impersonate")}</button>
                                 <button className="btn btn-ghost-inline btn-sm danger" onClick={() => setTenantToDelete(tenant)}>{t("common.delete")}</button>
                               </div>
                             </td>
@@ -2165,7 +2197,7 @@ export function AdminDashboardPage(): JSX.Element {
                 
                 {selectedTenantID && (
                    <div className="surface card shadow-soft spacing-mt-lg">
-                      <h3 className="form-title">Modul Fitur: {tenants.find(t => t.id === selectedTenantID)?.name}</h3>
+                      <h3 className="form-title">{t("admin.tenants.feature_modules")}: {tenants.find(t => t.id === selectedTenantID)?.name}</h3>
                       <div className="badge-grid">
                         {["finance", "inventory", "hrm", "crm"].map(code => {
                           const m = (selectedModules || []).find(sm => sm.module_code === code);
@@ -2193,14 +2225,14 @@ export function AdminDashboardPage(): JSX.Element {
                             style={{ fontSize: "0.85rem", padding: "6px 15px", minHeight: "auto" }}
                             onClick={() => setTenantModalTab('info')}
                           >
-                            Info & Users
+                            {t("admin.tenants.tab_info")}
                           </button>
                           <button 
                             className={`btn ${tenantModalTab === 'backups' ? 'btn-primary' : 'btn-ghost-inline'}`} 
                             style={{ fontSize: "0.85rem", padding: "6px 15px", minHeight: "auto" }}
                             onClick={() => setTenantModalTab('backups')}
                           >
-                            Backup & Restore
+                            {t("admin.tenants.tab_backups")}
                           </button>
                           <button 
                             className={`btn ${tenantModalTab === 'modules' ? 'btn-primary' : 'btn-ghost-inline'}`} 

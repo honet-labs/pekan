@@ -1,4 +1,4 @@
-import { apiFetch } from "../../../../core/api/client";
+import { apiFetch, ApiError } from "../../../../core/api/client";
 
 export type BootstrapTenantPayload = {
   tenant_code: string;
@@ -89,6 +89,32 @@ export type DatabaseGrowthPoint = {
 };
 
 
+export function isUnauthorizedError(err: unknown): boolean {
+  if (!err) return false;
+  if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+    return true;
+  }
+  if (typeof err === "object" && err !== null && "status" in err) {
+    const s = (err as { status: unknown }).status;
+    if (s === 401 || s === 403) return true;
+  }
+  if (err instanceof Error) {
+    const msg = err.message.toLowerCase();
+    if (
+      msg.includes("401") ||
+      msg.includes("403") ||
+      msg.includes("unauthorized") ||
+      msg.includes("admin access required") ||
+      msg.includes("invalid admin secret") ||
+      msg.includes("session expired") ||
+      msg.includes("token expired")
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function getAdminToken(): string | null {
   return localStorage.getItem("pekan_admin_token");
 }
@@ -102,10 +128,10 @@ async function adminFetch<T>(path: string, options: RequestInit = {}): Promise<T
   try {
     return await apiFetch<T>(path, { ...options, headers });
   } catch (err) {
-    // If unauthorized, clear token and reload to show login screen
-    if (err instanceof Error && (err.message.includes("401") || err.message.includes("Unauthorized"))) {
+    // If unauthorized / admin access required, clear token and notify UI
+    if (isUnauthorizedError(err)) {
       localStorage.removeItem("pekan_admin_token");
-      window.location.reload();
+      window.dispatchEvent(new CustomEvent("pekan:admin:unauthorized"));
     }
     throw err;
   }
