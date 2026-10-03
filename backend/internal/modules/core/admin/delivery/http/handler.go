@@ -478,8 +478,8 @@ func (h *Handler) UploadBackup(w http.ResponseWriter, r *http.Request) {
 
 	// Validate file extension
 	filename := header.Filename
-	if !strings.HasSuffix(filename, ".sql.gz") && !strings.HasSuffix(filename, ".sql") && !strings.HasSuffix(filename, ".dump") {
-		httpx.WriteError(w, http.StatusBadRequest, "INVALID_REQUEST", "only .sql.gz, .sql, or .dump files are allowed", middleware.GetRequestID(r.Context()))
+	if !strings.HasSuffix(filename, ".tar.gz") && !strings.HasSuffix(filename, ".tar") && !strings.HasSuffix(filename, ".sql.gz") && !strings.HasSuffix(filename, ".sql") && !strings.HasSuffix(filename, ".dump") {
+		httpx.WriteError(w, http.StatusBadRequest, "INVALID_REQUEST", "only .tar.gz, .sql.gz, .sql, or .dump files are allowed", middleware.GetRequestID(r.Context()))
 		return
 	}
 
