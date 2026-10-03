@@ -1,7 +1,9 @@
 package usecase
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
@@ -527,116 +529,565 @@ func (s *Service) getDatabaseURL(ctx context.Context) string {
 	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", dbUser, dbPass, dbHost, dbPort, dbName)
 }
 
+func escapeSQL(val string) string {
+	return strings.ReplaceAll(val, "'", "''")
+}
+
+func parseDatabaseURL(dbUrl string) (user, pass, host, port, dbName string) {
+	user = "postgres"
+	host = "127.0.0.1"
+	port = "5432"
+	dbName = "pekan"
+
+	u, err := url.Parse(dbUrl)
+	if err == nil {
+		if u.User != nil {
+			user = u.User.Username()
+			pass, _ = u.User.Password()
+		}
+		if h := u.Hostname(); h != "" {
+			host = h
+		}
+		if p := u.Port(); p != "" {
+			port = p
+		}
+		if path := strings.TrimPrefix(u.Path, "/"); path != "" {
+			dbName = path
+		}
+	}
+	return
+}
+
+func (s *Service) getStorageDir() string {
+	if envStorage := os.Getenv("STORAGE_LOCAL_PATH"); envStorage != "" {
+		if _, err := os.Stat(envStorage); err == nil {
+			return envStorage
+		}
+	}
+	for _, candidate := range []string{"/var/lib/pekan/storage", "data/storage", "storage"} {
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+	return "data/storage"
+}
+
+func (s *Service) getBackupDir(tenantCode string) string {
+	baseStorage := s.getStorageDir()
+	dir := filepath.Join(baseStorage, "backups")
+	if tenantCode != "" {
+		dir = filepath.Join(dir, "tenants", tenantCode)
+	}
+	_ = os.MkdirAll(dir, 0755)
+	return dir
+}
+
+func (s *Service) getBackupSearchDirs(tenantCode string) []string {
+	dirs := []string{
+		s.getBackupDir(tenantCode),
+		s.getBackupDir(""),
+		"/var/lib/pekan/storage/backups",
+		"data/storage/backups",
+		"/opt/pekan/backups",
+	}
+	if tenantCode != "" {
+		dirs = append(dirs,
+			filepath.Join("/var/lib/pekan/storage/backups", "tenants", tenantCode),
+			filepath.Join("data/storage/backups", "tenants", tenantCode),
+			filepath.Join("/opt/pekan/backups", "tenants", tenantCode),
+		)
+	}
+	var existingDirs []string
+	seen := make(map[string]bool)
+	for _, d := range dirs {
+		clean := filepath.Clean(d)
+		if !seen[clean] {
+			seen[clean] = true
+			if _, err := os.Stat(clean); err == nil {
+				existingDirs = append(existingDirs, clean)
+			}
+		}
+	}
+	return existingDirs
+}
+
+func (s *Service) dumpTenantMetadata(ctx context.Context, tenantID, tenantCode string) (string, error) {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("-- ======================================================\n"))
+	sb.WriteString(fmt.Sprintf("-- PEKAN Tenant Metadata: %s (%s)\n", tenantCode, tenantID))
+	sb.WriteString(fmt.Sprintf("-- ======================================================\n\n"))
+	sb.WriteString("BEGIN;\n\n")
+
+	// 1. Tenant record in public.tenants
+	var tID, tCode, tName, tStatus, tTZ string
+	var quotaUsers, quotaTx int
+	qTenant := `SELECT id, code, name, status, timezone, quota_users, quota_transactions FROM public.tenants WHERE id = $1`
+	if err := s.db.QueryRowContext(ctx, qTenant, tenantID).Scan(&tID, &tCode, &tName, &tStatus, &tTZ, &quotaUsers, &quotaTx); err == nil {
+		sb.WriteString(fmt.Sprintf(`INSERT INTO public.tenants (id, code, name, status, timezone, quota_users, quota_transactions, created_at, updated_at)
+VALUES ('%s', '%s', '%s', '%s', '%s', %d, %d, now(), now())
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, code = EXCLUDED.code, status = EXCLUDED.status, timezone = EXCLUDED.timezone, quota_users = EXCLUDED.quota_users, quota_transactions = EXCLUDED.quota_transactions;
+`, escapeSQL(tID), escapeSQL(tCode), escapeSQL(tName), escapeSQL(tStatus), escapeSQL(tTZ), quotaUsers, quotaTx))
+	}
+
+	// 2. Tenant modules in public.tenant_modules
+	qMods := `SELECT module_code, is_enabled FROM public.tenant_modules WHERE tenant_id = $1`
+	if rows, err := s.db.QueryContext(ctx, qMods, tenantID); err == nil {
+		for rows.Next() {
+			var mCode string
+			var isEnabled bool
+			if rows.Scan(&mCode, &isEnabled) == nil {
+				sb.WriteString(fmt.Sprintf(`INSERT INTO public.tenant_modules (tenant_id, module_code, is_enabled, created_at)
+VALUES ('%s', '%s', %t, now())
+ON CONFLICT (tenant_id, module_code) DO UPDATE SET is_enabled = EXCLUDED.is_enabled;
+`, escapeSQL(tenantID), escapeSQL(mCode), isEnabled))
+			}
+		}
+		rows.Close()
+	}
+
+	// 3. Users belonging to this tenant
+	qUsers := `
+		SELECT u.id, u.email, u.password_hash, u.full_name, u.is_active, 
+		       COALESCE(p.phone, ''), COALESCE(p.avatar_url, '')
+		FROM public.users u
+		JOIN public.tenant_memberships m ON u.id = m.user_id
+		LEFT JOIN public.user_profiles p ON u.id = p.user_id
+		WHERE m.tenant_id = $1`
+	if rows, err := s.db.QueryContext(ctx, qUsers, tenantID); err == nil {
+		for rows.Next() {
+			var uID, uEmail, uPass, uName, uPhone, uAvatar string
+			var uActive bool
+			if rows.Scan(&uID, &uEmail, &uPass, &uName, &uActive, &uPhone, &uAvatar) == nil {
+				sb.WriteString(fmt.Sprintf(`INSERT INTO public.users (id, email, password_hash, full_name, is_active, created_at, updated_at)
+VALUES ('%s', '%s', '%s', '%s', %t, now(), now())
+ON CONFLICT (id) DO UPDATE SET password_hash = EXCLUDED.password_hash, full_name = EXCLUDED.full_name, is_active = EXCLUDED.is_active;
+
+INSERT INTO public.user_profiles (user_id, phone, full_name, avatar_url, updated_at)
+VALUES ('%s', '%s', '%s', '%s', now())
+ON CONFLICT (user_id) DO UPDATE SET phone = EXCLUDED.phone, full_name = EXCLUDED.full_name, avatar_url = EXCLUDED.avatar_url;
+`, escapeSQL(uID), escapeSQL(uEmail), escapeSQL(uPass), escapeSQL(uName), uActive,
+					escapeSQL(uID), escapeSQL(uPhone), escapeSQL(uName), escapeSQL(uAvatar)))
+			}
+		}
+		rows.Close()
+	}
+
+	// 4. Global tenant memberships
+	qMem := `SELECT id, user_id, status FROM public.tenant_memberships WHERE tenant_id = $1`
+	if rows, err := s.db.QueryContext(ctx, qMem, tenantID); err == nil {
+		for rows.Next() {
+			var mID, mUID, mStatus string
+			if rows.Scan(&mID, &mUID, &mStatus) == nil {
+				sb.WriteString(fmt.Sprintf(`INSERT INTO public.tenant_memberships (id, tenant_id, user_id, status, joined_at, created_at)
+VALUES ('%s', '%s', '%s', '%s', now(), now())
+ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status;
+`, escapeSQL(mID), escapeSQL(tenantID), escapeSQL(mUID), escapeSQL(mStatus)))
+			}
+		}
+		rows.Close()
+	}
+
+	// 5. Files belonging to this tenant in public.files
+	qFiles := `SELECT id, file_name, file_path, file_size, mime_type, created_by FROM public.files WHERE tenant_id = $1`
+	if rows, err := s.db.QueryContext(ctx, qFiles, tenantID); err == nil {
+		for rows.Next() {
+			var fID, fName, fPath, fMime, fCreatedBy string
+			var fSize int64
+			if rows.Scan(&fID, &fName, &fPath, &fSize, &fMime, &fCreatedBy) == nil {
+				sb.WriteString(fmt.Sprintf(`INSERT INTO public.files (id, tenant_id, file_name, file_path, file_size, mime_type, created_by, created_at)
+VALUES ('%s', '%s', '%s', '%s', %d, '%s', '%s', now())
+ON CONFLICT (id) DO NOTHING;
+`, escapeSQL(fID), escapeSQL(tenantID), escapeSQL(fName), escapeSQL(fPath), fSize, escapeSQL(fMime), escapeSQL(fCreatedBy)))
+			}
+		}
+		rows.Close()
+	}
+
+	schemaName := tenancy.GetSchemaName(tenantCode)
+	sb.WriteString(fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s;\n\n", schemaName))
+	sb.WriteString("COMMIT;\n\n")
+	return sb.String(), nil
+}
+
+func (s *Service) runPgDump(ctx context.Context, args []string) ([]byte, error) {
+	dbUrl := s.getDatabaseURL(ctx)
+	user, pass, host, port, dbName := parseDatabaseURL(dbUrl)
+
+	hasHostPgDump := false
+	if _, err := exec.LookPath("pg_dump"); err == nil {
+		hasHostPgDump = true
+	}
+
+	isDocker := false
+	pgContainer := "pekan-postgres"
+	if strings.Contains(host, "pekan-postgres") || !hasHostPgDump {
+		if out, err := exec.CommandContext(ctx, "docker", "ps", "--format", "{{.Names}}").Output(); err == nil {
+			names := string(out)
+			if strings.Contains(names, "pekan-postgres") || strings.Contains(names, "postgres") {
+				isDocker = true
+				for _, line := range strings.Split(names, "\n") {
+					line = strings.TrimSpace(line)
+					if strings.Contains(line, "pekan-postgres") || strings.Contains(line, "postgres") {
+						pgContainer = line
+						break
+					}
+				}
+			}
+		}
+	}
+
+	if isDocker {
+		dockerArgs := append([]string{"exec", "-i", pgContainer, "pg_dump", "-U", user, "-d", dbName}, args...)
+		cmd := exec.CommandContext(ctx, "docker", dockerArgs...)
+		cmd.Env = append(os.Environ(), "PGPASSWORD="+pass)
+		var stderr bytes.Buffer
+		cmd.Stderr = &stderr
+		out, err := cmd.Output()
+		if err != nil {
+			return nil, fmt.Errorf("docker pg_dump failed (%v): %s", err, stderr.String())
+		}
+		return out, nil
+	}
+
+	// Host mode
+	hostArgs := append(args, "-h", host, "-p", port, "-U", user, "-d", dbName)
+	cmd := exec.CommandContext(ctx, "pg_dump", hostArgs...)
+	cmd.Env = append(os.Environ(), "PGPASSWORD="+pass)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("pg_dump failed (%v): %s", err, stderr.String())
+	}
+	return out, nil
+}
+
+func (s *Service) runPsql(ctx context.Context, sqlFilePath string) error {
+	dbUrl := s.getDatabaseURL(ctx)
+	user, pass, host, port, dbName := parseDatabaseURL(dbUrl)
+
+	hasHostPsql := false
+	if _, err := exec.LookPath("psql"); err == nil {
+		hasHostPsql = true
+	}
+
+	isDocker := false
+	pgContainer := "pekan-postgres"
+	if strings.Contains(host, "pekan-postgres") || !hasHostPsql {
+		if out, err := exec.CommandContext(ctx, "docker", "ps", "--format", "{{.Names}}").Output(); err == nil {
+			names := string(out)
+			if strings.Contains(names, "pekan-postgres") || strings.Contains(names, "postgres") {
+				isDocker = true
+				for _, line := range strings.Split(names, "\n") {
+					line = strings.TrimSpace(line)
+					if strings.Contains(line, "pekan-postgres") || strings.Contains(line, "postgres") {
+						pgContainer = line
+						break
+					}
+				}
+			}
+		}
+	}
+
+	if isDocker {
+		tmpInContainer := fmt.Sprintf("/tmp/restore_%d.sql", time.Now().UnixNano())
+		copyCmd := exec.CommandContext(ctx, "docker", "cp", sqlFilePath, pgContainer+":"+tmpInContainer)
+		if out, err := copyCmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("failed to copy backup to postgres container: %v, output: %s", err, string(out))
+		}
+		defer func() {
+			_ = exec.CommandContext(ctx, "docker", "exec", pgContainer, "rm", "-f", tmpInContainer).Run()
+		}()
+
+		cmd := exec.CommandContext(ctx, "docker", "exec", "-i", pgContainer,
+			"psql", "-U", user, "-d", dbName, "-f", tmpInContainer)
+		cmd.Env = append(os.Environ(), "PGPASSWORD="+pass)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("docker psql restore failed (%v): %s", err, string(out))
+		}
+		return nil
+	}
+
+	// Host mode
+	cmd := exec.CommandContext(ctx, "psql", "-h", host, "-p", port, "-U", user, "-d", dbName, "-f", sqlFilePath)
+	cmd.Env = append(os.Environ(), "PGPASSWORD="+pass)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("psql restore failed (%v): %s", err, string(out))
+	}
+	return nil
+}
+
+func createBackupArchive(archivePath, sqlFilePath, storageDir, manifestData string) error {
+	out, err := os.Create(archivePath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	gw := gzip.NewWriter(out)
+	defer gw.Close()
+
+	tw := tar.NewWriter(gw)
+	defer tw.Close()
+
+	// 1. Add database.sql
+	if sqlFilePath != "" {
+		sqlFile, err := os.Open(sqlFilePath)
+		if err == nil {
+			defer sqlFile.Close()
+			fi, err := sqlFile.Stat()
+			if err == nil {
+				hdr, err := tar.FileInfoHeader(fi, "")
+				if err == nil {
+					hdr.Name = "database.sql"
+					if err := tw.WriteHeader(hdr); err == nil {
+						_, _ = io.Copy(tw, sqlFile)
+					}
+				}
+			}
+		}
+	}
+
+	// 2. Add manifest.json
+	if manifestData != "" {
+		hdr := &tar.Header{
+			Name:     "manifest.json",
+			Mode:     0644,
+			Size:     int64(len(manifestData)),
+			ModTime:  time.Now(),
+			Typeflag: tar.TypeReg,
+		}
+		if err := tw.WriteHeader(hdr); err == nil {
+			_, _ = tw.Write([]byte(manifestData))
+		}
+	}
+
+	// 3. Add storage files (excluding backups/)
+	if storageDir != "" {
+		_ = filepath.Walk(storageDir, func(path string, info os.FileInfo, err error) error {
+			if err != nil || path == storageDir {
+				return nil
+			}
+			rel, err := filepath.Rel(storageDir, path)
+			if err != nil {
+				return nil
+			}
+			rel = filepath.ToSlash(rel)
+			// Skip backups directory so we don't recursively duplicate previous backups
+			if strings.HasPrefix(rel, "backups") || strings.HasPrefix(rel, "./backups") {
+				if info.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+
+			hdr, err := tar.FileInfoHeader(info, "")
+			if err != nil {
+				return nil
+			}
+			hdr.Name = "storage/" + rel
+			if err := tw.WriteHeader(hdr); err != nil {
+				return nil
+			}
+			if !info.IsDir() {
+				f, err := os.Open(path)
+				if err == nil {
+					_, _ = io.Copy(tw, f)
+					f.Close()
+				}
+			}
+			return nil
+		})
+	}
+
+	return nil
+}
+
+func extractBackupArchive(archivePath, tempDir, targetStorageDir string) (string, error) {
+	f, err := os.Open(archivePath)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	gr, err := gzip.NewReader(f)
+	if err != nil {
+		return "", err
+	}
+	defer gr.Close()
+
+	var sqlPath string
+	tr := tar.NewReader(gr)
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return sqlPath, err
+		}
+
+		cleanPath := filepath.Clean(hdr.Name)
+		if strings.HasPrefix(cleanPath, "..") || strings.HasPrefix(cleanPath, "/") {
+			continue // prevent zip slip
+		}
+
+		// Database SQL file
+		if cleanPath == "database.sql" || strings.HasSuffix(cleanPath, ".sql") {
+			dest := filepath.Join(tempDir, filepath.Base(cleanPath))
+			outFile, err := os.Create(dest)
+			if err != nil {
+				return "", err
+			}
+			_, _ = io.Copy(outFile, tr)
+			outFile.Close()
+			sqlPath = dest
+			continue
+		}
+
+		// Storage file
+		if strings.HasPrefix(cleanPath, "storage/") || strings.HasPrefix(cleanPath, "storage\\") {
+			rel := strings.TrimPrefix(strings.TrimPrefix(cleanPath, "storage/"), "storage\\")
+			if rel == "" {
+				continue
+			}
+			dest := filepath.Join(targetStorageDir, rel)
+			if hdr.Typeflag == tar.TypeDir {
+				_ = os.MkdirAll(dest, 0755)
+				continue
+			}
+			_ = os.MkdirAll(filepath.Dir(dest), 0755)
+			outFile, err := os.Create(dest)
+			if err == nil {
+				_, _ = io.Copy(outFile, tr)
+				outFile.Close()
+			}
+			continue
+		}
+	}
+
+	return sqlPath, nil
+}
+
 func (s *Service) CreateBackup(ctx context.Context, backupType string, tenantID string) error {
 	dbUrl := s.getDatabaseURL(ctx)
 	if dbUrl == "" {
 		return errors.New("database configuration not found")
 	}
 
-	backupDir := "data/storage/backups"
-	if _, err := os.Stat("/var/lib/pekan/storage"); err == nil {
-		backupDir = "/var/lib/pekan/storage/backups"
-	}
 	prefix := "global"
-	var schemaName string
-
+	var tenantCode string
 	if tenantID != "" {
-		// Get tenant code to resolve schema and storage path
 		const q = `SELECT code FROM public.tenants WHERE id = $1`
-		if err := s.db.QueryRowContext(ctx, q, tenantID).Scan(&prefix); err != nil {
-			return err
+		if err := s.db.QueryRowContext(ctx, q, tenantID).Scan(&tenantCode); err != nil {
+			return fmt.Errorf("tenant not found: %v", err)
 		}
-		schemaName = tenancy.GetSchemaName(prefix)
-		backupDir = filepath.Join(backupDir, "tenants", prefix)
+		prefix = tenantCode
 	}
 
-	if err := os.MkdirAll(backupDir, 0755); err != nil {
+	backupDir := s.getBackupDir(tenantCode)
+	timestamp := time.Now().Format("20060102_150405")
+
+	// Create temp directory for backup generation
+	tempDir, err := os.MkdirTemp("", "pekan_backup_*")
+	if err != nil {
 		return err
 	}
+	defer os.RemoveAll(tempDir)
 
-	filename := fmt.Sprintf("backup_%s_%s_%s.sql", prefix, backupType, time.Now().Format("20060102_150405"))
-	fp := filepath.Join(backupDir, filename)
+	tempSQLFile := filepath.Join(tempDir, "database.sql")
 
-	// Build pg_dump arguments with clean and if-exists
-	args := []string{"--clean", "--if-exists", "--no-owner", "--no-privileges"}
-	if schemaName != "" {
-		// Backup specific tenant schema
-		args = append(args, "-n", schemaName)
+	var dumpArgs []string
+	dumpArgs = append(dumpArgs, "--clean", "--if-exists", "--no-owner", "--no-privileges")
+
+	if tenantID != "" {
+		// Specific tenant schema
+		schemaName := tenancy.GetSchemaName(tenantCode)
+		dumpArgs = append(dumpArgs, "-n", schemaName)
 	}
+
 	if backupType == "schema" {
-		args = append(args, "-s")
+		dumpArgs = append(dumpArgs, "-s")
 	} else if backupType == "data" {
-		args = append(args, "-a")
+		dumpArgs = append(dumpArgs, "-a")
 	}
 
-	// Check if PostgreSQL is running in Docker container
-	isDocker := false
-	pgContainer := "pekan-postgres"
-	if output, err := exec.CommandContext(ctx, "docker", "ps", "--format", "{{.Names}}").Output(); err == nil {
-		if strings.Contains(string(output), "pekan-postgres") || strings.Contains(string(output), "postgres") {
-			isDocker = true
-			if out, err := exec.CommandContext(ctx, "docker", "ps", "--format", "{{.Names}}", "--filter", "name=postgres").Output(); err == nil {
-				containers := strings.TrimSpace(string(out))
-				if containers != "" {
-					pgContainer = strings.Split(containers, "\n")[0]
-				}
-			}
-		}
+	// 1. Run database dump
+	schemaDump, err := s.runPgDump(ctx, dumpArgs)
+	if err != nil {
+		return fmt.Errorf("database backup failed: %v", err)
+	}
+	if len(schemaDump) == 0 {
+		return fmt.Errorf("pg_dump produced empty output")
 	}
 
-	var output []byte
-	var err error
-	if isDocker {
-		// Docker mode: run pg_dump inside postgres container (without duplicate -d dbUrl)
-		dockerArgs := append([]string{"exec", "-i", pgContainer, "pg_dump", "-U", "postgres", "-d", "pekan"}, args...)
-		cmd := exec.CommandContext(ctx, "docker", dockerArgs...)
-		output, err = cmd.Output()
-		if err != nil {
-			errOutput, _ := cmd.CombinedOutput()
-			return fmt.Errorf("pg_dump failed: %v, output: %s", err, string(errOutput))
+	// For tenant backups, prepend metadata export so users, tenant info, and permissions are preserved
+	var fullSQLContent []byte
+	if tenantID != "" && backupType != "data" {
+		metaSQL, err := s.dumpTenantMetadata(ctx, tenantID, tenantCode)
+		if err == nil && metaSQL != "" {
+			fullSQLContent = append([]byte(metaSQL), schemaDump...)
+		} else {
+			fullSQLContent = schemaDump
 		}
 	} else {
-		// Systemd / Standalone mode: add dbUrl
-		systemdArgs := append(args, "-d", dbUrl)
-		cmd := exec.CommandContext(ctx, "pg_dump", systemdArgs...)
-		output, err = cmd.Output()
-		if err != nil {
-			errOutput, _ := cmd.CombinedOutput()
-			return fmt.Errorf("pg_dump failed: %v, output: %s", err, string(errOutput))
-		}
+		fullSQLContent = schemaDump
 	}
 
-	if len(output) == 0 {
-		return fmt.Errorf("pg_dump produced no output - check if database is accessible")
+	if err := os.WriteFile(tempSQLFile, fullSQLContent, 0644); err != nil {
+		return fmt.Errorf("failed to write temp SQL: %v", err)
 	}
 
-	// Write output to file
-	if err := os.WriteFile(fp, output, 0644); err != nil {
-		return fmt.Errorf("failed to write backup file: %v", err)
-	}
+	var finalBackupFile string
+	storageDir := s.getStorageDir()
 
-	log.Printf("[Admin] Database backup created at %s (size: %d bytes)", fp, len(output))
+	if backupType == "full" {
+		// Unified full backup: tar.gz containing database.sql + storage files
+		finalBackupFile = filepath.Join(backupDir, fmt.Sprintf("backup_%s_full_%s.tar.gz", prefix, timestamp))
+		manifest := fmt.Sprintf(`{"version":"1.0","type":"full","tenant":"%s","timestamp":"%s","app":"PEKAN"}`, prefix, timestamp)
 
-	// Also backup storage files (images/attachments) for full backups
-	if backupType == "full" && tenantID == "" {
-		for _, sDir := range []string{"/var/lib/pekan/storage", "data/storage"} {
-			if _, err := os.Stat(sDir); err == nil {
-				storageBackupFile := filepath.Join(backupDir, fmt.Sprintf("backup_storage_%s.tar.gz", time.Now().Format("20060102_150405")))
-				baseParent := filepath.Dir(sDir)
-				baseDir := filepath.Base(sDir)
-				tarCmd := exec.CommandContext(ctx, "tar", "-czf", storageBackupFile, "-C", baseParent, baseDir)
-				if err := tarCmd.Run(); err == nil {
-					log.Printf("[Admin] Storage backup created at %s", storageBackupFile)
-					break
-				}
+		tenantStorage := storageDir
+		if tenantID != "" {
+			// For tenant backup, isolate storage to tenant folder if exists
+			candidate := filepath.Join(storageDir, "tenants", tenantCode)
+			if _, err := os.Stat(candidate); err == nil {
+				tenantStorage = candidate
 			}
 		}
+
+		if err := createBackupArchive(finalBackupFile, tempSQLFile, tenantStorage, manifest); err != nil {
+			return fmt.Errorf("failed to create backup archive: %v", err)
+		}
+	} else {
+		// Data or schema only: compressed SQL (.sql.gz)
+		finalBackupFile = filepath.Join(backupDir, fmt.Sprintf("backup_%s_%s_%s.sql.gz", prefix, backupType, timestamp))
+		out, err := os.Create(finalBackupFile)
+		if err != nil {
+			return err
+		}
+		defer out.Close()
+		gw := gzip.NewWriter(out)
+		if _, err := gw.Write(fullSQLContent); err != nil {
+			gw.Close()
+			return err
+		}
+		gw.Close()
 	}
 
-	// Cloud Backup Integration
+	fi, _ := os.Stat(finalBackupFile)
+	size := int64(0)
+	if fi != nil {
+		size = fi.Size()
+	}
+	log.Printf("[Admin] Backup created successfully: %s (%d bytes)", finalBackupFile, size)
+
+	// Cloud Backup Integration (if configured)
 	if s.storage != nil {
-		data, err := os.ReadFile(fp)
+		data, err := os.ReadFile(finalBackupFile)
 		if err == nil {
+			filename := filepath.Base(finalBackupFile)
 			cloudKey := fmt.Sprintf("system/backups/%s", filename)
 			if tenantID != "" {
 				cloudKey = fmt.Sprintf("tenants/%s/backups/%s", prefix, filename)
@@ -645,13 +1096,17 @@ func (s *Service) CreateBackup(ctx context.Context, backupType string, tenantID 
 				TenantID:    "system",
 				Module:      "core.admin",
 				ObjectKey:   cloudKey,
-				ContentType: "application/octet-stream",
+				ContentType: "application/gzip",
 				Body:        bytes.NewReader(data),
 			})
 		}
 	}
 
-	_ = s.audit.Write(ctx, "BACKUP_CREATED", "tenant", tenantID, nil, map[string]any{"path": fp, "type": backupType, "size": len(output)})
+	_ = s.audit.Write(ctx, "BACKUP_CREATED", "tenant", tenantID, nil, map[string]any{
+		"path": finalBackupFile,
+		"type": backupType,
+		"size": size,
+	})
 	return nil
 }
 
@@ -661,17 +1116,18 @@ func (s *Service) RestoreBackup(ctx context.Context, filename string, tenantID s
 		return errors.New("database configuration not found")
 	}
 
+	var tenantCode string
+	if tenantID != "" {
+		const q = `SELECT code FROM public.tenants WHERE id = $1`
+		_ = s.db.QueryRowContext(ctx, q, tenantID).Scan(&tenantCode)
+	}
+
 	cleanName := filepath.Base(filename)
+	searchDirs := s.getBackupSearchDirs(tenantCode)
+
 	var fp string
-	for _, bDir := range []string{"/var/lib/pekan/storage/backups", "data/storage/backups"} {
-		candidate := filepath.Join(bDir, cleanName)
-		if tenantID != "" {
-			var tenantCode string
-			const q = `SELECT code FROM public.tenants WHERE id = $1`
-			if err := s.db.QueryRowContext(ctx, q, tenantID).Scan(&tenantCode); err == nil {
-				candidate = filepath.Join(bDir, "tenants", tenantCode, cleanName)
-			}
-		}
+	for _, dir := range searchDirs {
+		candidate := filepath.Join(dir, cleanName)
 		if _, err := os.Stat(candidate); err == nil {
 			fp = candidate
 			break
@@ -679,103 +1135,129 @@ func (s *Service) RestoreBackup(ctx context.Context, filename string, tenantID s
 	}
 
 	if fp == "" {
-		return fmt.Errorf("backup file %s not found", cleanName)
+		return fmt.Errorf("backup file %s not found in any search path", cleanName)
 	}
 
-	// Check if PostgreSQL is running in Docker container
-	isDocker := false
-	pgContainer := "pekan-postgres"
-	if output, err := exec.CommandContext(ctx, "docker", "ps", "--format", "{{.Names}}").Output(); err == nil {
-		if strings.Contains(string(output), "pekan-postgres") || strings.Contains(string(output), "postgres") {
-			isDocker = true
-			if out, err := exec.CommandContext(ctx, "docker", "ps", "--format", "{{.Names}}", "--filter", "name=postgres").Output(); err == nil {
-				containers := strings.TrimSpace(string(out))
-				if containers != "" {
-					pgContainer = strings.Split(containers, "\n")[0]
-				}
-			}
+	tempDir, err := os.MkdirTemp("", "pekan_restore_*")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tempDir)
+
+	targetStorage := s.getStorageDir()
+	var sqlFileToRun string
+
+	if strings.HasSuffix(cleanName, ".tar.gz") || strings.HasSuffix(cleanName, ".tar") {
+		// Extract archive containing database.sql and storage/
+		log.Printf("[Admin] Extracting full backup archive: %s", fp)
+		extractedSQL, err := extractBackupArchive(fp, tempDir, targetStorage)
+		if err != nil {
+			return fmt.Errorf("failed to extract backup archive: %v", err)
 		}
+		if extractedSQL == "" {
+			return fmt.Errorf("no database.sql found inside backup archive")
+		}
+		sqlFileToRun = extractedSQL
+	} else if strings.HasSuffix(cleanName, ".sql.gz") || strings.HasSuffix(cleanName, ".gz") {
+		// Decompress gzipped SQL
+		gzFile, err := os.Open(fp)
+		if err != nil {
+			return fmt.Errorf("failed to open gz file: %v", err)
+		}
+		defer gzFile.Close()
+		gr, err := gzip.NewReader(gzFile)
+		if err != nil {
+			return fmt.Errorf("failed to read gz: %v", err)
+		}
+		defer gr.Close()
+		tmpSQL := filepath.Join(tempDir, "restore.sql")
+		outSQL, err := os.Create(tmpSQL)
+		if err != nil {
+			return err
+		}
+		if _, err := io.Copy(outSQL, gr); err != nil {
+			outSQL.Close()
+			return fmt.Errorf("failed to decompress sql.gz: %v", err)
+		}
+		outSQL.Close()
+		sqlFileToRun = tmpSQL
+	} else {
+		// Direct SQL file
+		sqlFileToRun = fp
 	}
 
-	var cmd *exec.Cmd
-	if isDocker {
-		// Docker mode: copy file to postgres container and restore there
-		if strings.HasSuffix(cleanName, ".gz") {
-			copyCmd := exec.CommandContext(ctx, "docker", "cp", fp, pgContainer+":/tmp/restore.sql.gz")
-			if output, err := copyCmd.CombinedOutput(); err != nil {
-				return fmt.Errorf("failed to copy backup: %v, output: %s", err, string(output))
-			}
-			cmd = exec.CommandContext(ctx, "docker", "exec", "-i", pgContainer,
-				"sh", "-c", "gunzip -c /tmp/restore.sql.gz | psql -U postgres -d pekan 2>&1")
-		} else {
-			copyCmd := exec.CommandContext(ctx, "docker", "cp", fp, pgContainer+":/tmp/restore.sql")
-			if output, err := copyCmd.CombinedOutput(); err != nil {
-				return fmt.Errorf("failed to copy backup: %v, output: %s", err, string(output))
-			}
-			cmd = exec.CommandContext(ctx, "docker", "exec", "-i", pgContainer,
-				"psql", "-U", "postgres", "-d", "pekan", "-f", "/tmp/restore.sql")
+	// 2. Prepare database clean slate before executing restore
+	if tenantID == "" {
+		log.Printf("[Admin] Cleaning schemas for full database restore...")
+		cleanSlateSQL := `
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN (SELECT schema_name FROM information_schema.schemata WHERE schema_name LIKE 'wkspid_pekan_%') LOOP
+        EXECUTE 'DROP SCHEMA IF EXISTS ' || quote_ident(r.schema_name) || ' CASCADE';
+    END LOOP;
+END $$;
+DROP SCHEMA IF EXISTS public CASCADE;
+CREATE SCHEMA public;
+GRANT ALL ON SCHEMA public TO postgres;
+GRANT ALL ON SCHEMA public TO public;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+`
+		if _, err := s.db.ExecContext(ctx, cleanSlateSQL); err != nil {
+			log.Printf("[Admin] Clean slate warning: %v", err)
 		}
 	} else {
-		// Systemd mode: run psql directly
-		if strings.HasSuffix(cleanName, ".gz") {
-			cmd = exec.CommandContext(ctx, "sh", "-c", fmt.Sprintf("gunzip -c %s | psql '%s'", fp, dbUrl))
-		} else {
-			cmd = exec.CommandContext(ctx, "psql", "-d", dbUrl, "-f", fp)
+		// Clean only this tenant's schema
+		schemaName := tenancy.GetSchemaName(tenantCode)
+		if schemaName != "" && schemaName != "public" {
+			log.Printf("[Admin] Cleaning tenant schema %s before restore...", schemaName)
+			_, _ = s.db.ExecContext(ctx, fmt.Sprintf("DROP SCHEMA IF EXISTS %s CASCADE;", schemaName))
 		}
 	}
 
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Printf("[Admin] Restore warning/error: %v, output: %s", err, string(output))
+	// 3. Run SQL restore
+	log.Printf("[Admin] Executing SQL restore from %s...", sqlFileToRun)
+	if err := s.runPsql(ctx, sqlFileToRun); err != nil {
+		log.Printf("[Admin] SQL restore error: %v", err)
+		return fmt.Errorf("database restore failed: %v", err)
 	}
 
-	// Cleanup temp file in Docker
-	if isDocker {
-		_ = exec.CommandContext(ctx, "docker", "exec", pgContainer, "rm", "-f", "/tmp/restore.sql", "/tmp/restore.sql.gz").Run()
-	}
-
-	// Auto-heal / run schema migration patches to ensure all tenant tables & permissions match current version
-	log.Printf("[Admin] Running schema self-heal and migration patches...")
-	for _, patchScript := range []string{"scripts/apply_migrations.sh", "backend/scripts/apply_migrations.sh", "/opt/pekan/backend/scripts/apply_migrations.sh"} {
-		if _, err := os.Stat(patchScript); err == nil {
-			_ = exec.CommandContext(ctx, "bash", patchScript).Run()
-			break
-		}
-	}
-
-	// Also restore storage files if storage backup exists
-	for _, bDir := range []string{"/var/lib/pekan/storage/backups", "data/storage/backups"} {
-		storageBackups, _ := filepath.Glob(filepath.Join(bDir, "backup_storage_*.tar.gz"))
-		if len(storageBackups) > 0 {
-			latestStorageBackup := storageBackups[len(storageBackups)-1]
-			log.Printf("[Admin] Restoring storage from %s", latestStorageBackup)
-			targetDir := "data"
-			if _, err := os.Stat("/var/lib/pekan"); err == nil {
-				targetDir = "/var/lib/pekan"
+	// 4. Schema self-heal and migration patches to ensure all tenant tables & permissions match current version
+	if tenantID == "" {
+		log.Printf("[Admin] Running schema self-heal and migration patches...")
+		for _, patchScript := range []string{"scripts/apply_migrations.sh", "backend/scripts/apply_migrations.sh", "/opt/pekan/backend/scripts/apply_migrations.sh"} {
+			if _, err := os.Stat(patchScript); err == nil {
+				cmd := exec.CommandContext(ctx, "bash", patchScript)
+				cmd.Env = append(os.Environ(), "DATABASE_URL="+dbUrl)
+				_ = cmd.Run()
+				break
 			}
-			_ = exec.CommandContext(ctx, "tar", "-xzf", latestStorageBackup, "-C", targetDir).Run()
-			break
 		}
 	}
 
+	log.Printf("[Admin] Restore completed successfully for %s", cleanName)
 	_ = s.audit.Write(ctx, "BACKUP_RESTORED", "tenant", tenantID, nil, map[string]any{"filename": cleanName})
 	return nil
 }
 
 func (s *Service) SaveUploadedBackup(ctx context.Context, filename string, file io.Reader) error {
-	// Use absolute path based on working directory
-	backupDir := "data/storage/backups"
-	if err := os.MkdirAll(backupDir, 0755); err != nil {
-		return fmt.Errorf("failed to create backup directory: %v", err)
-	}
-
+	backupDir := s.getBackupDir("")
 	cleanName := filepath.Base(filename)
 	fp := filepath.Join(backupDir, cleanName)
 
-	// Check if file already exists, add timestamp if needed
 	if _, err := os.Stat(fp); err == nil {
 		ext := filepath.Ext(cleanName)
 		nameWithoutExt := strings.TrimSuffix(cleanName, ext)
+		if strings.HasSuffix(nameWithoutExt, ".tar") {
+			nameWithoutExt = strings.TrimSuffix(nameWithoutExt, ".tar")
+			ext = ".tar" + ext
+		}
+		if strings.HasSuffix(nameWithoutExt, ".sql") {
+			nameWithoutExt = strings.TrimSuffix(nameWithoutExt, ".sql")
+			ext = ".sql" + ext
+		}
 		fp = filepath.Join(backupDir, fmt.Sprintf("%s_%s%s", nameWithoutExt, time.Now().Format("20060102_150405"), ext))
 	}
 
@@ -796,41 +1278,49 @@ func (s *Service) SaveUploadedBackup(ctx context.Context, filename string, file 
 }
 
 func (s *Service) ListBackups(ctx context.Context, tenantID string) ([]domain.BackupFile, error) {
-	backupDir := "data/storage/backups"
+	var tenantCode string
 	if tenantID != "" {
-		var tenantCode string
 		const q = `SELECT code FROM public.tenants WHERE id = $1`
 		if err := s.db.QueryRowContext(ctx, q, tenantID).Scan(&tenantCode); err != nil {
 			return nil, err
 		}
-		backupDir = filepath.Join(backupDir, "tenants", tenantCode)
 	}
 
-	if err := os.MkdirAll(backupDir, 0755); err != nil {
-		return nil, err
-	}
-
-	entries, err := os.ReadDir(backupDir)
-	if err != nil {
-		return nil, err
-	}
-
+	searchDirs := s.getBackupSearchDirs(tenantCode)
 	var backups []domain.BackupFile
-	for _, e := range entries {
-		if !e.IsDir() && (strings.HasSuffix(e.Name(), ".dump") || strings.HasSuffix(e.Name(), ".sql") || strings.HasSuffix(e.Name(), ".sql.gz")) {
-			info, err := e.Info()
-			if err != nil {
+	seen := make(map[string]bool)
+
+	for _, bDir := range searchDirs {
+		entries, err := os.ReadDir(bDir)
+		if err != nil {
+			continue
+		}
+
+		for _, e := range entries {
+			if e.IsDir() {
 				continue
 			}
-			backups = append(backups, domain.BackupFile{
-				Name:      info.Name(),
-				Size:      info.Size(),
-				CreatedAt: info.ModTime().Format(time.RFC3339),
-			})
+			name := e.Name()
+			if strings.HasSuffix(name, ".tar.gz") || strings.HasSuffix(name, ".tar") ||
+				strings.HasSuffix(name, ".sql.gz") || strings.HasSuffix(name, ".sql") || strings.HasSuffix(name, ".dump") {
+				if seen[name] {
+					continue
+				}
+				seen[name] = true
+				info, err := e.Info()
+				if err != nil {
+					continue
+				}
+				backups = append(backups, domain.BackupFile{
+					Name:      info.Name(),
+					Size:      info.Size(),
+					CreatedAt: info.ModTime().Format(time.RFC3339),
+				})
+			}
 		}
 	}
-	
-	// reverse sort roughly assuming alphabetical order from time
+
+	// Sort newest first
 	for i, j := 0, len(backups)-1; i < j; i, j = i+1, j-1 {
 		backups[i], backups[j] = backups[j], backups[i]
 	}
@@ -839,19 +1329,25 @@ func (s *Service) ListBackups(ctx context.Context, tenantID string) ([]domain.Ba
 }
 
 func (s *Service) GetBackupPath(ctx context.Context, tenantID, filename string) (string, error) {
-	backupDir := "data/storage/backups"
-	cleanName := filepath.Base(filename)
-	
+	var tenantCode string
 	if tenantID != "" {
-		var tenantCode string
 		const q = `SELECT code FROM public.tenants WHERE id = $1`
 		if err := s.db.QueryRowContext(ctx, q, tenantID).Scan(&tenantCode); err != nil {
 			return "", err
 		}
-		backupDir = filepath.Join(backupDir, "tenants", tenantCode)
 	}
 
-	return filepath.Join(backupDir, cleanName), nil
+	cleanName := filepath.Base(filename)
+	searchDirs := s.getBackupSearchDirs(tenantCode)
+
+	for _, bDir := range searchDirs {
+		candidate := filepath.Join(bDir, cleanName)
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate, nil
+		}
+	}
+
+	return "", os.ErrNotExist
 }
 
 type AIModel struct {

@@ -113,14 +113,31 @@ main() {
       local PG_CONTAINER
       PG_CONTAINER=$(as_root docker ps --format '{{.Names}}' 2>/dev/null | grep -E '(pekan-postgres|postgres|pekan-db|db)' | head -n 1 || true)
       if [[ -n "$PG_CONTAINER" ]]; then
+        log "Resetting database for clean restore in Docker..."
+        as_root docker exec -i "${PG_CONTAINER}" psql -U postgres -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'pekan' AND pid <> pg_backend_pid();" 2>/dev/null || true
+        as_root docker exec -i "${PG_CONTAINER}" psql -U postgres -d postgres -c "DROP DATABASE IF EXISTS pekan;" 2>/dev/null || true
+        as_root docker exec -i "${PG_CONTAINER}" psql -U postgres -d postgres -c "CREATE DATABASE pekan;" 2>/dev/null || true
+        as_root docker exec -i "${PG_CONTAINER}" psql -U postgres -d pekan -c "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";" 2>/dev/null || true
+        as_root docker exec -i "${PG_CONTAINER}" psql -U postgres -d pekan -c "CREATE EXTENSION IF NOT EXISTS \"pgcrypto\";" 2>/dev/null || true
+        log "Executing SQL restore into PostgreSQL..."
         as_root docker exec -i "${PG_CONTAINER}" psql -U postgres -d pekan < "${data_dir}/database.sql"
       fi
     else
       # Standalone PostgreSQL (Systemd)
-      # Ensure database exists
-      as_root -u postgres psql -c "CREATE DATABASE pekan;" 2>/dev/null || true
+      log "Resetting database for clean restore in Systemd..."
+      as_root -u postgres psql -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'pekan' AND pid <> pg_backend_pid();" 2>/dev/null || true
+      as_root -u postgres psql -d postgres -c "DROP DATABASE IF EXISTS pekan;" 2>/dev/null || true
+      as_root -u postgres psql -d postgres -c "CREATE DATABASE pekan;" 2>/dev/null || true
       as_root -u postgres psql -d pekan -c "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";" 2>/dev/null || true
-      
+      as_root -u postgres psql -d pekan -c "CREATE EXTENSION IF NOT EXISTS \"pgcrypto\";" 2>/dev/null || true
+
+      local DB_USER_RESOLVED
+      DB_USER_RESOLVED=$(grep "^DB_USER=" "${INSTALL_DIR}/backend/.env" 2>/dev/null | cut -d= -f2- || echo "pekan")
+      if [[ -n "$DB_USER_RESOLVED" && "$DB_USER_RESOLVED" != "postgres" ]]; then
+        as_root -u postgres psql -d pekan -c "GRANT ALL PRIVILEGES ON DATABASE pekan TO \"${DB_USER_RESOLVED}\";" 2>/dev/null || true
+        as_root -u postgres psql -d pekan -c "GRANT ALL ON SCHEMA public TO \"${DB_USER_RESOLVED}\";" 2>/dev/null || true
+      fi
+
       log "Executing SQL restore into PostgreSQL..."
       as_root -u postgres psql -d pekan -f "${data_dir}/database.sql"
     fi

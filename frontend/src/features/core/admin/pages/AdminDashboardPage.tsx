@@ -3113,7 +3113,7 @@ export function AdminDashboardPage(): JSX.Element {
                          <line x1="12" y1="3" x2="12" y2="15" />
                        </svg>
                        Restore
-                       <input type="file" accept=".sql,.sql.gz,.dump" onChange={handleUploadBackup} style={{ display: "none" }} />
+                       <input type="file" accept=".tar.gz,.sql,.sql.gz,.dump" onChange={handleUploadBackup} style={{ display: "none" }} />
                      </label>
                    </div>
                  </div>

@@ -79,6 +79,10 @@ main() {
     as_root -u postgres pg_dump --clean --if-exists --no-owner --no-privileges pekan > "${TEMP_DIR}/database.sql"
   fi
 
+  if [[ ! -s "${TEMP_DIR}/database.sql" ]]; then
+    die "Database export failed or produced an empty file. Check PostgreSQL status and credentials."
+  fi
+
   # 2. Backup Config
   log "Copying configuration..."
   if [[ -n "$ENV_FILE" ]]; then
@@ -115,6 +119,9 @@ main() {
       as_root docker cp "${APP_CONTAINER}:/var/lib/pekan/storage" "${TEMP_DIR}/storage" 2>/dev/null || true
     fi
   fi
+
+  # Remove nested backups directory from storage backup to avoid recursive duplication
+  as_root rm -rf "${TEMP_DIR}/storage/backups" 2>/dev/null || true
 
   # 4. Create Archive
   log "Creating compressed archive..."
