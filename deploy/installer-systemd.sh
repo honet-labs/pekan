@@ -951,6 +951,13 @@ EOF
 EOF
 
   log "  Nginx configured"
+
+  # Configure automatic daily backup at 2 AM
+  if [[ -f "${INSTALL_DIR}/deploy/backup.sh" ]]; then
+    as_root chmod +x "${INSTALL_DIR}/deploy/backup.sh"
+    (crontab -l 2>/dev/null || true; echo "0 2 * * * ${INSTALL_DIR}/deploy/backup.sh >> /var/log/pekan/backup.log 2>&1") | as_root crontab -
+    log "  Automatic backup configured (daily at 02:00)"
+  fi
 }
 
 start_services() {

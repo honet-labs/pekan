@@ -671,18 +671,19 @@ setup_backup() {
 #!/usr/bin/env bash
 set -euo pipefail
 INSTALL_DIR="/opt/pekan"
-BACKUP_DIR="$INSTALL_DIR/backups"
-DATE=$(date +%Y%m%d_%H%M%S)
 
-mkdir -p "$BACKUP_DIR"
-
-cd "$INSTALL_DIR"
-docker compose exec -T pekan-postgres pg_dump -U postgres pekan | gzip > "$BACKUP_DIR/pekan_${DATE}.sql.gz"
+if [[ -f "$INSTALL_DIR/deploy/backup.sh" ]]; then
+  bash "$INSTALL_DIR/deploy/backup.sh"
+else
+  BACKUP_DIR="$INSTALL_DIR/backups"
+  DATE=$(date +%Y%m%d_%H%M%S)
+  mkdir -p "$BACKUP_DIR"
+  cd "$INSTALL_DIR"
+  docker compose exec -T pekan-postgres pg_dump -U postgres pekan | gzip > "$BACKUP_DIR/pekan_${DATE}.sql.gz"
+fi
 
 # Keep last 7 backups
-ls -t "$BACKUP_DIR"/pekan_*.sql.gz | tail -n +8 | xargs -r rm
-
-echo "Backup completed: pekan_${DATE}.sql.gz"
+ls -t "$INSTALL_DIR/backups"/pekan_*.* 2>/dev/null | tail -n +8 | xargs -r rm -f 2>/dev/null || true
 BACKUP_EOF
 
   as_root chmod +x "$BACKUP_SCRIPT"
