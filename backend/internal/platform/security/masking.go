@@ -1,18 +1,20 @@
 package security
 
 import (
+	"html"
+	"regexp"
 	"strings"
-	"github.com/microcosm-cc/bluemonday"
 )
 
-var policy = bluemonday.UGCPolicy()
+var htmlTagRegex = regexp.MustCompile(`<[^>]*>`)
 
 // SanitizeHTML removes potentially malicious HTML from a string
 func SanitizeHTML(s string) string {
 	if s == "" {
 		return ""
 	}
-	return policy.Sanitize(s)
+	stripped := htmlTagRegex.ReplaceAllString(s, "")
+	return html.EscapeString(stripped)
 }
 
 // MaskEmail masks an email address: a*******@example.com
