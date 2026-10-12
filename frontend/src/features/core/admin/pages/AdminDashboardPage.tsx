@@ -1961,6 +1961,7 @@ export function AdminDashboardPage(): JSX.Element {
               </svg>
               {locale.toUpperCase()}
             </button>
+          </div>
         </div>
       </aside>
 
