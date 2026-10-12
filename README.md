@@ -394,7 +394,6 @@ pekan/
 │   ├── update-versi.sh               # Update versi (auto-detect mode)
 │   ├── install_server.sh             # Installer Ubuntu/Debian (legacy)
 │   ├── install_server_rocky.sh       # Installer Rocky Linux (legacy)
-│   ├── update_app.sh                 # Script update (legacy)
 │   ├── backup.sh / restore.sh        # Backup & restore
 │   └── systemd/                      # Service unit files
 │       ├── pekan-api.service
