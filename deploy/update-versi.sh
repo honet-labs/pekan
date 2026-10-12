@@ -205,7 +205,7 @@ backup_database() {
       gzip > "$BACKUP_DIR/pekan_pre_update_${DATE}.sql.gz" 2>/dev/null || warn "  Backup failed, continuing update..."
   elif [[ "$DEPLOY_MODE" == "systemd" ]]; then
     local DATABASE_URL
-    DATABASE_URL=$(grep "^DATABASE_URL=" "$INSTALL_DIR/backend/.env" | cut -d= -f2-)
+    DATABASE_URL=$(grep "^DATABASE_URL=" "$INSTALL_DIR/backend/.env" 2>/dev/null | cut -d= -f2- || true)
     if [[ -n "$DATABASE_URL" ]]; then
       pg_dump "$DATABASE_URL" | gzip > "$BACKUP_DIR/pekan_pre_update_${DATE}.sql.gz" 2>/dev/null || warn "  Backup failed, continuing update..."
     fi
@@ -272,8 +272,8 @@ update_systemd() {
 
   log "Step 7/10: Running migrations..."
   local DATABASE_URL
-  DATABASE_URL=$(grep "^DATABASE_URL=" "$INSTALL_DIR/backend/.env" | cut -d= -f2-)
-  if [[ -f "$INSTALL_DIR/backend/scripts/apply_migrations.sh" ]]; then
+  DATABASE_URL=$(grep "^DATABASE_URL=" "$INSTALL_DIR/backend/.env" 2>/dev/null | cut -d= -f2- || true)
+  if [[ -n "$DATABASE_URL" && -f "$INSTALL_DIR/backend/scripts/apply_migrations.sh" ]]; then
     as_user "$APP_USER" "cd '$INSTALL_DIR/backend' && chmod +x ./scripts/apply_migrations.sh && DATABASE_URL='${DATABASE_URL}' ./scripts/apply_migrations.sh"
   fi
 
@@ -283,8 +283,80 @@ update_systemd() {
   log "  Systemd update complete!"
 }
 
+ensure_docker_env() {
+  local backend_env="$INSTALL_DIR/backend/.env"
+  local root_env="$INSTALL_DIR/.env"
+
+  if [[ ! -f "$backend_env" || ! -f "$root_env" ]]; then
+    log "  Checking environment configuration..."
+
+    local pg_pass="postgres"
+    if [[ -f "$root_env" ]]; then
+      local extracted_pass
+      extracted_pass=$(grep "^POSTGRES_PASSWORD=" "$root_env" | cut -d= -f2- || true)
+      if [[ -n "$extracted_pass" ]]; then pg_pass="$extracted_pass"; fi
+    elif [[ -f "$backend_env" ]]; then
+      local extracted_url
+      extracted_url=$(grep "^DATABASE_URL=" "$backend_env" | cut -d= -f2- || true)
+      if [[ -n "$extracted_url" ]]; then
+        local extracted_pass
+        extracted_pass=$(echo "$extracted_url" | sed -n 's/.*:\(.*\)@.*/\1/p' || true)
+        if [[ -n "$extracted_pass" ]]; then pg_pass="$extracted_pass"; fi
+      fi
+    fi
+
+    local jwt_secret
+    jwt_secret="$(openssl rand -base64 48 2>/dev/null || tr -dc 'a-zA-Z0-9' </dev/urandom | head -c 48)"
+    local scan_secret
+    scan_secret="$(openssl rand -base64 32 2>/dev/null || tr -dc 'a-zA-Z0-9' </dev/urandom | head -c 32)"
+    local admin_secret
+    admin_secret="$(openssl rand -base64 32 2>/dev/null || tr -dc 'a-zA-Z0-9' </dev/urandom | head -c 32)"
+
+    if [[ ! -f "$root_env" ]]; then
+      log "  Generating missing $root_env..."
+      cat <<EOF | as_root tee "$root_env" >/dev/null
+POSTGRES_PASSWORD=${pg_pass}
+DB_NAME=pekan
+DB_USER=postgres
+WEB_PORT=80
+EOF
+    fi
+
+    if [[ ! -f "$backend_env" ]]; then
+      log "  Generating missing $backend_env..."
+      as_root mkdir -p "$INSTALL_DIR/backend"
+      cat <<EOF | as_root tee "$backend_env" >/dev/null
+APP_ENV=production
+HTTP_PORT=8080
+DATABASE_URL=postgres://postgres:${pg_pass}@pekan-postgres:5432/pekan?sslmode=prefer
+DB_MAX_OPEN_CONNS=25
+DB_MAX_IDLE_CONNS=25
+DB_CONN_MAX_LIFETIME_MINUTES=30
+DB_CONN_MAX_IDLE_MINUTES=5
+JWT_SECRET=${jwt_secret}
+RECEIPT_SCAN_SECRET=${scan_secret}
+ADMIN_SECRET=${admin_secret}
+JWT_ISSUER=pekan-api
+JWT_ACCESS_TTL_MINUTES=15
+JWT_REFRESH_TTL_HOURS=720
+CORS_ALLOWED_ORIGINS=http://localhost:80,http://127.0.0.1:80
+REQUEST_BODY_MAX_BYTES=1048576
+API_RATE_LIMIT_PER_MINUTE=1000
+API_RATE_LIMIT_WINDOW_SECONDS=60
+API_REQUEST_TIMEOUT_SECONDS=30
+MAX_HEADER_BYTES=1048576
+RATE_LIMIT_REDIS_URL=redis://pekan-redis:6379/0
+RATE_LIMIT_REDIS_PREFIX=pekan:ratelimit
+STORAGE_PROVIDER=local
+STORAGE_LOCAL_PATH=/app/storage
+EOF
+    fi
+  fi
+}
+
 update_docker() {
   sync_code
+  ensure_docker_env
 
   log "Step 5/10: Building Docker images..."
   cd "$INSTALL_DIR"
@@ -296,6 +368,15 @@ update_docker() {
 
   log "Step 7/10: Waiting for database..."
   sleep 10
+
+  # Sync PostgreSQL password in case existing volume used default/custom password
+  local pg_pass="postgres"
+  if [[ -f "$INSTALL_DIR/.env" ]]; then
+    local p
+    p=$(grep "^POSTGRES_PASSWORD=" "$INSTALL_DIR/.env" | cut -d= -f2- || true)
+    if [[ -n "$p" ]]; then pg_pass="$p"; fi
+  fi
+  as_root docker compose exec -T pekan-postgres psql -U postgres -d postgres -c "ALTER USER postgres WITH PASSWORD '${pg_pass}';" 2>/dev/null || true
 
   log "  Docker update complete!"
 }
