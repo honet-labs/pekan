@@ -651,7 +651,6 @@ export const translations: Record<Locale, Record<string, string>> = {
     "admin.backups.load_failed": "Failed to load backups",
 
     "admin.nav_tenant_mgmt": "Workspace Management",
-    "admin.nav_system_infra": "System & Infra",
     "admin.brand_tag": "Admin Central",
     "admin.notifications.save": "Save Configuration",
     "admin.tenants.search": "Search workspaces...",
@@ -1330,7 +1329,6 @@ export const translations: Record<Locale, Record<string, string>> = {
     "admin.backups.load_failed": "Gagal memuat cadangan",
 
     "admin.nav_tenant_mgmt": "Manajemen Workspace",
-    "admin.nav_system_infra": "Sistem & Infrastruktur",
     "admin.brand_tag": "Admin Central",
     "admin.notifications.save": "Simpan Konfigurasi",
     "admin.tenants.search": "Cari workspace...",
