@@ -364,10 +364,10 @@ update_docker() {
 
   log "Step 6/10: Restarting containers..."
   as_root docker compose down
-  as_root docker compose up -d
+  as_root docker compose up -d pekan-postgres pekan-redis
 
   log "Step 7/10: Waiting for database..."
-  sleep 10
+  sleep 5
 
   # Sync PostgreSQL password in case existing volume used default/custom password
   local pg_pass="postgres"
@@ -377,6 +377,9 @@ update_docker() {
     if [[ -n "$p" ]]; then pg_pass="$p"; fi
   fi
   as_root docker compose exec -T pekan-postgres psql -U postgres -d postgres -c "ALTER USER postgres WITH PASSWORD '${pg_pass}';" 2>/dev/null || true
+
+  log "Step 8/10: Starting application services..."
+  as_root docker compose up -d
 
   log "  Docker update complete!"
 }
