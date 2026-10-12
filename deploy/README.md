@@ -19,7 +19,7 @@ sudo bash deploy/install_server.sh --app-env production --cors "https://domain.a
 To update the application code and rebuild without changing your current configuration:
 
 ```bash
-sudo bash deploy/update.sh
+sudo bash deploy/update-versi.sh
 ```
 
 This script will sync the latest code, rebuild the backend and frontend, apply new migrations, and restart services while preserving your `.env` settings and database data.
@@ -65,20 +65,20 @@ Anda dapat memisahkan komponen platform ke beberapa server berbeda menggunakan f
 
 ---
 
-## 2. Pembaruan Aplikasi (`update_app.sh`)
+## 2. Pembaruan Aplikasi (`update-versi.sh`)
 
 Gunakan skrip ini untuk memperbarui fitur atau bug fix tanpa mengubah konfigurasi yang sudah ada.
 
 ```bash
-sudo bash deploy/update_app.sh
+sudo bash deploy/update-versi.sh
 ```
 
 **Fungsi:**
-*   Sinkronisasi kode terbaru.
+*   Sinkronisasi kode terbaru (otomatis deteksi mode Docker / Systemd).
 *   **Menjaga file `.env` tetap aman** (tidak overwrite).
-*   Rebuild Backend & Frontend.
+*   Rebuild Backend (API, Worker, AI) & Frontend.
 *   Menjalankan migrasi database otomatis.
-*   Restart service `pekan-api` dan `pekan-worker`.
+*   Restart seluruh service terkait.
 
 ---
 
@@ -127,7 +127,7 @@ sudo bash deploy/uninstall_server.sh --only-services
 
 ## Best Practices
 
-1.  **Sebelum Update**: Selalu jalankan `backup.sh` sebelum menjalankan `update_app.sh`.
+1.  **Sebelum Update**: Selalu jalankan `backup.sh` sebelum menjalankan `update-versi.sh`.
 2.  **Keamanan**: Simpan file `.env` di tempat yang aman sebagai cadangan manual.
 3.  **Logs**: Jika terjadi masalah pada service, gunakan perintah:
     ```bash
